@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#1F4D36">
+<title>GoyerFlow</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<style>
+  :root{
+    --cream:#F7F5EF; --ink:#1B2B22; --accent:#1F4D36; --accent-soft:rgba(31,77,54,0.08);
+    --border:#ECE7DA; --muted:#9A9385; --muted-ink:#6B6558; --warn:#A85E1C; --warn-bg:rgba(168,94,28,0.08);
+    --err:#A33434; --err-bg:rgba(163,52,52,0.08);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--cream);color:var(--ink);font-family:'Inter',system-ui,sans-serif;
+    min-height:100vh;display:flex;flex-direction:column}
+  a{color:inherit}
+  button{font-family:inherit}
+  .wrap{flex:1;display:flex;flex-direction:column;max-width:480px;width:100%;margin:0 auto;padding:0 20px}
+  .topbar{padding:28px 0 8px 0}
+  .brand{font-size:15px;font-weight:800;color:var(--accent);letter-spacing:0.2px}
+  .sub{font-size:13px;color:var(--muted);margin-top:2px}
+  .screen{flex:1;display:flex;flex-direction:column;justify-content:center;padding:24px 0 40px 0;gap:16px}
+  .screen.tracker{justify-content:flex-start;padding-top:12px}
+  h1{font-size:22px;font-weight:800;margin:0 0 4px 0}
+  p.help{font-size:14px;color:var(--muted-ink);line-height:1.45;margin:0 0 4px 0}
+  label{font-size:13px;font-weight:700;color:var(--muted-ink);text-transform:uppercase;letter-spacing:0.3px}
+  input[type=text], input[type=password], input[inputmode=numeric]{
+    width:100%;font-size:22px;font-weight:700;letter-spacing:2px;padding:14px 16px;margin-top:6px;
+    border-radius:14px;border:1.5px solid var(--border);background:#fff;color:var(--ink);text-align:center}
+  input:focus{outline:none;border-color:var(--accent)}
+  .btn{display:block;width:100%;padding:15px 18px;border-radius:14px;border:none;background:var(--accent);
+    color:#fff;font-size:16px;font-weight:700;cursor:pointer;margin-top:4px}
+  .btn:disabled{opacity:0.5;cursor:default}
+  .btn.secondary{background:#fff;color:var(--accent);border:1.5px solid var(--border)}
+  .msg{font-size:14px;line-height:1.45;padding:12px 14px;border-radius:12px}
+  .msg.err{color:var(--err);background:var(--err-bg)}
+  .msg.warn{color:var(--warn);background:var(--warn-bg)}
+  .card{border-radius:20px;border:1px solid var(--border);background:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.04);
+    padding:16px 18px;margin-bottom:10px}
+  .card.me{background:var(--accent);border:none;box-shadow:0 4px 14px rgba(0,0,0,0.12);color:#fff;padding:20px 18px}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+  .card.me .eyebrow{color:rgba(255,255,255,0.7)}
+  .posline{font-size:17px;line-height:1.4}
+  .card.me .posline{font-size:20px;font-weight:700}
+  .hole{font-size:44px;font-weight:800;line-height:1}
+  .footerinfo{font-size:12px;color:var(--muted);text-align:center;padding:16px 0}
+  .logoutrow{display:flex;justify-content:flex-end;margin-bottom:4px}
+  .logoutbtn{font-size:13px;color:var(--muted-ink);background:none;border:none;cursor:pointer;text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">GoyerFlow</div>
+    <div class="sub" id="subline">Tempo-tracker voor leden</div>
+  </div>
+  <div id="app" class="screen"></div>
+</div>
+
+<script>
+/* ============================================================================================
+   CONFIGURATIE — eenmalig invullen (zelfde patroon als de Marshal App: deze waarden zijn
+   publieke client-sleutels, bedoeld om in de frontend te staan — geen geheimen).
+   ============================================================================================ */
+const SUPABASE_URL = "https://osnahudrlucxxpncdscs.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zbmFodWRybHVjeHhwbmNkc2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI2OTA5ODUsImV4cCI6MjEwODI2Njk4NX0.XLZgfsED-MgdBZzKrgvciTS160uBbwNuUWFqkEiVUa4";
+
+/* ============================================================================================
+   AANNAMES DIE NOG BEVESTIGD MOETEN WORDEN (zie claude/scope-tempo-tracker-leden-app.md)
+   1) Par-verdeling van de baan (North Course, 18 holes): hier aangenomen als 4x par3 + 10x par4
+      + 4x par5 (par 72) — een gangbare verdeling, NIET geverifieerd tegen Goyer's eigen
+      HOLES_DATA. Zodra Kay de echte hole-nummer→par-lijst aanlevert (zie holes-tabel in
+      schema.sql), moet de berekening hieronder vervangen worden door een echte cumulatieve
+      per-hole tijdlijn in plaats van dit vlakke gemiddelde.
+   2) De hcp- en flightgrootte-correctieformule is gereconstrueerd uit het screenshot van het
+      bestaande instelscherm (par3=9.5, par4=11.1, par5=13.6, hcp-correctie=0.05/punt boven 10,
+      flightgrootte-correctie=0.8/speler boven 2), NIET uit de Marshal App-broncode zelf
+      (die is hier niet beschikbaar). De uitkomst is tegen Kay's eigen "Verwachte rondetijden"-
+      tabel gevalideerd or (tweebal 210, driebal ~224-225, vierbal 240 — binnen afronding gelijk),
+      maar dit moet je nog bevestigen tegen de echte Marshal App-formule voordat dit als
+      definitief geldt.
+   ============================================================================================ */
+const AANTAL_HOLES = 18;
+const PAR_VERDELING = { 3: 4, 4: 10, 5: 4 }; // aantal holes per par-type, aanname (zie boven)
+const ZICHTBAARHEIDSVENSTER_MINUTEN = 15;    // zelfde venster als Marshal App v1.9.0
+
+/* ============================================================================================
+   Supabase REST helper
+   ============================================================================================ */
+async function sb(path, opts = {}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...opts,
+    headers: {
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": opts.prefer || "return=representation",
+      ...(opts.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Supabase-fout (${res.status}): ${body}`);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+function loggen(persoonscode, type, succes) {
+  // Logboek van logins/pincode-wijzigingen (maatregel 1+2 uit "Login-beveiliging"). Best-effort:
+  // een logging-fout mag een login nooit blokkeren.
+  sb("login_log", {
+    method: "POST",
+    prefer: "return=minimal",
+    body: JSON.stringify({ persoonscode, type, succes }),
+  }).catch((e) => console.warn("Loggen mislukt (niet blokkerend):", e));
+}
+
+/* ============================================================================================
+   Rondetijd-berekening
+   ============================================================================================ */
+function basisRondetijd(params) {
+  return PAR_VERDELING[3] * params.par3_minuten
+       + PAR_VERDELING[4] * params.par4_minuten
+       + PAR_VERDELING[5] * params.par5_minuten;
+}
+
+function rondetijdVoor(params, aantalSpelers, gemiddeldeHcp) {
+  const basis = basisRondetijd(params);
+  const hcpBovenTien = Math.max(0, gemiddeldeHcp - 10);
+  const hcpCorrectie = hcpBovenTien * params.hcp_correctie_per_punt_boven_10 * AANTAL_HOLES;
+  const extraSpelers = Math.max(0, aantalSpelers - 2);
+  const flightCorrectie = extraSpelers * params.flightgrootte_correctie_per_speler_boven_2 * AANTAL_HOLES;
+  return basis + hcpCorrectie + flightCorrectie;
+}
+
+function verwachtePositie(starttijdISO, minutenPerHole, nu) {
+  const starttijd = new Date(starttijdISO).getTime();
+  const verstreken = (nu.getTime() - starttijd) / 60000; // minuten
+  const fractie = verstreken / minutenPerHole;
+  const holeIndex = Math.floor(fractie);
+  const rest = fractie - holeIndex;
+  let checkpoint = "afslag";
+  if (rest >= 0.75) checkpoint = "green";
+  else if (rest >= 0.25) checkpoint = "fairway";
+  const hole = Math.max(1, Math.min(AANTAL_HOLES, holeIndex + 1));
+  return { hole, checkpoint, verstreken };
+}
+
+const CHECKPOINT_LABEL = { afslag: "afslag", fairway: "fairway", green: "green" };
+
+/* ============================================================================================
+   App-state en navigatie
+   ============================================================================================ */
+const state = { scherm: "persoonscode", speler: null, flight: null, fout: null, bericht: null };
+
+function render() {
+  const app = document.getElementById("app");
+  const sub = document.getElementById("subline");
+  app.innerHTML = "";
+  app.className = "screen" + (state.scherm === "tracker" ? " tracker" : "");
+  sub.textContent = state.scherm === "tracker" ? "" : "Tempo-tracker voor leden";
+
+  if (state.scherm === "persoonscode") return renderPersoonscode(app);
+  if (state.scherm === "pincode") return renderPincode(app);
+  if (state.scherm === "nieuwe_pincode") return renderNieuwePincode(app);
+  if (state.scherm === "tracker") return renderTracker(app);
+}
+
+function el(tag, attrs = {}, children = []) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "text") node.textContent = v;
+    else if (k.startsWith("on")) node.addEventListener(k.slice(2).toLowerCase(), v);
+    else node.setAttribute(k, v);
+  }
+  for (const c of children) node.appendChild(c);
+  return node;
+}
+
+function meldingNode() {
+  if (!state.fout) return null;
+  return el("div", { class: "msg err", text: state.fout });
+}
+
+/* ---- Scherm 1: persoonscode ---- */
+function renderPersoonscode(app) {
+  const input = el("input", { type: "text", id: "persoonscode", inputmode: "text", placeholder: "bv. 1234", maxlength: "12" });
+  const err = meldingNode();
+
+  const submit = async () => {
+    state.fout = null;
+    const code = input.value.trim().toUpperCase();
+    if (!code) return;
+    const btn = document.getElementById("submit-persoonscode");
+    btn.disabled = true;
+    try {
+      const rows = await sb(`spelers?persoonscode=eq.${encodeURIComponent(code)}&select=*,flights(*)`);
+      if (!rows || rows.length === 0) {
+        loggen(code, "login", false);
+        state.fout = "Geen geboekte flight gevonden voor deze persoonscode. Probeer het vanaf ongeveer 15 minuten voor je starttijd nog eens, of neem contact op met de caddymaster.";
+        render();
+        return;
+      }
+      const speler = rows[0];
+      const flight = speler.flights;
+      if (flight.uitgestapt) {
+        loggen(code, "login", false);
+        state.fout = "Deze flight staat als uitgestapt geregistreerd.";
+        render();
+        return;
+      }
+      const nu = new Date();
+      const venstertijd = new Date(new Date(flight.starttijd_effectief).getTime() - ZICHTBAARHEIDSVENSTER_MINUTEN * 60000);
+      if (nu < venstertijd) {
+        loggen(code, "login", false);
+        const tijdstr = venstertijd.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+        state.fout = `Nog niet beschikbaar — deze flight wordt zichtbaar vanaf ${tijdstr} (15 minuten voor de starttijd).`;
+        render();
+        return;
+      }
+      state.speler = speler;
+      state.flight = flight;
+      state.fout = null;
+      state.scherm = "pincode";
+      render();
+    } catch (e) {
+      state.fout = "Er ging iets mis bij het ophalen van je gegevens. Probeer het zo nog eens.";
+      console.error(e);
+      render();
+    } finally {
+      btn.disabled = false;
+    }
+  };
+
+  input.addEventListener("keydown", (ev) => { if (ev.key === "Enter") submit(); });
+
+  app.append(
+    el("h1", { text: "Inloggen" }),
+    el("p", { class: "help", text: "Vul je persoonscode in — dezelfde code als op je tassenlabel." }),
+    el("label", { text: "Persoonscode" }),
+    input,
+    ...(err ? [err] : []),
+    el("button", { class: "btn", id: "submit-persoonscode", onclick: submit, text: "Verder" })
+  );
+  input.focus();
+}
+
+/* ---- Scherm 2: pincode ---- */
+function renderPincode(app) {
+  const voornaam = (state.speler.naam || "").split(" ")[0];
+  const input = el("input", { type: "password", inputmode: "numeric", maxlength: "4", placeholder: "••••" });
+  const err = meldingNode();
+
+  const submit = async () => {
+    state.fout = null;
+    const pin = input.value.trim();
+    if (pin.length !== 4) { state.fout = "Vul een pincode van 4 cijfers in."; render(); return; }
+    const btn = document.getElementById("submit-pincode");
+    btn.disabled = true;
+    try {
+      if (pin !== state.speler.pincode) {
+        loggen(state.speler.persoonscode, "login", false);
+        state.fout = "Onjuiste pincode.";
+        render();
+        return;
+      }
+      loggen(state.speler.persoonscode, "login", true);
+      if (!state.speler.pincode_gewijzigd) {
+        state.scherm = "nieuwe_pincode";
+      } else {
+        state.scherm = "tracker";
+      }
+      state.fout = null;
+      render();
+    } finally {
+      btn.disabled = false;
+    }
+  };
+
+  input.addEventListener("keydown", (ev) => { if (ev.key === "Enter") submit(); });
+
+  app.append(
+    el("h1", { text: `Welkom, ${voornaam}` }),
+    el("p", { class: "help", text: state.speler.pincode_gewijzigd ? "Vul je pincode in." : "Vul de standaard pincode in (0000) — je wordt daarna gevraagd een eigen pincode te kiezen." }),
+    el("label", { text: "Pincode" }),
+    input,
+    ...(err ? [err] : []),
+    el("button", { class: "btn", id: "submit-pincode", onclick: submit, text: "Inloggen" })
+  );
+  input.focus();
+}
+
+/* ---- Scherm 3: nieuwe pincode (verplicht bij eerste login) ---- */
+function renderNieuwePincode(app) {
+  const i1 = el("input", { type: "password", inputmode: "numeric", maxlength: "4", placeholder: "nieuwe pincode" });
+  const i2 = el("input", { type: "password", inputmode: "numeric", maxlength: "4", placeholder: "herhaal" });
+  const err = meldingNode();
+
+  const submit = async () => {
+    state.fout = null;
+    const p1 = i1.value.trim(), p2 = i2.value.trim();
+    if (p1.length !== 4 || !/^\d{4}$/.test(p1)) { state.fout = "Kies een pincode van 4 cijfers."; render(); return; }
+    if (p1 !== p2) { state.fout = "De twee pincodes komen niet overeen."; render(); return; }
+    if (p1 === "0000") { state.fout = "Kies een andere pincode dan de standaardwaarde 0000."; render(); return; }
+    const btn = document.getElementById("submit-nieuwe-pincode");
+    btn.disabled = true;
+    try {
+      await sb(`spelers?id=eq.${state.speler.id}`, {
+        method: "PATCH",
+        prefer: "return=minimal",
+        body: JSON.stringify({ pincode: p1, pincode_gewijzigd: true }),
+      });
+      loggen(state.speler.persoonscode, "pincode_wijziging", true);
+      state.speler = { ...state.speler, pincode: p1, pincode_gewijzigd: true };
+      state.scherm = "tracker";
+      state.fout = null;
+      render();
+    } catch (e) {
+      state.fout = "Pincode wijzigen is niet gelukt. Probeer het nog eens.";
+      console.error(e);
+      render();
+    } finally {
+      btn.disabled = false;
+    }
+  };
+
+  app.append(
+    el("h1", { text: "Kies je eigen pincode" }),
+    el("p", { class: "help", text: "Verplicht bij de eerste keer inloggen. Kies 4 cijfers die je kunt onthouden." }),
+    el("label", { text: "Nieuwe pincode" }),
+    i1,
+    el("label", { text: "Herhaal" }),
+    i2,
+    ...(err ? [err] : []),
+    el("button", { class: "btn", id: "submit-nieuwe-pincode", onclick: submit, text: "Pincode instellen" })
+  );
+  i1.focus();
+}
+
+/* ---- Scherm 4: tracker ---- */
+async function renderTracker(app) {
+  app.append(
+    el("div", { class: "logoutrow" }, [
+      el("button", { class: "logoutbtn", onclick: logout, text: "Uitloggen" }),
+    ]),
+    el("div", { class: "msg", text: "Bezig met laden…" })
+  );
+
+  let params, flights;
+  try {
+    [params] = await sb("parameters?select=*&limit=1");
+    flights = await sb(`flights?lus=eq.${encodeURIComponent(state.flight.lus)}&uitgestapt=eq.false&select=*&order=starttijd_effectief.asc`);
+  } catch (e) {
+    app.innerHTML = "";
+    app.append(el("div", { class: "msg err", text: "Kon de actuele gegevens niet ophalen. Probeer de pagina te verversen." }));
+    console.error(e);
+    return;
+  }
+
+  const nu = new Date();
+  const index = flights.findIndex((f) => f.id === state.flight.id);
+  const voor = index > 0 ? flights[index - 1] : null;
+  const achter = index >= 0 && index < flights.length - 1 ? flights[index + 1] : null;
+  const zelf = flights[index] || state.flight;
+
+  function positieRegel(flight) {
+    const minutenPerHole = rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp) / AANTAL_HOLES;
+    const pos = verwachtePositie(flight.starttijd_effectief, minutenPerHole, nu);
+    return `Naar schatting bij de ${CHECKPOINT_LABEL[pos.checkpoint]} van hole ${pos.hole}.`;
+  }
+
+  app.innerHTML = "";
+  app.append(
+    el("div", { class: "logoutrow" }, [
+      el("button", { class: "logoutbtn", onclick: logout, text: "Uitloggen" }),
+    ]),
+    el("div", { class: "card" }, [
+      el("div", { class: "eyebrow", text: "Flight voor jou" }),
+      el("div", { class: "posline", text: voor ? positieRegel(voor) : "Geen flight voor jou gevonden op dezelfde lus." }),
+    ]),
+    el("div", { class: "card me" }, [
+      el("div", { class: "eyebrow", text: "Jouw flight" }),
+      el("div", { class: "posline", text: positieRegel(zelf) }),
+    ]),
+    el("div", { class: "card" }, [
+      el("div", { class: "eyebrow", text: "Flight achter jou" }),
+      el("div", { class: "posline", text: achter ? positieRegel(achter) : "Geen flight achter jou gevonden op dezelfde lus." }),
+    ]),
+    el("div", { class: "footerinfo", text: "Fase 1 — alleen geschatte posities op basis van starttijd. Zelf je positie melden en doorlaten volgen in een latere versie." })
+  );
+}
+
+function logout() {
+  state.scherm = "persoonscode";
+  state.speler = null;
+  state.flight = null;
+  state.fout = null;
+  render();
+}
+
+render();
+</script>
+</body>
+</html>

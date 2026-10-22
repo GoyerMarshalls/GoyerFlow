@@ -1,0 +1,12 @@
+{
+  "name": "GoyerFlow",
+  "short_name": "GoyerFlow",
+  "description": "Tempo-tracker voor leden van De Goyer Golf & Country Club",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F7F5EF",
+  "theme_color": "#1F4D36",
+  "lang": "nl"
+}
