@@ -20,19 +20,30 @@
   button{font-family:inherit}
   .wrap{flex:1;display:flex;flex-direction:column;max-width:480px;width:100%;margin:0 auto;padding:0 20px}
   .topbar{padding:28px 0 8px 0;display:flex;align-items:center;gap:10px}
+  /* Op de login-/pincodeschermen staat de "Welkom bij GoyerFlow"-titel al in het scherm zelf
+     (zie .authtitle), dus is de merknaam/ondertitel hierboven in de topbar overbodig — alleen
+     het versienummer blijft daar zichtbaar, met minder gereserveerde ruimte erboven/eronder. */
+  .topbar.compact{padding:10px 0 2px 0}
+  .topbar.compact .brandwrap{display:none}
   .backbtn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:10px;
     background:#fff;border:1px solid var(--border);cursor:pointer;flex-shrink:0;padding:0}
   .brandwrap{flex:1;min-width:0}
   .brand{font-size:15px;font-weight:800;color:var(--accent);letter-spacing:0.2px}
   .sub{font-size:13px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .versiebadge{font-size:11px;font-weight:600;color:var(--muted);flex-shrink:0;align-self:flex-start;margin-top:2px}
   /* flex-start (ipv eerder: center) zodat het invoerveld bij een opkomend toetsenbord niet
      onder de rand van het scherm verdwijnt — de inhoud begint nu gewoon bovenaan */
   .screen{flex:1;display:flex;flex-direction:column;justify-content:flex-start;padding:24px 0 40px 0;gap:16px}
   .screen.tracker{padding-top:14px;gap:8px}
+  .screen.auth{padding-top:4px}
   h1{font-size:22px;font-weight:800;margin:0 0 4px 0}
   p.help{font-size:14px;color:var(--muted-ink);line-height:1.45;margin:0 0 4px 0}
+  /* Titel + tagline samen in één blok (eigen, kleine gap) i.p.v. los op de algemene .screen-gap
+     (16px) te laten vertrouwen — zo kan de ruimte tússen titel en tagline specifiek klein
+     blijven, zonder de ruimte tussen dit blok en de rest van het scherm te verkleinen. */
+  .authheader{display:flex;flex-direction:column;gap:2px}
   .authtitle{font-size:24px;font-weight:800;color:var(--ink);margin:0}
-  .authtagline{font-size:15px;font-weight:700;color:var(--accent);margin:2px 0 0 0}
+  .authtagline{font-size:15px;font-weight:700;color:var(--accent);margin:0}
   .authdesc{font-size:14px;color:var(--muted-ink);line-height:1.5;margin:10px 0 0 0}
   .authwelkom{font-size:17px;font-weight:700;color:var(--ink);margin:14px 0 0 0}
   label{font-size:13px;font-weight:700;color:var(--muted-ink);text-transform:uppercase;letter-spacing:0.3px}
@@ -141,15 +152,27 @@
 <body>
 <div class="wrap">
   <div class="topbar" id="topbar">
-    <div class="brandwrap">
+    <div class="brandwrap" id="brandwrap">
       <div class="brand">GoyerFlow</div>
       <div class="sub" id="subline">Tempo-tracker voor leden</div>
     </div>
+    <div class="versiebadge" id="versiebadge"></div>
   </div>
   <div id="app" class="screen"></div>
 </div>
 
 <script>
+/* ============================================================================================
+   GoyerFlow — v0.1.0
+   Versienummer bij elke volgende build op TWEE plekken bijwerken: deze kopregel-comment en de
+   APP_VERSIE-constante hieronder (zelfde patroon als de Marshal App — zie diens bouwgeschiedenis
+   voor de precedent-regel). De zichtbare versie-indicator naast "GoyerFlow" in de topbar wordt
+   dynamisch uit APP_VERSIE afgeleid, dus die hoeft nergens los bijgewerkt te worden.
+   Bump-conventie: patch (0.1.0 → 0.1.1) voor kleine/bugfix-wijzigingen, minor (0.1.x → 0.2.0)
+   voor een nieuwe/functioneel andere feature — zelfde onderscheid als bij de Marshal App.
+   ============================================================================================ */
+const APP_VERSIE = "0.1.0";
+
 /* ============================================================================================
    CONFIGURATIE — eenmalig invullen (zelfde patroon als de Marshal App: deze waarden zijn
    publieke client-sleutels, bedoeld om in de frontend te staan — geen geheimen).
@@ -159,11 +182,14 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 /* ============================================================================================
    AANNAMES DIE NOG BEVESTIGD MOETEN WORDEN (zie claude/scope-tempo-tracker-leden-app.md)
-   1) Par-verdeling van de baan (North Course, 18 holes): hier aangenomen als 4x par3 + 10x par4
-      + 4x par5 (par 72) — een gangbare verdeling, NIET geverifieerd tegen Goyer's eigen
-      HOLES_DATA. Zodra Kay de echte hole-nummer→par-lijst aanlevert (zie holes-tabel in
-      schema.sql), moet de berekening hieronder vervangen worden door een echte cumulatieve
-      per-hole tijdlijn in plaats van dit vlakke gemiddelde.
+   1) Par-verdeling van de baan (North Course, 18 holes): 4x par3 + 10x par4 + 4x par5 (par 72).
+      Dit is inmiddels WEL bevestigd (tegen de per-hole-pagina's op goyer.nl en de GolfPass-
+      scorekaart van deze baan — zie HOLE_PAR hieronder voor de exacte hole-per-hole lijst), maar
+      de berekening hieronder gebruikt die lijst nog NIET voor de rondetijd-schatting zelf: dat
+      blijft een vlak gemiddelde per hole (zie basisRondetijd/rondetijdVoor). HOLE_PAR wordt tot
+      nu toe alleen gebruikt voor de doorlaat-afstandsmarge (zie doorlaatMarge). Een echte
+      cumulatieve per-hole tijdlijn (elke hole zijn eigen par-afhankelijke duur, i.p.v. het
+      gemiddelde) zou de volgende stap zijn als dat gewenst is.
    2) De hcp- en flightgrootte-correctieformule is gereconstrueerd uit het screenshot van het
       bestaande instelscherm (par3=9.5, par4=11.1, par5=13.6, hcp-correctie=0.05/punt boven 10,
       flightgrootte-correctie=0.8/speler boven 2), NIET uit de Marshal App-broncode zelf
@@ -398,6 +424,7 @@ function nieuweTrackerLocal() {
     achterBevestigen: false,
     zelfHoleDraft: null,       // null = volg de live berekende verwachte hole
     voorCorrectieHole: null,  // null = volg de live berekende positie van de flight voor je
+    achterCorrectieHole: null, // null = volg de live berekende positie van de flight achter je
     toontTipsPopup: false,
     bezig: false,              // voorkomt dubbele schrijfacties tijdens een lopende Supabase-call
   };
@@ -423,7 +450,9 @@ function render() {
   const sub = document.getElementById("subline");
   const topbar = document.getElementById("topbar");
   app.innerHTML = "";
-  app.className = "screen" + (state.scherm === "tracker" ? " tracker" : "");
+  const isAuthScherm = state.scherm === "persoonscode" || state.scherm === "pincode";
+  app.className = "screen" + (state.scherm === "tracker" ? " tracker" : "") + (isAuthScherm ? " auth" : "");
+  topbar.classList.toggle("compact", isAuthScherm);
 
   // Topbar: op het trackerscherm een terug/uitlog-knop, net als de "terug naar inloggen"-pijl in
   // de goedgekeurde mockup — en een contextregel (starttijd) in plaats van de generieke ondertitel.
@@ -524,10 +553,12 @@ function renderPersoonscode(app) {
   input.addEventListener("keydown", (ev) => { if (ev.key === "Enter") submit(); });
 
   app.append(
-    el("h1", { class: "authtitle", text: "Welkom bij GoyerFlow" }),
-    el("p", { class: "authtagline", text: "De speelsnelheid tracker" }),
-    el("p", { class: "authdesc", text: "Met deze app zie je live of jouw flight op schema ligt, en kun je de flights voor en achter je eenvoudig laten doorgaan of laten doorlaten." }),
-    el("label", { text: "Goyer Lidcode" }),
+    el("div", { class: "authheader" }, [
+      el("h1", { class: "authtitle", text: "Welkom bij GoyerFlow" }),
+      el("p", { class: "authtagline", text: "De speelsnelheid tracker" }),
+    ]),
+    el("p", { class: "authdesc", text: "Deze app biedt inzicht in de speelsnelheid van jouw flight op De Goyer." }),
+    el("label", { text: "Log in met je Goyer Lidcode" }),
     input,
     ...(err ? [err] : []),
     el("button", { class: "btn", id: "submit-persoonscode", onclick: submit, text: "Verder" })
@@ -569,8 +600,10 @@ function renderPincode(app) {
   input.addEventListener("keydown", (ev) => { if (ev.key === "Enter") submit(); });
 
   app.append(
-    el("h1", { class: "authtitle", text: "Welkom bij GoyerFlow" }),
-    el("p", { class: "authtagline", text: "De speelsnelheid tracker" }),
+    el("div", { class: "authheader" }, [
+      el("h1", { class: "authtitle", text: "Welkom bij GoyerFlow" }),
+      el("p", { class: "authtagline", text: "De speelsnelheid tracker" }),
+    ]),
     el("p", { class: "authwelkom", text: `Welkom, ${state.speler.naam || ""}` }),
     el("label", { text: "Pincode" }),
     input,
@@ -698,6 +731,14 @@ async function renderTracker(app, opts = {}) {
   // gemeld en er een flight voor je is.
   const loopJeTegenVoorAan = heeftGekozen && voor && !voorRondeVoltooid && actueleFractie >= voorPos.fractie;
 
+  // Spiegelbeeld van loopJeTegenVoorAan: je eigen melding ligt gelijk aan of verder TERUG dan de
+  // geschatte (live berekende) positie van de flight achter je — dus volgens de klok zou die
+  // flight je al ingehaald moeten hebben. Net als bij de voor-flight is dit geen directe melding
+  // over je eigen positie, maar een signaal dat de live-berekende positie van de ACHTER-flight
+  // vermoedelijk niet klopt (bijv. een te vroege starttijd_effectief) — vandaar de correctie-optie
+  // hieronder, die de starttijd van de achter-flight aanpast, niet jouw eigen melding.
+  const loopAchterTegenJouAan = heeftGekozen && achter && !achterRondeVoltooid && actueleFractie <= achterPos.fractie;
+
   // Doorlaat-knoppen alleen tonen als de twee flights dicht genoeg bij elkaar zitten om een
   // doorlaat realistisch te maken (zie scopedocument "Doorlaat-afstand") — op basis van de
   // weergavepositie (zelfWeergavePos), in checkpoint-stappen (checkpointOrdinaal), met een marge
@@ -718,6 +759,7 @@ async function renderTracker(app, opts = {}) {
   // iets naar de database.
   const zelfHoleWeergave = trackerLocal.zelfHoleDraft ?? zelfWeergavePos.hole;
   const voorCorrectieHoleWeergave = voor ? (trackerLocal.voorCorrectieHole ?? voorPos.hole) : null;
+  const achterCorrectieHoleWeergave = achter ? (trackerLocal.achterCorrectieHole ?? achterPos.hole) : null;
 
   app.innerHTML = "";
 
@@ -870,6 +912,34 @@ async function renderTracker(app, opts = {}) {
       el("b", { text: CHECKPOINT_LABEL[achterPos.checkpoint] }),
       document.createTextNode(` van hole ${achterPos.hole} zijn.`),
     ]));
+
+    if (loopAchterTegenJouAan) {
+      achterKinderen.push(el("div", { class: "correctiewarn", text: "Jouw gemelde positie is gelijk aan of verder terug dan die van de flight achter jou. Waar bevindt de flight achter jou zich in werkelijkheid?" }));
+
+      const stepMinAchter = el("button", { class: "stepbtn", "aria-label": "Een hole terug", onclick: () => { trackerLocal.achterCorrectieHole = Math.max(1, achterCorrectieHoleWeergave - 1); render(); } }, [chevronSvg("links", "#8A5A1C")]);
+      const stepPlusAchter = el("button", { class: "stepbtn", "aria-label": "Een hole verder", onclick: () => { trackerLocal.achterCorrectieHole = Math.min(AANTAL_HOLES, achterCorrectieHoleWeergave + 1); render(); } }, [chevronSvg("rechts", "#8A5A1C")]);
+      achterKinderen.push(el("div", { class: "stepperrow" }, [
+        stepMinAchter,
+        el("div", { class: "steplabel", text: "hole" }),
+        el("div", { class: "stepvalue", text: String(achterCorrectieHoleWeergave) }),
+        stepPlusAchter,
+      ]));
+
+      const markerKnoppenAchter = CHECKPOINT_VOLGORDE.map((key) => {
+        const komtOvereen = achterCorrectieHoleWeergave === achterPos.hole && key === achterPos.checkpoint && trackerLocal.achterCorrectieHole === null;
+        return el("button", {
+          class: "markerbtn",
+          style: komtOvereen ? "background:rgba(168,94,28,0.12);border:2px solid #8A5A1C;color:#8A5A1C"
+                              : "background:#fff;border:1.5px solid rgba(168,94,28,0.4);color:#8A5A1C",
+          onclick: () => correctieVanAchterMelden(key),
+          text: CHECKPOINT_KNOPLABEL[key],
+        });
+      });
+      achterKinderen.push(el("div", { class: "markerrow" }, markerKnoppenAchter));
+
+      achterKinderen.push(el("button", { class: "uitgestaptbtn", onclick: markeerAchterUitgestapt, text: "Uitgestapt" }));
+    }
+
     const achterVergrendeld = trackerLocal.achterKnopVergrendeld;
     if (achterVergrendeld) {
       achterKinderen.push(el("button", { class: "doorlaatbtn vergrendeld" }, [
@@ -901,6 +971,14 @@ async function renderTracker(app, opts = {}) {
   // tijdlijnPercentage), zonder een volledige render() — zo blijft de balk vloeiend meelopen
   // zonder dat de rest van het scherm elke seconde opnieuw wordt opgebouwd. Wordt bij elke
   // renderTracker-aanroep opnieuw opgezet (en de vorige opgeruimd), omdat de DOM-node dan vervangen is.
+  //
+  // Uitzondering: zodra de balk zelf terugspringt naar het begin (hole/checkpoint is doorgeschoven
+  // — bijv. Green van hole N wordt Afslag van hole N+1), mag de balk niet alleen zelf alvast
+  // resetten terwijl het holecijfer en de Afslag/Fairway/Green-highlight nog op de oude waarde
+  // blijven staan tot de eerstvolgende volledige ververing (tot TRACKER_VERVERS_MS, dus tot 20s
+  // later — precies de "dissonantie" die Kay meldde). Daarom wordt bij zo'n overgang, in plaats
+  // van alleen de breedte te zetten, meteen een volledige (stille) renderTracker() gedaan, zodat
+  // balk, holecijfer en highlight in dezelfde seconde samen overgaan.
   if (tijdlijnIntervalId) { clearInterval(tijdlijnIntervalId); tijdlijnIntervalId = null; }
   if (document.getElementById("zelf-tijdlijn-voortgang")) {
     tijdlijnIntervalId = setInterval(() => {
@@ -908,6 +986,12 @@ async function renderTracker(app, opts = {}) {
       if (!live) { clearInterval(tijdlijnIntervalId); tijdlijnIntervalId = null; return; }
       const pos = projecteerVanafMelding(zelf, zelfPos.minutenPerHole, new Date());
       if (!pos) return;
+      if (pos.hole !== zelfWeergavePos.hole || pos.checkpoint !== zelfWeergavePos.checkpoint) {
+        clearInterval(tijdlijnIntervalId);
+        tijdlijnIntervalId = null;
+        renderTracker(app, { stil: true });
+        return;
+      }
       const rest = pos.fractie - Math.floor(pos.fractie);
       live.style.width = tijdlijnPercentage(rest) + "%";
     }, 1000);
@@ -1007,6 +1091,46 @@ async function renderTracker(app, opts = {}) {
     }
   }
 
+  // Spiegelbeeld van correctieVanVoorMelden/markeerVoorUitgestapt — zelfde mechaniek, maar dan voor
+  // de flight ACHTER je (zie loopAchterTegenJouAan hierboven).
+  async function correctieVanAchterMelden(checkpoint) {
+    if (trackerLocal.bezig || !achter) return;
+    trackerLocal.bezig = true;
+    try {
+      const doelFractie = (achterCorrectieHoleWeergave - 1) + checkpointFractie(checkpoint);
+      const nieuweStartTijdMs = nu.getTime() - doelFractie * achterPos.minutenPerHole * 60000;
+      await sb(`flights?id=eq.${achter.id}`, {
+        method: "PATCH",
+        prefer: "return=minimal",
+        body: JSON.stringify({ starttijd_effectief: new Date(nieuweStartTijdMs).toISOString(), gecorrigeerd: true }),
+      });
+      trackerLocal.achterCorrectieHole = null;
+      trackerLocal.fout = null;
+    } catch (e) {
+      trackerLocal.fout = "Corrigeren is niet gelukt. Probeer het nog eens.";
+      console.error(e);
+    } finally {
+      trackerLocal.bezig = false;
+      render();
+    }
+  }
+
+  async function markeerAchterUitgestapt() {
+    if (trackerLocal.bezig || !achter) return;
+    trackerLocal.bezig = true;
+    try {
+      await sb(`flights?id=eq.${achter.id}`, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ uitgestapt: true }) });
+      trackerLocal.achterCorrectieHole = null;
+      trackerLocal.fout = null;
+    } catch (e) {
+      trackerLocal.fout = "Markeren als 'uitgestapt' is niet gelukt. Probeer het nog eens.";
+      console.error(e);
+    } finally {
+      trackerLocal.bezig = false;
+      render();
+    }
+  }
+
   // Generieke doorlaat-wissel: zelf en de buurflight (voor of achter) wisselen van starttijd. Welke
   // van de twee daarna "voor"/"achter" is, volgt vanzelf uit de eerstvolgende sortering op
   // starttijd_effectief — geen aparte queue-boekhouding nodig (zie opmerking hierboven bij voor/achter).
@@ -1040,6 +1164,7 @@ function logout() {
   render();
 }
 
+document.getElementById("versiebadge").textContent = `v${APP_VERSIE}`;
 render();
 </script>
 </body>
