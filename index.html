@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 <style>
   :root{
-    --cream:#F7F5EF; --ink:#1B2B22; --accent:#1F4D36; --accent-soft:rgba(31,77,54,0.08);
+    --cream:#F7F5EF; --ink:#1B2B22; --accent:#1F4D36; --accent-soft:rgba(31,77,54,0.14);
     --border:#ECE7DA; --muted:#9A9385; --muted-ink:#6B6558; --warn:#A85E1C; --warn-bg:rgba(168,94,28,0.08);
     --err:#A33434; --err-bg:rgba(163,52,52,0.08); --blue:#3E74A8; --blue-dark:#1F4566;
   }
@@ -77,13 +77,20 @@
   .uitgestaptbtn{width:100%;box-sizing:border-box;padding:9px 12px;border-radius:10px;background:#fff;
     border:1.5px dashed rgba(168,94,28,0.4);cursor:pointer;margin-bottom:8px;font-size:14px;
     font-weight:700;color:var(--warn);text-align:center}
-  /* Doorlaat-knop — bewust opvallend: gevulde accentkleur, geen onopvallende outline-knop */
+  /* Doorlaat-knop — duidelijk herkenbaar door een stevige rand + lichte tint, zonder een volle
+     blok accentkleur te zijn (dat trok te veel aandacht naast de groene middelste kaart) */
   .doorlaatbtn{display:block;width:100%;box-sizing:border-box;padding:13px 14px;border-radius:14px;
-    cursor:pointer;text-align:center;background:var(--accent);border:1.5px solid var(--accent);
+    cursor:pointer;text-align:center;background:var(--accent-soft);border:2px solid var(--accent);
     transition:opacity 0.15s}
-  .doorlaatbtn.vergrendeld{background:#C7C0AF;border-color:#C7C0AF;opacity:0.7;cursor:default}
-  .doorlaatbtn .tekst{font-size:15px;font-weight:700;color:#fff}
+  .doorlaatbtn.vergrendeld{background:#F0EEE6;border-color:#C7C0AF;opacity:1;cursor:default}
+  .doorlaatbtn .tekst{font-size:15px;font-weight:800;color:var(--accent)}
+  .doorlaatbtn.vergrendeld .tekst{color:#9B9585}
   .gewisseldline{font-size:13px;color:#8A8470;margin-top:6px;line-height:1.35}
+
+  /* Ronde voltooid (eigen kaart) */
+  .rondeklaartekst{font-size:14px;color:rgba(255,255,255,0.92);line-height:1.45;margin-bottom:14px}
+  .rondeafgerondbtn{width:100%;box-sizing:border-box;padding:13px 14px;border-radius:14px;background:#fff;
+    border:none;cursor:pointer;font-size:15px;font-weight:800;color:var(--accent);text-align:center}
 
   /* Conclusie (op schema / te snel / te langzaam) */
   .conclusieline{font-size:14px;color:rgba(255,255,255,0.92);line-height:1.45;margin-top:12px;
@@ -213,6 +220,14 @@ const CHECKPOINT_VOLGORDE = ["afslag", "fairway", "green"];
 
 function checkpointFractie(key) {
   return { afslag: 0, fairway: 0.5, green: 1 }[key] ?? 0;
+}
+
+// Ronde voltooid: de ONGECLEMDE fractie (dus los van de weergegeven hole, die bij
+// verwachtePositie() al op AANTAL_HOLES wordt vastgezet) is voorbij het totaal aantal holes —
+// er is geen hole 19, dus vanaf hier moet de tracker een eindstatus laten zien in plaats van
+// te blijven "hangen" op hole 18.
+function rondeVoltooid(pos) {
+  return pos.fractie >= AANTAL_HOLES;
 }
 
 function formatTijd(iso) {
@@ -544,6 +559,12 @@ async function renderTracker(app, opts = {}) {
   const zelfPos = posVan(zelf);
   const zelfRondetijd = rondetijdVoor(params, zelf.aantal_spelers, zelf.gemiddelde_hcp);
 
+  // Ronde voltooid: vanaf hier toont elke kaart een eindstatus in plaats van door te blijven
+  // rekenen aan een hole die niet bestaat (zie rondeVoltooid()).
+  const zelfRondeVoltooid = rondeVoltooid(zelfPos);
+  const voorRondeVoltooid = voor ? rondeVoltooid(voorPos) : false;
+  const achterRondeVoltooid = achter ? rondeVoltooid(achterPos) : false;
+
   // Eigen gemelde positie: gedeeld per flight (zelfde rij, dus zichtbaar voor alle spelers van die
   // flight — "laatste melding wint"), opgeslagen in gerapporteerde_hole/gerapporteerd_checkpoint.
   const heeftGekozen = zelf.gerapporteerde_hole != null && zelf.gerapporteerd_checkpoint != null;
@@ -556,7 +577,7 @@ async function renderTracker(app, opts = {}) {
   // Inhaal-signaal: je eigen melding bereikt of overschrijdt de geschatte positie van de flight
   // voor je (zie scopedocument, "Inhaal-signaal"). Alleen relevant als je al een positie hebt
   // gemeld en er een flight voor je is.
-  const loopJeTegenVoorAan = heeftGekozen && voor && actueleFractie >= voorPos.fractie;
+  const loopJeTegenVoorAan = heeftGekozen && voor && !voorRondeVoltooid && actueleFractie >= voorPos.fractie;
 
   // Draft-waarden van de steppers: volgen de live berekening totdat de speler er zelf aan heeft
   // gedraaid (zie nieuweTrackerLocal()). Let op: dit volgt altijd zelfPos (de live berekende
@@ -576,6 +597,8 @@ async function renderTracker(app, opts = {}) {
   const voorKinderen = [el("div", { class: "eyebrow", text: "Flight voor jou" })];
   if (!voor) {
     voorKinderen.push(el("div", { class: "posline", text: "Geen flight voor jou gevonden op dezelfde lus." }));
+  } else if (voorRondeVoltooid) {
+    voorKinderen.push(el("div", { class: "posline", text: "Deze flight heeft de ronde waarschijnlijk afgerond." }));
   } else {
     voorKinderen.push(el("div", { class: "posline" }, [
       document.createTextNode("Moet rond de "),
@@ -642,24 +665,32 @@ async function renderTracker(app, opts = {}) {
     });
   });
 
-  const meKinderen = [
-    el("div", { class: "eyebrow", text: "Waar is jouw flight nu?" }),
-    el("div", { class: "stepperrow big" }, [stepMinZelf, el("div", { class: "stepvalue big", text: String(zelfHoleWeergave) }), stepPlusZelf]),
-    el("div", { class: "markerrow big" }, markerKnoppenZelf),
-  ];
-  if (heeftGekozen) {
-    meKinderen.push(el("div", { class: "conclusieline" }, [
-      document.createTextNode("Op basis van een start om "),
-      el("b", { text: formatTijd(zelf.starttijd_effectief) }),
-      document.createTextNode(" en een gemiddelde rondetijd van "),
-      el("b", { text: formatDuur(zelfRondetijd) }),
-      document.createTextNode(` voor een ${zelf.aantal_spelers}-bal over ${AANTAL_HOLES} holes zou je nu ongeveer op de `),
-      el("b", { text: `${CHECKPOINT_LABEL[zelfPos.checkpoint]} van hole ${zelfPos.hole}` }),
-      document.createTextNode(` moeten zijn. ${conclusie.zin}`),
-    ]));
-  }
-  if (toonTipsKnop) {
-    meKinderen.push(el("button", { class: "tipsbtn", style: "color:" + kaartKleur, onclick: () => { trackerLocal.toontTipsPopup = true; render(); }, text: "Tips om sneller te spelen" }));
+  const meKinderen = [el("div", { class: "eyebrow", text: "Waar is jouw flight nu?" })];
+  if (zelfRondeVoltooid) {
+    // Ronde voltooid: er is geen hole 19 om naar te schuiven, dus geen stepper/marker-knoppen meer —
+    // alleen een expliciete bevestiging (zelfRondeAfgerond) sluit de ronde daadwerkelijk af en
+    // haalt de flight uit de live lijst voor andere spelers.
+    meKinderen.push(el("div", { class: "rondeklaartekst", text: `Op basis van jullie starttijd zouden jullie alle ${AANTAL_HOLES} holes nu gespeeld moeten hebben.` }));
+    meKinderen.push(el("button", { class: "rondeafgerondbtn", onclick: zelfRondeAfgerond, text: "Ronde afgerond" }));
+  } else {
+    meKinderen.push(
+      el("div", { class: "stepperrow big" }, [stepMinZelf, el("div", { class: "stepvalue big", text: String(zelfHoleWeergave) }), stepPlusZelf]),
+      el("div", { class: "markerrow big" }, markerKnoppenZelf)
+    );
+    if (heeftGekozen) {
+      meKinderen.push(el("div", { class: "conclusieline" }, [
+        document.createTextNode("Op basis van een start om "),
+        el("b", { text: formatTijd(zelf.starttijd_effectief) }),
+        document.createTextNode(" en een gemiddelde rondetijd van "),
+        el("b", { text: formatDuur(zelfRondetijd) }),
+        document.createTextNode(` voor een ${zelf.aantal_spelers}-bal over ${AANTAL_HOLES} holes zou je nu ongeveer op de `),
+        el("b", { text: `${CHECKPOINT_LABEL[zelfPos.checkpoint]} van hole ${zelfPos.hole}` }),
+        document.createTextNode(` moeten zijn. ${conclusie.zin}`),
+      ]));
+    }
+    if (toonTipsKnop) {
+      meKinderen.push(el("button", { class: "tipsbtn", style: "color:" + kaartKleur, onclick: () => { trackerLocal.toontTipsPopup = true; render(); }, text: "Tips om sneller te spelen" }));
+    }
   }
   const meCard = el("div", { class: "card me", style: "background:" + kaartKleur }, meKinderen);
 
@@ -669,6 +700,8 @@ async function renderTracker(app, opts = {}) {
   const achterKinderen = [el("div", { class: "eyebrow", text: "Flight achter jou" })];
   if (!achter) {
     achterKinderen.push(el("div", { class: "posline", text: "Geen flight achter jou gevonden op dezelfde lus." }));
+  } else if (achterRondeVoltooid) {
+    achterKinderen.push(el("div", { class: "posline", text: "Deze flight heeft de ronde waarschijnlijk afgerond." }));
   } else {
     achterKinderen.push(el("div", { class: "posline" }, [
       document.createTextNode("Moet rond de "),
@@ -721,6 +754,24 @@ async function renderTracker(app, opts = {}) {
       trackerLocal.fout = "Melden is niet gelukt. Probeer het nog eens.";
       console.error(e);
     } finally {
+      trackerLocal.bezig = false;
+      render();
+    }
+  }
+
+  // Ronde afgerond (eigen flight): schrijft uitgestapt=true op de eigen rij, zodat deze flight
+  // verdwijnt uit de live lijst (dezelfde kolom/filter als "uitgestapt" bij een buurflight — het
+  // praktische effect is identiek: niet meer meegenomen als "voor"/"achter" bij andere spelers),
+  // en logt daarna direct uit: er is voor jezelf niets meer te tracken na afloop van de ronde.
+  async function zelfRondeAfgerond() {
+    if (trackerLocal.bezig) return;
+    trackerLocal.bezig = true;
+    try {
+      await sb(`flights?id=eq.${zelf.id}`, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ uitgestapt: true }) });
+      logout();
+    } catch (e) {
+      trackerLocal.fout = "Afsluiten van de ronde is niet gelukt. Probeer het nog eens.";
+      console.error(e);
       trackerLocal.bezig = false;
       render();
     }
