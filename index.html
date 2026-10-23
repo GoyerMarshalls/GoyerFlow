@@ -44,7 +44,7 @@
   .card{border-radius:20px;border:1px solid var(--border);background:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.04);
     padding:16px 18px;margin-bottom:0}
   .card.me{background:var(--accent);border:none;box-shadow:0 4px 14px rgba(0,0,0,0.1);color:#fff;padding:18px}
-  .eyebrow{font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+  .eyebrow{font-size:12px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;color:var(--ink);margin-bottom:6px}
   .card.me .eyebrow{color:rgba(255,255,255,0.7);text-align:center;margin-bottom:10px}
   .posline{font-size:16px;line-height:1.35}
   .holebig{font-size:52px;font-weight:800;color:#fff;line-height:1;text-align:center;margin:2px 0 2px}
@@ -77,15 +77,12 @@
   .uitgestaptbtn{width:100%;box-sizing:border-box;padding:9px 12px;border-radius:10px;background:#fff;
     border:1.5px dashed rgba(168,94,28,0.4);cursor:pointer;margin-bottom:8px;font-size:14px;
     font-weight:700;color:var(--warn);text-align:center}
-  .gecorrigeerdline{font-size:13px;color:#8A8470;margin-bottom:8px;line-height:1.35}
-
-  /* Doorlaat-knop */
-  .doorlaatbtn{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;padding:12px 14px;
-    border-radius:14px;cursor:pointer;text-align:left;background:#fff;border:1.5px solid var(--border);
+  /* Doorlaat-knop — bewust opvallend: gevulde accentkleur, geen onopvallende outline-knop */
+  .doorlaatbtn{display:block;width:100%;box-sizing:border-box;padding:13px 14px;border-radius:14px;
+    cursor:pointer;text-align:center;background:var(--accent);border:1.5px solid var(--accent);
     transition:opacity 0.15s}
-  .doorlaatbtn.vergrendeld{background:rgba(60,107,74,0.08);border-color:#3C6B4A;opacity:0.6;cursor:default}
-  .doorlaatbtn .tekst{font-size:15px;font-weight:600;color:var(--muted-ink)}
-  .doorlaatbtn.vergrendeld .tekst{color:#2F5B3E}
+  .doorlaatbtn.vergrendeld{background:#C7C0AF;border-color:#C7C0AF;opacity:0.7;cursor:default}
+  .doorlaatbtn .tekst{font-size:15px;font-weight:700;color:#fff}
   .gewisseldline{font-size:13px;color:#8A8470;margin-top:6px;line-height:1.35}
 
   /* Conclusie (op schema / te snel / te langzaam) */
@@ -292,6 +289,15 @@ function nieuweTrackerLocal() {
 }
 let trackerLocal = nieuweTrackerLocal();
 
+// Auto-ververs: zolang het trackerscherm open staat, wordt de weergave periodiek stil opnieuw
+// berekend (en de flights opnieuw opgehaald), zodat de verwachte positie — en welke Afslag/
+// Fairway/Green-knop live gemarkeerd is — vanzelf meebeweegt met de klok, zonder dat de speler
+// iets hoeft aan te raken. Een druk op een knop blijft de ENIGE manier om een echte melding op
+// te slaan; de automatische highlight is puur informatief. 20 seconden is een eerste inschatting
+// — makkelijk aan te passen (TRACKER_VERVERS_MS hieronder) als dat te vaak/te traag blijkt.
+const TRACKER_VERVERS_MS = 20000;
+let trackerIntervalId = null;
+
 function render() {
   const app = document.getElementById("app");
   const sub = document.getElementById("subline");
@@ -309,8 +315,14 @@ function render() {
     ]);
     topbar.insertBefore(back, topbar.firstChild);
     sub.textContent = `${state.flight.aantal_spelers}-bal · gestart ${formatTijd(state.flight.starttijd_effectief)}`;
+    if (!trackerIntervalId) {
+      trackerIntervalId = setInterval(() => {
+        if (state.scherm === "tracker") renderTracker(document.getElementById("app"), { stil: true });
+      }, TRACKER_VERVERS_MS);
+    }
   } else {
     sub.textContent = "Tempo-tracker voor leden";
+    if (trackerIntervalId) { clearInterval(trackerIntervalId); trackerIntervalId = null; }
   }
 
   if (state.scherm === "persoonscode") return renderPersoonscode(app);
@@ -491,17 +503,25 @@ function renderNieuwePincode(app) {
 }
 
 /* ---- Scherm 4: tracker ---- */
-async function renderTracker(app) {
-  app.append(el("div", { class: "msg", text: "Bezig met laden…" }));
+async function renderTracker(app, opts = {}) {
+  // "stil" = automatische achtergrondverversing (zie TRACKER_VERVERS_MS/trackerIntervalId in
+  // render()): geen laad-tekst tonen, en bij een mislukte ophaalactie de bestaande weergave laten
+  // staan in plaats van te vervangen door een foutmelding — de speler heeft niets aangeraakt en
+  // mag niet merken dat er op de achtergrond iets misging. Bij de eerste, niet-stille load blijft
+  // het oude gedrag (laad-tekst, en bij een fout de melding tonen) ongewijzigd.
+  const stil = !!opts.stil;
+  if (!stil) app.append(el("div", { class: "msg", text: "Bezig met laden…" }));
 
   let params, flights;
   try {
     [params] = await sb("parameters?select=*&limit=1");
     flights = await sb(`flights?lus=eq.${encodeURIComponent(state.flight.lus)}&uitgestapt=eq.false&select=*&order=starttijd_effectief.asc`);
   } catch (e) {
-    app.innerHTML = "";
-    app.append(el("div", { class: "msg err", text: "Kon de actuele gegevens niet ophalen. Probeer de pagina te verversen." }));
     console.error(e);
+    if (!stil) {
+      app.innerHTML = "";
+      app.append(el("div", { class: "msg err", text: "Kon de actuele gegevens niet ophalen. Probeer de pagina te verversen." }));
+    }
     return;
   }
 
@@ -539,8 +559,11 @@ async function renderTracker(app) {
   const loopJeTegenVoorAan = heeftGekozen && voor && actueleFractie >= voorPos.fractie;
 
   // Draft-waarden van de steppers: volgen de live berekening totdat de speler er zelf aan heeft
-  // gedraaid (zie nieuweTrackerLocal()).
-  const zelfHoleWeergave = trackerLocal.zelfHoleDraft ?? (zelf.gerapporteerde_hole ?? zelfPos.hole);
+  // gedraaid (zie nieuweTrackerLocal()). Let op: dit volgt altijd zelfPos (de live berekende
+  // positie), NIET de laatst opgeslagen melding — zo loopt de weergave vanzelf door (Afslag →
+  // Fairway → Green → volgende hole) zonder dat dat ooit zelf een melding opslaat. Alleen een
+  // druk op een knop (zelfPositieMelden) schrijft iets naar de database.
+  const zelfHoleWeergave = trackerLocal.zelfHoleDraft ?? zelfPos.hole;
   const voorCorrectieHoleWeergave = voor ? (trackerLocal.voorCorrectieHole ?? voorPos.hole) : null;
 
   app.innerHTML = "";
@@ -555,9 +578,9 @@ async function renderTracker(app) {
     voorKinderen.push(el("div", { class: "posline", text: "Geen flight voor jou gevonden op dezelfde lus." }));
   } else {
     voorKinderen.push(el("div", { class: "posline" }, [
-      document.createTextNode("Moet zich ongeveer op de "),
+      document.createTextNode("Moet rond de "),
       el("b", { text: CHECKPOINT_LABEL[voorPos.checkpoint] }),
-      document.createTextNode(` van hole ${voorPos.hole} bevinden.`),
+      document.createTextNode(` van hole ${voorPos.hole} zijn.`),
     ]));
 
     if (loopJeTegenVoorAan) {
@@ -587,17 +610,13 @@ async function renderTracker(app) {
       voorKinderen.push(el("button", { class: "uitgestaptbtn", onclick: markeerVoorUitgestapt, text: "Uitgestapt" }));
     }
 
-    if (voor.gecorrigeerd) {
-      voorKinderen.push(el("div", { class: "gecorrigeerdline", text: "Positie van deze flight is bijgewerkt op basis van een melding van een andere speler." }));
-    }
 
     const voorVergrendeld = trackerLocal.voorKnopVergrendeld;
     voorKinderen.push(el("button", {
       class: "doorlaatbtn" + (voorVergrendeld ? " vergrendeld" : ""),
       onclick: () => doorlaatWissel(voor, "voor"),
     }, [
-      checkSvg(voorVergrendeld ? "#3C6B4A" : "#C7C0AF"),
-      el("div", { class: "tekst", text: "Deze flight heeft ons doorgelaten" }),
+      el("div", { class: "tekst", text: "Deze flight laat ons door" }),
     ]));
     if (voorVergrendeld) voorKinderen.push(el("div", { class: "gewisseldline", text: "Starttijden gewisseld — jullie spelen nu op elkaars schema." }));
   }
@@ -610,7 +629,10 @@ async function renderTracker(app) {
   const stepPlusZelf = el("button", { class: "stepbtn light", "aria-label": "Een hole verder", onclick: () => { trackerLocal.zelfHoleDraft = Math.min(AANTAL_HOLES, zelfHoleWeergave + 1); render(); } }, [chevronSvg("rechts", "#fff")]);
 
   const markerKnoppenZelf = CHECKPOINT_VOLGORDE.map((key) => {
-    const geselecteerd = heeftGekozen && zelf.gerapporteerd_checkpoint === key && zelfHoleWeergave === zelf.gerapporteerde_hole;
+    // Highlight volgt de live berekende positie (zelfPos), niet de laatst opgeslagen melding —
+    // dit is puur visueel/informatief en slaat niets op. Zodra de speler zelf aan de stepper
+    // draait (trackerLocal.zelfHoleDraft wijkt af van zelfPos.hole), volgt de highlight die keuze.
+    const geselecteerd = key === zelfPos.checkpoint && zelfHoleWeergave === zelfPos.hole;
     return el("button", {
       class: "markerbtn big",
       style: geselecteerd ? "background:#fff;border-color:#fff;color:" + kaartKleur
@@ -649,20 +671,16 @@ async function renderTracker(app) {
     achterKinderen.push(el("div", { class: "posline", text: "Geen flight achter jou gevonden op dezelfde lus." }));
   } else {
     achterKinderen.push(el("div", { class: "posline" }, [
-      document.createTextNode("Moet zich ongeveer op de "),
+      document.createTextNode("Moet rond de "),
       el("b", { text: CHECKPOINT_LABEL[achterPos.checkpoint] }),
-      document.createTextNode(` van hole ${achterPos.hole} bevinden.`),
+      document.createTextNode(` van hole ${achterPos.hole} zijn.`),
     ]));
-    if (achter.gecorrigeerd) {
-      achterKinderen.push(el("div", { class: "gecorrigeerdline", text: "Positie van deze flight is bijgewerkt op basis van een melding van een andere speler." }));
-    }
     const achterVergrendeld = trackerLocal.achterKnopVergrendeld;
     achterKinderen.push(el("button", {
       class: "doorlaatbtn" + (achterVergrendeld ? " vergrendeld" : ""),
       onclick: () => doorlaatWissel(achter, "achter"),
     }, [
-      checkSvg(achterVergrendeld ? "#3C6B4A" : "#C7C0AF"),
-      el("div", { class: "tekst", text: "Wij hebben deze flight doorgelaten" }),
+      el("div", { class: "tekst", text: "Wij laten deze flight door" }),
     ]));
     if (achterVergrendeld) achterKinderen.push(el("div", { class: "gewisseldline", text: "Starttijden gewisseld — jullie spelen nu op elkaars schema." }));
   }
