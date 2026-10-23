@@ -735,8 +735,10 @@ async function renderTracker(app, opts = {}) {
     // Highlight volgt de weergavepositie (zelfWeergavePos — na een melding vooruit geprojecteerd
     // vanaf die melding, anders de pure live berekening) — puur visueel/informatief, slaat niets
     // op. Zodra de speler zelf aan de stepper draait (trackerLocal.zelfHoleDraft wijkt af), volgt
-    // de highlight die keuze.
-    const geselecteerd = key === zelfWeergavePos.checkpoint && zelfHoleWeergave === zelfWeergavePos.hole;
+    // de highlight die keuze. Vóór de EERSTE melding (heeftGekozen=false) wordt bewust geen enkele
+    // knop vooraf gemarkeerd — de speler moet die allereerste keuze zelf expliciet maken, i.p.v.
+    // een voorgestelde positie te zien staan die lijkt op een al-gemaakte keuze.
+    const geselecteerd = heeftGekozen && key === zelfWeergavePos.checkpoint && zelfHoleWeergave === zelfWeergavePos.hole;
     return el("button", {
       class: "markerbtn big",
       style: geselecteerd ? "background:#fff;border-color:#fff;color:" + kaartKleur
@@ -746,7 +748,7 @@ async function renderTracker(app, opts = {}) {
     });
   });
 
-  const meKinderen = [el("div", { class: "eyebrow", text: "Waar is jouw flight nu?" })];
+  const meKinderen = [el("div", { class: "eyebrow", text: heeftGekozen ? "Waar is jouw flight nu?" : "Maak een keuze: waar is jouw flight nu?" })];
   if (zelfRondeVoltooid) {
     // Ronde voltooid: er is geen hole 19 om naar te schuiven, dus geen stepper/marker-knoppen meer —
     // alleen een expliciete bevestiging (zelfRondeAfgerond) sluit de ronde daadwerkelijk af en
