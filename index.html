@@ -239,12 +239,48 @@ function checkpointFractie(key) {
   return { afslag: 0, fairway: 0.5, green: 1 }[key] ?? 0;
 }
 
+// Middelpunt van elke checkpoint-"zone" i.p.v. de grenswaarde (zie verwachtePositie: afslag =
+// rest < 0.25, fairway = 0.25-0.75, green = rest >= 0.75). checkpointFractie() geeft de GRENS
+// (0 / 0.5 / 1) — prima voor de "op schema"-vergelijking, maar onbruikbaar om een melding mee te
+// verankeren: een fractie van precies N (green van hole N) ligt exact op de drempel en zou bij het
+// direct terugrekenen naar hole/checkpoint onmiddellijk omslaan naar "afslag van hole N+1". Het
+// middelpunt van de zone voorkomt dat: die rekent vlak na het melden weer exact terug naar wat er
+// net gemeld is.
+function checkpointFractieMidden(key) {
+  return { afslag: 0.125, fairway: 0.5, green: 0.875 }[key] ?? 0.125;
+}
+
 // Ronde voltooid: de ONGECLEMDE fractie (dus los van de weergegeven hole, die bij
 // verwachtePositie() al op AANTAL_HOLES wordt vastgezet) is voorbij het totaal aantal holes —
 // er is geen hole 19, dus vanaf hier moet de tracker een eindstatus laten zien in plaats van
 // te blijven "hangen" op hole 18.
 function rondeVoltooid(pos) {
   return pos.fractie >= AANTAL_HOLES;
+}
+
+// Projecteert de laatst gemelde positie vooruit in de tijd, met hetzelfde tempo (minutenPerHole)
+// als de live berekening. Dit lost een sprong-bug op: zonder dit viel de weergave direct na het
+// melden van een (eventueel handmatig gecorrigeerde) positie terug op de pure starttijd-gebaseerde
+// berekening (verwachtePositie vanaf starttijd_effectief) — die bij een net gemelde, afwijkende
+// positie een heel andere hole/checkpoint kan tonen dan wat net is ingedrukt. Door in plaats
+// daarvan vanaf het gemelde punt verder te tellen, sluit de weergave direct na een melding aan bij
+// wat er net is gemeld, en loopt hij daarna vanzelf door (Afslag → Fairway → Green → volgende hole)
+// — precies het gedrag dat hoort bij "alleen een knopdruk mag een melding geven, de rest is live".
+// Geeft null terug als er nog geen melding is; de aanroeper valt dan terug op de pure live positie.
+function projecteerVanafMelding(zelf, minutenPerHole, nu) {
+  if (zelf.gerapporteerde_hole == null || zelf.gerapporteerd_checkpoint == null || !zelf.gerapporteerd_tijdstip) {
+    return null;
+  }
+  const gemeldeFractie = (zelf.gerapporteerde_hole - 1) + checkpointFractieMidden(zelf.gerapporteerd_checkpoint);
+  const minutenSindsMelding = (nu.getTime() - new Date(zelf.gerapporteerd_tijdstip).getTime()) / 60000;
+  const fractie = gemeldeFractie + minutenSindsMelding / minutenPerHole;
+  const holeIndex = Math.floor(fractie);
+  const rest = fractie - holeIndex;
+  let checkpoint = "afslag";
+  if (rest >= 0.75) checkpoint = "green";
+  else if (rest >= 0.25) checkpoint = "fairway";
+  const hole = Math.max(1, Math.min(AANTAL_HOLES, holeIndex + 1));
+  return { hole, checkpoint, fractie };
 }
 
 function formatTijd(iso) {
@@ -582,12 +618,6 @@ async function renderTracker(app, opts = {}) {
   const zelfPos = posVan(zelf);
   const zelfRondetijd = rondetijdVoor(params, zelf.aantal_spelers, zelf.gemiddelde_hcp);
 
-  // Ronde voltooid: vanaf hier toont elke kaart een eindstatus in plaats van door te blijven
-  // rekenen aan een hole die niet bestaat (zie rondeVoltooid()).
-  const zelfRondeVoltooid = rondeVoltooid(zelfPos);
-  const voorRondeVoltooid = voor ? rondeVoltooid(voorPos) : false;
-  const achterRondeVoltooid = achter ? rondeVoltooid(achterPos) : false;
-
   // Eigen gemelde positie: gedeeld per flight (zelfde rij, dus zichtbaar voor alle spelers van die
   // flight — "laatste melding wint"), opgeslagen in gerapporteerde_hole/gerapporteerd_checkpoint.
   const heeftGekozen = zelf.gerapporteerde_hole != null && zelf.gerapporteerd_checkpoint != null;
@@ -597,17 +627,30 @@ async function renderTracker(app, opts = {}) {
   const kaartKleur = conclusie ? conclusie.kleur : "var(--accent)";
   const toonTipsKnop = conclusie && (conclusie.key === "te_langzaam" || conclusie.key === "veel_te_langzaam");
 
+  // Weergavepositie: zonder melding de pure live berekening (zelfPos, vanaf starttijd_effectief).
+  // Mét melding: diezelfde melding vooruit geprojecteerd in de tijd (zie projecteerVanafMelding) —
+  // zo sluit de weergave na het indrukken van een knop direct aan bij wat er net gemeld is (geen
+  // sprong naar een andere hole), en loopt hij daarna vanzelf door. zelfPos zelf blijft ongewijzigd
+  // en wordt verderop nog los gebruikt voor de "op schema"-vergelijking (deltaHoles/conclusie),
+  // want dat vergelijkt een melding bewust tegen het ORIGINELE, ongecorrigeerde rondeschema.
+  const zelfWeergavePos = (heeftGekozen ? projecteerVanafMelding(zelf, zelfPos.minutenPerHole, nu) : null) ?? zelfPos;
+
+  // Ronde voltooid: vanaf hier toont elke kaart een eindstatus in plaats van door te blijven
+  // rekenen aan een hole die niet bestaat (zie rondeVoltooid()). Voor de eigen kaart op basis van
+  // de weergavepositie (dus inclusief een eventuele correctie), niet de ruwe schema-berekening.
+  const zelfRondeVoltooid = rondeVoltooid(zelfWeergavePos);
+  const voorRondeVoltooid = voor ? rondeVoltooid(voorPos) : false;
+  const achterRondeVoltooid = achter ? rondeVoltooid(achterPos) : false;
+
   // Inhaal-signaal: je eigen melding bereikt of overschrijdt de geschatte positie van de flight
   // voor je (zie scopedocument, "Inhaal-signaal"). Alleen relevant als je al een positie hebt
   // gemeld en er een flight voor je is.
   const loopJeTegenVoorAan = heeftGekozen && voor && !voorRondeVoltooid && actueleFractie >= voorPos.fractie;
 
-  // Draft-waarden van de steppers: volgen de live berekening totdat de speler er zelf aan heeft
-  // gedraaid (zie nieuweTrackerLocal()). Let op: dit volgt altijd zelfPos (de live berekende
-  // positie), NIET de laatst opgeslagen melding — zo loopt de weergave vanzelf door (Afslag →
-  // Fairway → Green → volgende hole) zonder dat dat ooit zelf een melding opslaat. Alleen een
-  // druk op een knop (zelfPositieMelden) schrijft iets naar de database.
-  const zelfHoleWeergave = trackerLocal.zelfHoleDraft ?? zelfPos.hole;
+  // Draft-waarden van de steppers: volgen de weergavepositie totdat de speler er zelf aan heeft
+  // gedraaid (zie nieuweTrackerLocal()). Alleen een druk op een knop (zelfPositieMelden) schrijft
+  // iets naar de database.
+  const zelfHoleWeergave = trackerLocal.zelfHoleDraft ?? zelfWeergavePos.hole;
   const voorCorrectieHoleWeergave = voor ? (trackerLocal.voorCorrectieHole ?? voorPos.hole) : null;
 
   app.innerHTML = "";
@@ -689,10 +732,11 @@ async function renderTracker(app, opts = {}) {
   const stepPlusZelf = el("button", { class: "stepbtn light", "aria-label": "Een hole verder", onclick: () => { trackerLocal.zelfHoleDraft = Math.min(AANTAL_HOLES, zelfHoleWeergave + 1); render(); } }, [chevronSvg("rechts", "#fff")]);
 
   const markerKnoppenZelf = CHECKPOINT_VOLGORDE.map((key) => {
-    // Highlight volgt de live berekende positie (zelfPos), niet de laatst opgeslagen melding —
-    // dit is puur visueel/informatief en slaat niets op. Zodra de speler zelf aan de stepper
-    // draait (trackerLocal.zelfHoleDraft wijkt af van zelfPos.hole), volgt de highlight die keuze.
-    const geselecteerd = key === zelfPos.checkpoint && zelfHoleWeergave === zelfPos.hole;
+    // Highlight volgt de weergavepositie (zelfWeergavePos — na een melding vooruit geprojecteerd
+    // vanaf die melding, anders de pure live berekening) — puur visueel/informatief, slaat niets
+    // op. Zodra de speler zelf aan de stepper draait (trackerLocal.zelfHoleDraft wijkt af), volgt
+    // de highlight die keuze.
+    const geselecteerd = key === zelfWeergavePos.checkpoint && zelfHoleWeergave === zelfWeergavePos.hole;
     return el("button", {
       class: "markerbtn big",
       style: geselecteerd ? "background:#fff;border-color:#fff;color:" + kaartKleur
