@@ -147,6 +147,55 @@
   .tipitem{display:flex;gap:9px;align-items:flex-start;margin-bottom:10px}
   .tipdot{width:5px;height:5px;border-radius:50%;background:var(--accent);margin-top:7px;flex-shrink:0}
   .tiptekst{font-size:14px;line-height:1.4;color:#3A362C}
+
+  /* Kleine losse links onder een inlogscherm (beheerder inlog, pincode vergeten, terug) */
+  .authlink{display:block;text-align:center;font-size:13px;font-weight:600;color:var(--muted-ink);
+    margin-top:14px;background:none;border:none;cursor:pointer;padding:4px;text-decoration:underline;
+    text-decoration-color:var(--border)}
+  .authlink.klein{margin-top:6px;font-size:12px}
+
+  /* Beheerder — tabbalk (Tracker/Parameters/Admin) */
+  .tabbar{display:flex;gap:6px;margin-bottom:14px;background:#F0EEE6;border-radius:14px;padding:4px}
+  .tabbtn{flex:1;text-align:center;padding:10px 4px;border-radius:11px;border:none;background:none;
+    cursor:pointer;font-size:13px;font-weight:700;color:var(--muted-ink)}
+  .tabbtn.actief{background:#fff;color:var(--accent);box-shadow:0 1px 4px rgba(0,0,0,0.08)}
+
+  /* Beheerder — Tracker-tab: overzicht van alle flights */
+  .flightrij{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+  .flightrij:last-child{border-bottom:none}
+  .flightbol{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;font-size:14px;font-weight:800;color:#fff}
+  .flightinfo{flex:1;min-width:0}
+  .flightnaam{font-size:14px;font-weight:700;color:var(--ink)}
+  .flightsub{font-size:12px;color:var(--muted-ink);margin-top:2px}
+  .flightstatus{font-size:12px;font-weight:800;text-align:right;flex-shrink:0;white-space:nowrap;max-width:110px}
+
+  /* Beheerder — Parameters-tab */
+  .paramrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;
+    border-bottom:1px solid var(--border)}
+  .paramrow:last-child{border-bottom:none}
+  .paramlabel{font-size:14px;color:var(--ink);font-weight:600;text-transform:none;letter-spacing:0}
+  .paraminput{width:84px;font-size:15px;font-weight:700;padding:8px 10px;margin-top:0;letter-spacing:0;
+    text-align:center;border-radius:10px;border:1.5px solid var(--border);background:#fff;color:var(--ink)}
+  .analyseresultaat{font-size:14px;color:var(--ink);line-height:1.6;margin-top:12px;padding-top:12px;
+    border-top:1px solid var(--border)}
+  .analyseresultaat b{color:var(--accent)}
+
+  /* Beheerder — Admin-tab: in-/uitklapbare ledenlijst + wachtwoordwijzigen */
+  .ledenlijst{display:flex;flex-direction:column}
+  .ledenrij{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 0;
+    border-bottom:1px solid var(--border);cursor:pointer}
+  .ledenrij:last-child{border-bottom:none}
+  .ledenrij.open{border-bottom:none}
+  .ledennaam{font-size:14px;font-weight:700;color:var(--ink)}
+  .ledensub{font-size:12px;color:var(--muted-ink);margin-top:2px}
+  .ledendetail{padding:0 0 14px 0;border-bottom:1px solid var(--border)}
+  .ledendetail:last-child{border-bottom:none}
+  .resetbtn{width:100%;box-sizing:border-box;padding:11px 14px;border-radius:12px;background:var(--warn-bg);
+    border:1.5px solid rgba(168,94,28,0.35);cursor:pointer;font-size:14px;font-weight:700;color:var(--warn);
+    text-align:center}
+  .okmsg{font-size:13px;color:var(--accent);font-weight:700;margin-top:8px}
+  .paramfout{font-size:13px;color:var(--err);margin-top:8px}
 </style>
 </head>
 <body>
@@ -163,15 +212,17 @@
 
 <script>
 /* ============================================================================================
-   GoyerFlow — v0.1.0
+   GoyerFlow — v0.2.0
    Versienummer bij elke volgende build op TWEE plekken bijwerken: deze kopregel-comment en de
    APP_VERSIE-constante hieronder (zelfde patroon als de Marshal App — zie diens bouwgeschiedenis
    voor de precedent-regel). De zichtbare versie-indicator naast "GoyerFlow" in de topbar wordt
    dynamisch uit APP_VERSIE afgeleid, dus die hoeft nergens los bijgewerkt te worden.
    Bump-conventie: patch (0.1.0 → 0.1.1) voor kleine/bugfix-wijzigingen, minor (0.1.x → 0.2.0)
    voor een nieuwe/functioneel andere feature — zelfde onderscheid als bij de Marshal App.
+   v0.2.0: beheerders inlog functie (Tracker/Parameters/Admin-tabs, pincode-reset, "pincode
+   vergeten"-link). Vereist twee nieuwe kolommen in Supabase — zie schema.sql, Fase 2b.
    ============================================================================================ */
-const APP_VERSIE = "0.1.0";
+const APP_VERSIE = "0.2.0";
 
 /* ============================================================================================
    CONFIGURATIE — eenmalig invullen (zelfde patroon als de Marshal App: deze waarden zijn
@@ -431,6 +482,25 @@ function nieuweTrackerLocal() {
 }
 let trackerLocal = nieuweTrackerLocal();
 
+// Lokale, niet-opgeslagen UI-staat voor het beheerderscherm (tab-keuze, open/dicht van de
+// ledenlijst, formuliervelden voor wachtwoord-wijzigen en de parameters-aanpassing). Wordt bij
+// uitloggen gereset. Geen wachtwoord/sessie-token hierin — de admin-login zelf is bewust niet
+// persistent (geen localStorage-vlag): elke keer dat de app opnieuw geopend wordt, moet het
+// beheerderswachtwoord opnieuw ingevoerd worden, net als bij de leden-pincode.
+function nieuwAdminLocal() {
+  return {
+    tab: "tracker",              // "tracker" | "parameters" | "admin"
+    geopendLid: null,            // id van het opengeklapte lid in de ledenlijst (Admin-tab)
+    resetBezig: false,
+    resetSucces: null,           // id van het lid waarvoor een pincode-reset net gelukt is
+    wachtwoordOud: "", wachtwoordNieuw: "", wachtwoordHerhaal: "",
+    wachtwoordFout: null, wachtwoordSucces: false, wachtwoordBezig: false,
+    paramFout: null, paramSucces: false, paramBezig: false,
+    analyseResultaat: null,      // gevuld na klik op "Analyseer huidige flights"
+  };
+}
+let adminLocal = nieuwAdminLocal();
+
 // Auto-ververs: zolang het trackerscherm open staat, wordt de weergave periodiek stil opnieuw
 // berekend (en de flights opnieuw opgehaald), zodat de verwachte positie — en welke Afslag/
 // Fairway/Green-knop live gemarkeerd is — vanzelf meebeweegt met de klok, zonder dat de speler
@@ -450,12 +520,13 @@ function render() {
   const sub = document.getElementById("subline");
   const topbar = document.getElementById("topbar");
   app.innerHTML = "";
-  const isAuthScherm = state.scherm === "persoonscode" || state.scherm === "pincode";
+  const isAuthScherm = state.scherm === "persoonscode" || state.scherm === "pincode" || state.scherm === "admin_login";
   app.className = "screen" + (state.scherm === "tracker" ? " tracker" : "") + (isAuthScherm ? " auth" : "");
   topbar.classList.toggle("compact", isAuthScherm);
 
-  // Topbar: op het trackerscherm een terug/uitlog-knop, net als de "terug naar inloggen"-pijl in
-  // de goedgekeurde mockup — en een contextregel (starttijd) in plaats van de generieke ondertitel.
+  // Topbar: op het tracker- en beheerderscherm een terug/uitlog-knop, net als de "terug naar
+  // inloggen"-pijl in de goedgekeurde mockup — en een contextregel in plaats van de generieke
+  // ondertitel.
   const bestaandeBackbtn = document.getElementById("backbtn");
   if (bestaandeBackbtn) bestaandeBackbtn.remove();
   if (state.scherm === "tracker" && state.flight) {
@@ -469,6 +540,14 @@ function render() {
         if (state.scherm === "tracker") renderTracker(document.getElementById("app"), { stil: true });
       }, TRACKER_VERVERS_MS);
     }
+  } else if (state.scherm === "admin") {
+    const back = el("button", { class: "backbtn", id: "backbtn", "aria-label": "Uitloggen", onclick: adminUitloggen }, [
+      chevronSvg("links", "#5B5648"),
+    ]);
+    topbar.insertBefore(back, topbar.firstChild);
+    sub.textContent = "Beheerder";
+    if (trackerIntervalId) { clearInterval(trackerIntervalId); trackerIntervalId = null; }
+    if (tijdlijnIntervalId) { clearInterval(tijdlijnIntervalId); tijdlijnIntervalId = null; }
   } else {
     sub.textContent = "Tempo-tracker voor leden";
     if (trackerIntervalId) { clearInterval(trackerIntervalId); trackerIntervalId = null; }
@@ -479,6 +558,8 @@ function render() {
   if (state.scherm === "pincode") return renderPincode(app);
   if (state.scherm === "nieuwe_pincode") return renderNieuwePincode(app);
   if (state.scherm === "tracker") return renderTracker(app);
+  if (state.scherm === "admin_login") return renderAdminLogin(app);
+  if (state.scherm === "admin") return renderAdmin(app);
 }
 
 function el(tag, attrs = {}, children = []) {
@@ -561,7 +642,8 @@ function renderPersoonscode(app) {
     el("label", { text: "Log in met je Goyer Lidcode" }),
     input,
     ...(err ? [err] : []),
-    el("button", { class: "btn", id: "submit-persoonscode", onclick: submit, text: "Verder" })
+    el("button", { class: "btn", id: "submit-persoonscode", onclick: submit, text: "Verder" }),
+    el("button", { class: "authlink", onclick: toonAdminLogin, text: "Beheerder inlog" })
   );
   input.focus();
 }
@@ -608,9 +690,27 @@ function renderPincode(app) {
     el("label", { text: "Pincode" }),
     input,
     ...(err ? [err] : []),
-    el("button", { class: "btn", id: "submit-pincode", onclick: submit, text: "Inloggen" })
+    el("button", { class: "btn", id: "submit-pincode", onclick: submit, text: "Inloggen" }),
+    pincodeVergetenLink(state.speler.persoonscode)
   );
   input.focus();
+}
+
+// "Pincode vergeten"-link op het pincode-inlogscherm: opent de mailapp van het lid met een
+// kant-en-klare mail aan de beheerder, exact zoals Kay de tekst heeft doorgegeven (22/23 oktober
+// 2026) — lidcode wordt automatisch ingevuld, "Voornaam Achternaam" blijft een placeholder die het
+// lid zelf moet aanpassen (die naam is hier niet los van de volledige naam bekend).
+function pincodeVergetenLink(persoonscode) {
+  const onderwerp = "GoyerFlow pincode resetten";
+  const body = [
+    "Beste beheerder,",
+    "Ik ben mijn pincode vergeten. Kun je die resetten?",
+    "Met vriendelijke groet,",
+    "Voornaam Achternaam",
+    persoonscode || "Lidcode",
+  ].join("\n");
+  const href = `mailto:kayvandelinde@gmail.com?subject=${encodeURIComponent(onderwerp)}&body=${encodeURIComponent(body)}`;
+  return el("a", { class: "authlink klein", href, text: "Pincode vergeten" });
 }
 
 /* ---- Scherm 3: nieuwe pincode (verplicht bij eerste login) ---- */
@@ -631,7 +731,10 @@ function renderNieuwePincode(app) {
       await sb(`spelers?id=eq.${state.speler.id}`, {
         method: "PATCH",
         prefer: "return=minimal",
-        body: JSON.stringify({ pincode: p1, pincode_gewijzigd: true }),
+        // pincode_ooit_aangemaakt wordt NOOIT meer teruggezet (ook niet door een beheerder-reset,
+        // zie resetPincode hieronder) — dat is precies wat de beheerder-ledenlijst gebruikt om te
+        // bepalen wie daar ooit in heeft gestaan, zie schema.sql Fase 2b.
+        body: JSON.stringify({ pincode: p1, pincode_gewijzigd: true, pincode_ooit_aangemaakt: true }),
       });
       loggen(state.speler.persoonscode, "pincode_wijziging", true);
       state.speler = { ...state.speler, pincode: p1, pincode_gewijzigd: true };
@@ -1153,6 +1256,391 @@ async function renderTracker(app, opts = {}) {
       render();
     }
   }
+}
+
+/* ============================================================================================
+   Beheerder — inlog + tabs (Tracker / Parameters / Admin)
+   Vereist de twee kolommen uit schema.sql "Fase 2b" (parameters.admin_wachtwoord en
+   spelers.pincode_ooit_aangemaakt) — zonder die migratie geven de fetches hieronder een
+   Supabase-fout (ontbrekende kolom), opgevangen door dezelfde try/catch als overal elders in deze
+   app.
+   ============================================================================================ */
+function toonAdminLogin() {
+  state.scherm = "admin_login";
+  state.fout = null;
+  render();
+}
+
+function adminUitloggen() {
+  state.scherm = "persoonscode";
+  state.fout = null;
+  adminLocal = nieuwAdminLocal();
+  render();
+}
+
+/* ---- Beheerder-inlogscherm (wachtwoord-only, geen persoonscode) ---- */
+function renderAdminLogin(app) {
+  const input = el("input", { type: "password", inputmode: "text", maxlength: "32", placeholder: "Wachtwoord" });
+  const err = meldingNode();
+
+  const submit = async () => {
+    state.fout = null;
+    const wachtwoord = input.value;
+    if (!wachtwoord) return;
+    const btn = document.getElementById("submit-admin-login");
+    btn.disabled = true;
+    try {
+      const [params] = await sb("parameters?select=admin_wachtwoord&limit=1");
+      const huidigWachtwoord = (params && params.admin_wachtwoord) || "GF2026";
+      if (wachtwoord !== huidigWachtwoord) {
+        state.fout = "Onjuist wachtwoord.";
+        render();
+        return;
+      }
+      adminLocal = nieuwAdminLocal();
+      state.scherm = "admin";
+      state.fout = null;
+      render();
+    } catch (e) {
+      state.fout = "Inloggen is niet gelukt. Probeer het zo nog eens.";
+      console.error(e);
+      render();
+    } finally {
+      btn.disabled = false;
+    }
+  };
+
+  input.addEventListener("keydown", (ev) => { if (ev.key === "Enter") submit(); });
+
+  app.append(
+    el("div", { class: "authheader" }, [
+      el("h1", { class: "authtitle", text: "Beheerder inlog" }),
+      el("p", { class: "authtagline", text: "GoyerFlow" }),
+    ]),
+    el("p", { class: "authdesc", text: "Alleen voor de caddymaster/beheerder van GoyerFlow." }),
+    el("label", { text: "Wachtwoord" }),
+    input,
+    ...(err ? [err] : []),
+    el("button", { class: "btn", id: "submit-admin-login", onclick: submit, text: "Inloggen" }),
+    el("button", { class: "authlink", onclick: () => { state.scherm = "persoonscode"; state.fout = null; render(); }, text: "Terug naar leden-inlog" })
+  );
+  input.focus();
+}
+
+/* ---- Beheerderscherm: tabbalk + inhoud ---- */
+function tabKnop(key, label) {
+  return el("button", {
+    class: "tabbtn" + (adminLocal.tab === key ? " actief" : ""),
+    onclick: () => { adminLocal.tab = key; render(); },
+    text: label,
+  });
+}
+
+async function renderAdmin(app) {
+  app.append(
+    el("div", { class: "tabbar" }, [
+      tabKnop("tracker", "Tracker"),
+      tabKnop("parameters", "Parameters"),
+      tabKnop("admin", "Admin"),
+    ])
+  );
+  const inhoud = el("div", { id: "admininhoud" });
+  app.append(inhoud);
+  inhoud.append(el("div", { class: "msg", text: "Bezig met laden…" }));
+
+  try {
+    if (adminLocal.tab === "tracker") await vulAdminTrackerTab(inhoud);
+    else if (adminLocal.tab === "parameters") await vulAdminParametersTab(inhoud);
+    else await vulAdminLedenTab(inhoud);
+  } catch (e) {
+    inhoud.innerHTML = "";
+    inhoud.append(el("div", { class: "msg err", text: "Kon de gegevens niet ophalen. Probeer het nog eens." }));
+    console.error(e);
+  }
+}
+
+/* ---- Tab: Tracker — overzicht van ALLE flights (niet relatief t.o.v. voor/achter, in
+   tegenstelling tot het leden-trackerscherm: als beheerder heb je al het totaaloverzicht nodig,
+   geen "flight voor/achter jou"-redenering — zie Kay's toelichting bij deze fase). ---- */
+async function vulAdminTrackerTab(inhoud) {
+  const [params] = await sb("parameters?select=*&limit=1");
+  const flights = await sb("flights?uitgestapt=eq.false&select=*&order=starttijd_effectief.asc");
+  inhoud.innerHTML = "";
+
+  const nu = new Date();
+  const rijen = flights.map((flight) => {
+    const minutenPerHole = rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp) / AANTAL_HOLES;
+    const zelfPos = verwachtePositie(flight.starttijd_effectief, minutenPerHole, nu);
+    const heeftMelding = flight.gerapporteerde_hole != null && flight.gerapporteerd_checkpoint != null;
+    const weergave = (heeftMelding ? projecteerVanafMelding(flight, minutenPerHole, nu) : null) ?? zelfPos;
+    const voltooid = rondeVoltooid(weergave);
+    let conclusie = null;
+    if (heeftMelding && !voltooid) {
+      const actueleFractie = (flight.gerapporteerde_hole - 1) + checkpointFractie(flight.gerapporteerd_checkpoint);
+      conclusie = conclusieVoor(actueleFractie - zelfPos.fractie);
+    }
+    return { flight, weergave, voltooid, heeftMelding, conclusie };
+  });
+
+  const kaart = el("div", { class: "card" }, [
+    el("div", { class: "eyebrow", text: "Alle flights" }),
+    rijen.length === 0
+      ? el("p", { class: "help", text: "Geen actieve flights gevonden." })
+      : el("div", {}, rijen.map(({ flight, weergave, voltooid, heeftMelding, conclusie }) => {
+          const kleur = voltooid ? "#9B9585" : (conclusie ? conclusie.kleur : "var(--blue)");
+          const statustekst = voltooid ? "Ronde voltooid" : (conclusie ? conclusie.label : "Nog geen melding");
+          return el("div", { class: "flightrij" }, [
+            el("div", { class: "flightbol", style: `background:${kleur}`, text: voltooid ? "✓" : String(weergave.hole) }),
+            el("div", { class: "flightinfo" }, [
+              el("div", { class: "flightnaam", text: `${flight.lus} · ${flight.aantal_spelers}-bal` }),
+              el("div", { class: "flightsub", text: `Gestart ${formatTijd(flight.starttijd_effectief)}` + (heeftMelding ? ` · laatste melding ${CHECKPOINT_LABEL[flight.gerapporteerd_checkpoint]} hole ${flight.gerapporteerde_hole}` : "") }),
+            ]),
+            el("div", { class: "flightstatus", style: `color:${kleur}`, text: statustekst }),
+          ]);
+        })),
+  ]);
+  inhoud.append(kaart);
+}
+
+/* ---- Tab: Parameters — checkpointtijden bewerken + "analyse"-functie. LET OP: de analyse hier is
+   bewust een lichte momentopname van de NU actieve flights, geen echte historische calibratie
+   zoals de Marshal App (die rekent op basis van een meetlogboek dat GoyerFlow nog niet heeft — zie
+   schema.sql Fase 2b en de toelichting in de chat). ---- */
+async function vulAdminParametersTab(inhoud) {
+  const [params] = await sb("parameters?select=*&limit=1");
+  inhoud.innerHTML = "";
+
+  const iPar3 = el("input", { class: "paraminput", type: "number", step: "0.1", value: params.par3_minuten });
+  const iPar4 = el("input", { class: "paraminput", type: "number", step: "0.1", value: params.par4_minuten });
+  const iPar5 = el("input", { class: "paraminput", type: "number", step: "0.1", value: params.par5_minuten });
+  const iHcp = el("input", { class: "paraminput", type: "number", step: "0.01", value: params.hcp_correctie_per_punt_boven_10 });
+  const iFlight = el("input", { class: "paraminput", type: "number", step: "0.1", value: params.flightgrootte_correctie_per_speler_boven_2 });
+
+  const voorbeeldtekst = el("p", { class: "help" });
+  const voorbeeldrij = (label, aantalSpelers, hcp) => {
+    const waarden = {
+      par3_minuten: parseFloat(iPar3.value) || 0,
+      par4_minuten: parseFloat(iPar4.value) || 0,
+      par5_minuten: parseFloat(iPar5.value) || 0,
+      hcp_correctie_per_punt_boven_10: parseFloat(iHcp.value) || 0,
+      flightgrootte_correctie_per_speler_boven_2: parseFloat(iFlight.value) || 0,
+    };
+    return `${label}: ${formatDuur(rondetijdVoor(waarden, aantalSpelers, hcp))}`;
+  };
+  const herbereken = () => {
+    voorbeeldtekst.textContent = [
+      voorbeeldrij("Tweebal (hcp 10)", 2, 10),
+      voorbeeldrij("Driebal (hcp 15)", 3, 15),
+      voorbeeldrij("Vierbal (hcp 18)", 4, 18),
+    ].join("  ·  ");
+  };
+  herbereken();
+  [iPar3, iPar4, iPar5, iHcp, iFlight].forEach((input) => input.addEventListener("input", herbereken));
+
+  const opslaan = async () => {
+    adminLocal.paramFout = null;
+    adminLocal.paramSucces = false;
+    const nieuw = {
+      par3_minuten: parseFloat(iPar3.value),
+      par4_minuten: parseFloat(iPar4.value),
+      par5_minuten: parseFloat(iPar5.value),
+      hcp_correctie_per_punt_boven_10: parseFloat(iHcp.value),
+      flightgrootte_correctie_per_speler_boven_2: parseFloat(iFlight.value),
+    };
+    if (Object.values(nieuw).some((v) => Number.isNaN(v) || v < 0)) {
+      adminLocal.paramFout = "Vul voor elk veld een geldig, niet-negatief getal in.";
+      render();
+      return;
+    }
+    adminLocal.paramBezig = true;
+    render();
+    try {
+      await sb(`parameters?id=eq.${params.id}`, {
+        method: "PATCH", prefer: "return=minimal",
+        body: JSON.stringify({ ...nieuw, updated_at: new Date().toISOString() }),
+      });
+      adminLocal.paramSucces = true;
+    } catch (e) {
+      adminLocal.paramFout = "Opslaan is niet gelukt. Probeer het nog eens.";
+      console.error(e);
+    } finally {
+      adminLocal.paramBezig = false;
+      render();
+    }
+  };
+
+  const fout = adminLocal.paramFout ? el("div", { class: "paramfout", text: adminLocal.paramFout }) : null;
+  const succes = adminLocal.paramSucces ? el("div", { class: "okmsg", text: "Opgeslagen." }) : null;
+
+  const paramKaart = el("div", { class: "card" }, [
+    el("div", { class: "eyebrow", text: "Checkpointtijden" }),
+    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Par 3 (minuten)" }), iPar3]),
+    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Par 4 (minuten)" }), iPar4]),
+    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Par 5 (minuten)" }), iPar5]),
+    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Hcp-correctie / punt boven 10" }), iHcp]),
+    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Flightgrootte-correctie / speler boven 2" }), iFlight]),
+    el("p", { class: "help", text: "Verwachte rondetijden:" }),
+    voorbeeldtekst,
+    ...(fout ? [fout] : []),
+    ...(succes ? [succes] : []),
+    el("button", { class: "btn", onclick: opslaan, text: adminLocal.paramBezig ? "Bezig…" : "Opslaan" }),
+  ]);
+
+  const analyseBtn = el("button", { class: "btn secondary", text: "📊 Analyseer huidige flights" });
+  const analyseResultaatNode = el("div", { id: "analyseresultaat" });
+
+  analyseBtn.addEventListener("click", async () => {
+    analyseBtn.disabled = true;
+    analyseBtn.textContent = "Bezig…";
+    analyseResultaatNode.innerHTML = "";
+    try {
+      const alleFlights = await sb("flights?uitgestapt=eq.false&select=*");
+      const metMelding = alleFlights.filter((f) => f.gerapporteerde_hole != null && f.gerapporteerd_checkpoint != null);
+      const nu = new Date();
+      let opSchema = 0, voor = 0, achter = 0, somAfwijking = 0;
+      for (const flight of metMelding) {
+        const minutenPerHole = rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp) / AANTAL_HOLES;
+        const zelfPos = verwachtePositie(flight.starttijd_effectief, minutenPerHole, nu);
+        const actueleFractie = (flight.gerapporteerde_hole - 1) + checkpointFractie(flight.gerapporteerd_checkpoint);
+        const deltaHoles = actueleFractie - zelfPos.fractie;
+        somAfwijking += deltaHoles;
+        if (deltaHoles >= 0.4) voor++;
+        else if (deltaHoles <= -0.4) achter++;
+        else opSchema++;
+      }
+      const totaal = metMelding.length;
+      analyseResultaatNode.append(el("div", {
+        class: "analyseresultaat",
+        text: totaal === 0
+          ? "Geen flights met een actuele melding gevonden — nog geen data om te analyseren."
+          : `${totaal} flight(s) met een melding: ${opSchema} op schema, ${voor} voor, ${achter} achter. Gemiddelde afwijking: ${(somAfwijking / totaal).toFixed(2)} hole.`,
+      }));
+    } catch (e) {
+      analyseResultaatNode.append(el("div", { class: "paramfout", text: "Analyse is niet gelukt. Probeer het nog eens." }));
+      console.error(e);
+    } finally {
+      analyseBtn.disabled = false;
+      analyseBtn.textContent = "📊 Analyseer huidige flights";
+    }
+  });
+
+  const analyseKaart = el("div", { class: "card" }, [
+    el("div", { class: "eyebrow", text: "Analyse" }),
+    el("p", { class: "help", text: "Momentopname van de nu actieve flights — geen historische calibratie (GoyerFlow bewaart nog geen meetlogboek zoals de Marshal App; zie toelichting in de chat)." }),
+    analyseBtn,
+    analyseResultaatNode,
+  ]);
+
+  inhoud.append(paramKaart, analyseKaart);
+}
+
+/* ---- Tab: Admin — ledenlijst met pincode-reset + beheerderswachtwoord wijzigen ---- */
+async function vulAdminLedenTab(inhoud) {
+  const leden = await sb("spelers?pincode_ooit_aangemaakt=eq.true&select=*,flights(*)&order=naam.asc");
+  inhoud.innerHTML = "";
+
+  const ledenKaart = el("div", { class: "card" }, [
+    el("div", { class: "eyebrow", text: "Leden — pincode resetten" }),
+    el("p", { class: "help", text: "Alle leden die ooit zelf een pincode hebben gekozen. Resetten dwingt bij de volgende login een nieuwe keuze af." }),
+    leden.length === 0
+      ? el("p", { class: "help", text: "Nog geen leden gevonden." })
+      : el("div", { class: "ledenlijst" }, leden.flatMap((lid) => renderLidRij(lid))),
+  ]);
+
+  inhoud.append(ledenKaart, bouwWachtwoordKaart());
+}
+
+function renderLidRij(lid) {
+  const open = adminLocal.geopendLid === lid.id;
+  const rij = el("div", { class: "ledenrij" + (open ? " open" : "") }, [
+    el("div", {}, [
+      el("div", { class: "ledennaam", text: lid.naam }),
+      el("div", { class: "ledensub", text: `${lid.persoonscode}` + (lid.flights ? ` · ${lid.flights.lus}` : "") }),
+    ]),
+    el("div", { text: open ? "▾" : "▸" }),
+  ]);
+  rij.addEventListener("click", () => {
+    adminLocal.geopendLid = open ? null : lid.id;
+    adminLocal.resetSucces = null;
+    render();
+  });
+
+  const nodes = [rij];
+  if (open) {
+    const succes = adminLocal.resetSucces === lid.id
+      ? el("div", { class: "okmsg", text: "Pincode gereset — bij de volgende login moet een nieuwe pincode gekozen worden." })
+      : null;
+    const resetBtn = el("button", { class: "resetbtn", text: adminLocal.resetBezig ? "Bezig…" : "Pincode resetten" });
+    resetBtn.addEventListener("click", async (ev) => {
+      ev.stopPropagation();
+      if (!confirm(`Pincode van ${lid.naam} resetten? De speler moet bij de volgende login zelf een nieuwe pincode kiezen.`)) return;
+      adminLocal.resetBezig = true;
+      render();
+      try {
+        await sb(`spelers?id=eq.${lid.id}`, {
+          method: "PATCH", prefer: "return=minimal",
+          body: JSON.stringify({ pincode: "0000", pincode_gewijzigd: false }),
+        });
+        adminLocal.resetSucces = lid.id;
+      } catch (e) {
+        alert("Pincode resetten is niet gelukt. Probeer het nog eens.");
+        console.error(e);
+      } finally {
+        adminLocal.resetBezig = false;
+        render();
+      }
+    });
+    nodes.push(el("div", { class: "ledendetail" }, [...(succes ? [succes] : []), resetBtn]));
+  }
+  return nodes;
+}
+
+function bouwWachtwoordKaart() {
+  const iOud = el("input", { type: "password", placeholder: "Huidig wachtwoord" });
+  const iNieuw = el("input", { type: "password", placeholder: "Nieuw wachtwoord" });
+  const iHerhaal = el("input", { type: "password", placeholder: "Herhaal nieuw wachtwoord" });
+
+  const opslaan = async () => {
+    adminLocal.wachtwoordFout = null;
+    adminLocal.wachtwoordSucces = false;
+    const oud = iOud.value, nieuw = iNieuw.value, herhaal = iHerhaal.value;
+    if (nieuw.length < 4) { adminLocal.wachtwoordFout = "Kies een nieuw wachtwoord van minstens 4 tekens."; render(); return; }
+    if (nieuw !== herhaal) { adminLocal.wachtwoordFout = "De twee nieuwe wachtwoorden komen niet overeen."; render(); return; }
+    adminLocal.wachtwoordBezig = true;
+    render();
+    try {
+      const [params] = await sb("parameters?select=id,admin_wachtwoord&limit=1");
+      const huidig = (params && params.admin_wachtwoord) || "GF2026";
+      if (oud !== huidig) {
+        adminLocal.wachtwoordFout = "Huidig wachtwoord is onjuist.";
+        return;
+      }
+      await sb(`parameters?id=eq.${params.id}`, {
+        method: "PATCH", prefer: "return=minimal",
+        body: JSON.stringify({ admin_wachtwoord: nieuw }),
+      });
+      adminLocal.wachtwoordSucces = true;
+    } catch (e) {
+      adminLocal.wachtwoordFout = "Wijzigen is niet gelukt. Probeer het nog eens.";
+      console.error(e);
+    } finally {
+      adminLocal.wachtwoordBezig = false;
+      render();
+    }
+  };
+
+  const fout = adminLocal.wachtwoordFout ? el("div", { class: "msg err", text: adminLocal.wachtwoordFout }) : null;
+  const succes = adminLocal.wachtwoordSucces ? el("div", { class: "okmsg", text: "Wachtwoord gewijzigd." }) : null;
+
+  return el("div", { class: "card" }, [
+    el("div", { class: "eyebrow", text: "Beheerderswachtwoord wijzigen" }),
+    el("label", { text: "Huidig wachtwoord" }), iOud,
+    el("label", { text: "Nieuw wachtwoord" }), iNieuw,
+    el("label", { text: "Herhaal nieuw wachtwoord" }), iHerhaal,
+    ...(fout ? [fout] : []),
+    ...(succes ? [succes] : []),
+    el("button", { class: "btn", onclick: opslaan, text: adminLocal.wachtwoordBezig ? "Bezig…" : "Wachtwoord wijzigen" }),
+  ]);
 }
 
 function logout() {
