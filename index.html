@@ -6,6 +6,12 @@
 <meta name="theme-color" content="#1F4D36">
 <title>GoyerFlow</title>
 <link rel="manifest" href="manifest.json">
+<!-- Homescherm-icoon: iOS/Safari negeert manifest.json-icons bij "Zet op beginscherm" en heeft een
+     expliciete apple-touch-icon-link nodig; icon-192/icon-512 (via manifest.json) dekken Android/
+     Chrome. Logo aangeleverd door Kay (23 oktober 2026), hier vastgezet als apple-touch-icon.png/
+     icon-192.png/icon-512.png — alleen als homescherm-icoon, verder nergens in de app verwerkt. -->
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 <style>
   :root{
@@ -120,6 +126,11 @@
   .rondeafgerondbtn{width:100%;box-sizing:border-box;padding:13px 14px;border-radius:14px;background:#fff;
     border:none;cursor:pointer;font-size:15px;font-weight:800;color:var(--accent);text-align:center}
 
+  /* GPS-ondersteunde check-in (eigen kaart) — zie startGpsPositiebepaling()/gpsPending in index.html */
+  .gpsuitleg{font-size:13px;color:rgba(255,255,255,0.85);line-height:1.4;margin-bottom:10px}
+  .gpsbevestigbtn{margin-top:12px;width:100%;box-sizing:border-box;padding:13px 14px;border-radius:14px;
+    background:#fff;border:none;cursor:pointer;font-size:15px;font-weight:800;text-align:center}
+
   /* Tijdlijn onder Afslag/Fairway/Green — vordert live mee met de klok, puur visueel (zie
      tijdlijnPercentage()); de knoppen erboven zijn drie gelijke kolommen, dus de balk komt exact
      bij 1/3 (Fairway) resp. 2/3 (Green) op het moment dat die knop wit wordt. */
@@ -221,8 +232,15 @@
    voor een nieuwe/functioneel andere feature — zelfde onderscheid als bij de Marshal App.
    v0.2.0: beheerders inlog functie (Tracker/Parameters/Admin-tabs, pincode-reset, "pincode
    vergeten"-link). Vereist twee nieuwe kolommen in Supabase — zie schema.sql, Fase 2b.
+   v0.3.0: GPS-ondersteunde check-in op de "zelf"-kaart. Bij elk bezoek aan het trackerscherm wordt
+   op de achtergrond een eenmalige, foreground GPS-fix opgevraagd (stilzwijgend bij weigering/
+   time-out/geen ondersteuning — de kaart werkt dan exact als voorheen) en vergeleken met HOLE_GPS
+   (door Kay zelf op de baan ingemeten, zie dat blok hieronder). Bij een gevonden match toont de
+   kaart een voorstel ("Je bent op de … van hole … — bevestig of pas aan") dat de speler altijd
+   zelf moet bevestigen of aanpassen — nooit een automatische melding. Zie
+   claude/bouwgeschiedenis-goyerflow-app.md voor de volledige UX-specificatie.
    ============================================================================================ */
-const APP_VERSIE = "0.2.0";
+const APP_VERSIE = "0.3.0";
 
 /* ============================================================================================
    CONFIGURATIE — eenmalig invullen (zelfde patroon als de Marshal App: deze waarden zijn
@@ -257,6 +275,36 @@ const ZICHTBAARHEIDSVENSTER_MINUTEN = 15;    // zelfde venster als Marshal App v
 // GolfPass-scorekaart van deze baan — 4x par 3 (holes 2,5,11,14), 10x par 4, 4x par 5 (holes
 // 4,7,13,17), optellend tot par 72 over 18 holes, consistent met PAR_VERDELING hierboven.
 const HOLE_PAR = [4, 3, 4, 5, 3, 4, 5, 4, 4, 4, 3, 4, 5, 3, 4, 4, 5, 4];
+
+// GPS-coördinaten per hole (North Course), zelf ingemeten door Kay op de baan (23 oktober 2026) —
+// live GPS-fixes via de blauwe stip in Google Maps, per checkpoint een screenshot genomen en
+// overgetypt, GEEN satellietschatting. Gebruikt door de GPS-ondersteunde check-in (zie het blok
+// "GPS-ondersteunde check-in" verderop) om bij het openen van het trackerscherm een afslag/fairway/
+// green-suggestie te doen — nooit om automatisch iets te melden, zie startGpsPositiebepaling().
+// "fairway" is alleen gevuld bij de 7 holes met een dogleg of lange par-5 waar Kay bewust een extra
+// tussenpunt heeft genomen (op het punt van de dogleg, resp. halverwege de fairway); bij de overige
+// 11 holes is "fairway" null en valt holeCheckpointCoord() terug op het midden tussen afslag en
+// green.
+const HOLE_GPS = [
+  { afslag: { lat: 52.24057, lon: 5.2358 }, green: { lat: 52.2427, lon: 5.23777 }, fairway: { lat: 52.24207, lon: 5.2365 } }, // hole 1
+  { afslag: { lat: 52.24269, lon: 5.23841 }, green: { lat: 52.24144, lon: 5.23699 }, fairway: null }, // hole 2
+  { afslag: { lat: 52.24084, lon: 5.23722 }, green: { lat: 52.24326, lon: 5.24042 }, fairway: null }, // hole 3
+  { afslag: { lat: 52.24293, lon: 5.24096 }, green: { lat: 52.24619, lon: 5.23935 }, fairway: { lat: 52.24496, lon: 5.24157 } }, // hole 4
+  { afslag: { lat: 52.247, lon: 5.23977 }, green: { lat: 52.24787, lon: 5.24089 }, fairway: null }, // hole 5
+  { afslag: { lat: 52.2482, lon: 5.24064 }, green: { lat: 52.24759, lon: 5.24527 }, fairway: null }, // hole 6
+  { afslag: { lat: 52.24768, lon: 5.24573 }, green: { lat: 52.24319, lon: 5.24423 }, fairway: { lat: 52.24541, lon: 5.24518 } }, // hole 7
+  { afslag: { lat: 52.24349, lon: 5.24515 }, green: { lat: 52.24009, lon: 5.244 }, fairway: null }, // hole 8
+  { afslag: { lat: 52.23979, lon: 5.24412 }, green: { lat: 52.24007, lon: 5.23922 }, fairway: null }, // hole 9
+  { afslag: { lat: 52.24048, lon: 5.23868 }, green: { lat: 52.24038, lon: 5.24316 }, fairway: null }, // hole 10
+  { afslag: { lat: 52.24101, lon: 5.24295 }, green: { lat: 52.24266, lon: 5.2441 }, fairway: null }, // hole 11
+  { afslag: { lat: 52.24279, lon: 5.24353 }, green: { lat: 52.24107, lon: 5.24037 }, fairway: { lat: 52.24125, lon: 5.24259 } }, // hole 12
+  { afslag: { lat: 52.24124, lon: 5.24005 }, green: { lat: 52.24472, lon: 5.24413 }, fairway: { lat: 52.24317, lon: 5.24283 } }, // hole 13
+  { afslag: { lat: 52.24507, lon: 5.24439 }, green: { lat: 52.24672, lon: 5.24447 }, fairway: null }, // hole 14
+  { afslag: { lat: 52.247135, lon: 5.24544 }, green: { lat: 52.24722, lon: 5.24075 }, fairway: null }, // hole 15
+  { afslag: { lat: 52.24689, lon: 5.24082 }, green: { lat: 52.24477, lon: 5.24341 }, fairway: { lat: 52.24607, lon: 5.24339 } }, // hole 16
+  { afslag: { lat: 52.24602, lon: 5.24222 }, green: { lat: 52.24187, lon: 5.24016 }, fairway: { lat: 52.24377, lon: 5.24243 } }, // hole 17
+  { afslag: { lat: 52.24304, lon: 5.24078 }, green: { lat: 52.24035, lon: 5.23759 }, fairway: null }, // hole 18
+];
 
 /* ============================================================================================
    Supabase REST helper
@@ -425,6 +473,99 @@ function conclusieVoor(deltaHoles) {
   return { key: "op_schema", label: "Op schema", kleur: "var(--accent)", zin: "Dus je loopt op schema." };
 }
 
+/* ============================================================================================
+   GPS-ondersteunde check-in — Fase 2c (toegevoegd 23 oktober 2026, zie
+   claude/bouwgeschiedenis-goyerflow-app.md). Eén keer per bezoek aan het trackerscherm (zie de
+   aanroep van startGpsPositiebepaling() in render()) wordt een eenmalige, foreground GPS-fix
+   opgevraagd en vergeleken met HOLE_GPS, om een suggestie te doen op de "zelf"-kaart — ALTIJD als
+   voorstel, nooit als automatische melding: de speler moet zelf op "Bevestigen" drukken (zie
+   renderTracker: gpsPending/markerKnoppenZelf/zelfPositieBevestigenGps). Bij weigering, time-out of
+   een niet-ondersteunende browser werkt de kaart exact zoals zonder deze functie — zie
+   haalGpsPositieOp(). Bewust geen achtergrond-tracking: de Geolocation API biedt daar op iOS/
+   Android-PWA's geen betrouwbare ondersteuning voor, dus alleen een eenmalige fix bij het openen
+   van het scherm.
+   ============================================================================================ */
+
+// Haversine-afstand in meters tussen twee {lat, lon}-punten.
+function gpsAfstandMeter(p1, p2) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(p2.lat - p1.lat);
+  const dLon = toRad(p2.lon - p1.lon);
+  const a = Math.sin(dLat / 2) ** 2
+          + Math.cos(toRad(p1.lat)) * Math.cos(toRad(p2.lat)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Coördinaat van één checkpoint. "fairway" valt terug op het midden tussen afslag en green als er
+// geen expliciet ingemeten fairwaypunt is (zie toelichting bij HOLE_GPS hierboven).
+function holeCheckpointCoord(hole, checkpoint) {
+  const punten = HOLE_GPS[hole - 1];
+  if (!punten) return null;
+  if (checkpoint === "afslag") return punten.afslag;
+  if (checkpoint === "green") return punten.green;
+  if (punten.fairway) return punten.fairway;
+  return { lat: (punten.afslag.lat + punten.green.lat) / 2, lon: (punten.afslag.lon + punten.green.lon) / 2 };
+}
+
+// Dichtstbijzijnde van alle 18×3 checkpoints t.o.v. een gemeten positie — puur een suggestie, zie
+// de toelichting hierboven.
+function dichtstbijzijndeCheckpoint(positie) {
+  let beste = null;
+  for (let hole = 1; hole <= AANTAL_HOLES; hole++) {
+    for (const checkpoint of CHECKPOINT_VOLGORDE) {
+      const coord = holeCheckpointCoord(hole, checkpoint);
+      if (!coord) continue;
+      const afstandMeter = gpsAfstandMeter(positie, coord);
+      if (!beste || afstandMeter < beste.afstandMeter) beste = { hole, checkpoint, afstandMeter };
+    }
+  }
+  return beste;
+}
+
+// Eenmalige, foreground GPS-fix. Geeft {lat, lon} terug, of null bij weigering/time-out/een browser
+// zonder Geolocation-ondersteuning — de aanroeper (startGpsPositiebepaling) behandelt null exact
+// als "geen GPS beschikbaar": de kaart werkt dan verder zoals vandaag, zonder foutmelding.
+function haalGpsPositieOp() {
+  return new Promise((resolve) => {
+    if (!("geolocation" in navigator)) { resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+    );
+  });
+}
+
+// Start, eenmaal per bezoek aan het trackerscherm (zie de aanroep in render()), de GPS-suggestie:
+// zet gpsStatus op "bezig" (renderTracker toont dan de korte toestemmings-uitleg), vraagt een fix
+// op, en zet bij succes zowel de hole-stepper als de checkpoint-keuze al op de dichtstbijzijnde
+// match. De speler ziet die suggestie in renderTracker (gpsPending) en moet zelf bevestigen of
+// aanpassen, zie zelfPositieBevestigenGps(). Loopt synchroon tot de eerste "await": gpsStatus staat
+// dus al op "bezig" zodra render() verderop renderTracker(app) aanroept, zonder dat hier zelf al een
+// render() nodig is — dat voorkomt een dubbele render bij het openen van het scherm. De guard op
+// state.scherm ná de await voorkomt dat een trage/late fix nog een render forceert nadat de speler
+// al is uitgelogd of naar het beheerderscherm is gegaan.
+async function startGpsPositiebepaling() {
+  trackerLocal.gpsStatus = "bezig";
+  trackerLocal.gpsSuggestie = null;
+  trackerLocal.gpsCheckpointDraft = null;
+  trackerLocal.gpsBevestigd = false;
+  const positie = await haalGpsPositieOp();
+  if (state.scherm !== "tracker") return;
+  if (!positie) {
+    trackerLocal.gpsStatus = "nietBeschikbaar";
+    render();
+    return;
+  }
+  const suggestie = dichtstbijzijndeCheckpoint(positie);
+  trackerLocal.gpsStatus = "beschikbaar";
+  trackerLocal.gpsSuggestie = suggestie;
+  trackerLocal.gpsCheckpointDraft = suggestie.checkpoint;
+  trackerLocal.zelfHoleDraft = suggestie.hole;
+  render();
+}
+
 const TIPS = [
   "Speel 'ready golf': wie klaar is, slaat — niet per se op volgorde van afstand tot de hole.",
   "Bepaal je club en richting terwijl een ander aan de beurt is, niet pas als jij aan de beurt bent.",
@@ -478,6 +619,15 @@ function nieuweTrackerLocal() {
     achterCorrectieHole: null, // null = volg de live berekende positie van de flight achter je
     toontTipsPopup: false,
     bezig: false,              // voorkomt dubbele schrijfacties tijdens een lopende Supabase-call
+    // GPS-ondersteunde check-in (zie startGpsPositiebepaling/renderTracker): "onbekend" = nog geen
+    // poging deze visit, "bezig" = fix aangevraagd (toont de toestemmings-uitleg), "beschikbaar" =
+    // suggestie klaar (gpsSuggestie/gpsCheckpointDraft gevuld, wacht op bevestigen/aanpassen),
+    // "nietBeschikbaar" = weigering/time-out/geen ondersteuning (kaart werkt als voorheen).
+    gpsStatus: "onbekend",
+    gpsSuggestie: null,        // { hole, checkpoint, afstandMeter } van de laatst gevonden match
+    gpsCheckpointDraft: null,  // checkpoint-keuze binnen de GPS-suggestie, vóór bevestiging
+    gpsBevestigd: false,       // true zodra deze visit al bevestigd/aangepast is — verbergt de
+                                // suggestie-UI daarna voor de rest van dit bezoek
   };
 }
 let trackerLocal = nieuweTrackerLocal();
@@ -539,6 +689,10 @@ function render() {
       trackerIntervalId = setInterval(() => {
         if (state.scherm === "tracker") renderTracker(document.getElementById("app"), { stil: true });
       }, TRACKER_VERVERS_MS);
+      // Eén keer per bezoek aan dit scherm (trackerIntervalId wordt bij het verlaten weer op null
+      // gezet, zie de else-takken hieronder) een GPS-suggestie proberen — zie
+      // startGpsPositiebepaling() voor waarom dit hier en niet bij het inloggen gebeurt.
+      startGpsPositiebepaling();
     }
   } else if (state.scherm === "admin") {
     const back = el("button", { class: "backbtn", id: "backbtn", "aria-label": "Uitloggen", onclick: adminUitloggen }, [
@@ -942,24 +1096,44 @@ async function renderTracker(app, opts = {}) {
   const stepMinZelf = el("button", { class: "stepbtn light", "aria-label": "Een hole terug", onclick: () => { trackerLocal.zelfHoleDraft = Math.max(1, zelfHoleWeergave - 1); render(); } }, [chevronSvg("links", "#fff")]);
   const stepPlusZelf = el("button", { class: "stepbtn light", "aria-label": "Een hole verder", onclick: () => { trackerLocal.zelfHoleDraft = Math.min(AANTAL_HOLES, zelfHoleWeergave + 1); render(); } }, [chevronSvg("rechts", "#fff")]);
 
+  // GPS-suggestie staat "open" (nog niet bevestigd/aangepast deze visit) zolang er een gevonden
+  // match is, er nog niet bevestigd is, en de ronde niet al voltooid is (geen hole 19 om naar te
+  // suggereren) — zie startGpsPositiebepaling()/nieuweTrackerLocal() voor gpsStatus/gpsBevestigd.
+  const gpsPending = trackerLocal.gpsStatus === "beschikbaar" && !trackerLocal.gpsBevestigd && !zelfRondeVoltooid;
+
   const markerKnoppenZelf = CHECKPOINT_VOLGORDE.map((key) => {
-    // Highlight volgt de weergavepositie (zelfWeergavePos — na een melding vooruit geprojecteerd
-    // vanaf die melding, anders de pure live berekening) — puur visueel/informatief, slaat niets
-    // op. Zodra de speler zelf aan de stepper draait (trackerLocal.zelfHoleDraft wijkt af), volgt
-    // de highlight die keuze. Vóór de EERSTE melding (heeftGekozen=false) wordt bewust geen enkele
-    // knop vooraf gemarkeerd — de speler moet die allereerste keuze zelf expliciet maken, i.p.v.
-    // een voorgestelde positie te zien staan die lijkt op een al-gemaakte keuze.
-    const geselecteerd = heeftGekozen && key === zelfWeergavePos.checkpoint && zelfHoleWeergave === zelfWeergavePos.hole;
+    // Highlight volgt, zolang een GPS-suggestie openstaat, de checkpoint-keuze van die suggestie
+    // (gpsCheckpointDraft — alleen aanpasbaar door hier zelf op te tikken, zie onclick hieronder).
+    // Zonder openstaande suggestie: de weergavepositie (zelfWeergavePos — na een melding vooruit
+    // geprojecteerd vanaf die melding, anders de pure live berekening), puur visueel/informatief.
+    // Zodra de speler zelf aan de stepper draait (trackerLocal.zelfHoleDraft wijkt af), volgt de
+    // highlight die keuze. Vóór de EERSTE melding (heeftGekozen=false) en zonder GPS-suggestie
+    // wordt bewust geen enkele knop vooraf gemarkeerd — de speler moet die allereerste keuze zelf
+    // expliciet maken, i.p.v. een voorgestelde positie te zien staan die lijkt op een al-gemaakte
+    // keuze.
+    const geselecteerd = gpsPending
+      ? key === trackerLocal.gpsCheckpointDraft
+      : (heeftGekozen && key === zelfWeergavePos.checkpoint && zelfHoleWeergave === zelfWeergavePos.hole);
     return el("button", {
       class: "markerbtn big",
       style: geselecteerd ? "background:#fff;border-color:#fff;color:" + kaartKleur
                            : "background:rgba(255,255,255,0.14);border-color:rgba(255,255,255,0.3);color:rgba(255,255,255,0.85)",
-      onclick: () => zelfPositieMelden(key, zelfHoleWeergave),
+      // Met een openstaande GPS-suggestie schrijft een tik NIET meteen naar de database (anders dan
+      // het bestaande gedrag) — alleen de draft-checkpoint-keuze wijzigt; de speler moet daarna nog
+      // expliciet op "Bevestigen" drukken (zie zelfPositieBevestigenGps hieronder).
+      onclick: gpsPending
+        ? () => { trackerLocal.gpsCheckpointDraft = key; render(); }
+        : () => zelfPositieMelden(key, zelfHoleWeergave),
       text: CHECKPOINT_KNOPLABEL[key],
     });
   });
 
-  const meKinderen = [el("div", { class: "eyebrow", text: heeftGekozen ? "Waar is jouw flight nu?" : "Maak een keuze: waar is jouw flight nu?" })];
+  const meKinderen = [el("div", {
+    class: "eyebrow",
+    text: gpsPending
+      ? `Je bent op de ${CHECKPOINT_LABEL[trackerLocal.gpsCheckpointDraft]} van hole ${zelfHoleWeergave} — bevestig of pas aan`
+      : (heeftGekozen ? "Waar is jouw flight nu?" : "Maak een keuze: waar is jouw flight nu?"),
+  })];
   if (zelfRondeVoltooid) {
     // Ronde voltooid: er is geen hole 19 om naar te schuiven, dus geen stepper/marker-knoppen meer —
     // alleen een expliciete bevestiging (zelfRondeAfgerond) sluit de ronde daadwerkelijk af en
@@ -967,36 +1141,48 @@ async function renderTracker(app, opts = {}) {
     meKinderen.push(el("div", { class: "rondeklaartekst", text: `Op basis van jullie starttijd zouden jullie alle ${AANTAL_HOLES} holes nu gespeeld moeten hebben.` }));
     meKinderen.push(el("button", { class: "rondeafgerondbtn", onclick: zelfRondeAfgerond, text: "Ronde afgerond" }));
   } else {
+    // Terwijl de GPS-fix nog loopt: een korte, vaste uitleg waarom de locatie gevraagd wordt (zie
+    // het permissie-schot van de browser zelf) — exacte tekst door Kay bevestigd.
+    if (trackerLocal.gpsStatus === "bezig") {
+      meKinderen.push(el("div", { class: "gpsuitleg", text: "We gebruiken je locatie alleen om je ruwe positie te bepalen, jij bevestigt altijd zelf." }));
+    }
     meKinderen.push(
       el("div", { class: "stepperrow big" }, [stepMinZelf, el("div", { class: "stepvalue big", text: String(zelfHoleWeergave) }), stepPlusZelf]),
       el("div", { class: "markerrow big" }, markerKnoppenZelf)
     );
-    // Tijdlijn alleen tonen ná de eerste melding (zelfde reden als bij het niet vooraf markeren
-    // van een knop: vóór die eerste keuze niets suggereren) en alleen zolang de speler de live
-    // positie volgt (geen handmatige stepper-afwijking — anders zou de balk een andere hole tonen
-    // dan waar de steppers net naartoe zijn gezet).
-    const toonTijdlijn = heeftGekozen && trackerLocal.zelfHoleDraft === null;
-    if (toonTijdlijn) {
-      const restFractieNu = zelfWeergavePos.fractie - Math.floor(zelfWeergavePos.fractie);
-      meKinderen.push(el("div", { class: "tijdlijn" }, [
-        el("div", { class: "tijdlijnvak" }, [
-          el("div", { class: "tijdlijnvoortgang", id: "zelf-tijdlijn-voortgang", style: `width:${tijdlijnPercentage(restFractieNu)}%` }),
-        ]),
-      ]));
-    }
-    if (heeftGekozen) {
-      meKinderen.push(el("div", { class: "conclusieline" }, [
-        document.createTextNode("Op basis van een start om "),
-        el("b", { text: formatTijd(zelf.starttijd_effectief) }),
-        document.createTextNode(" en een gemiddelde rondetijd van "),
-        el("b", { text: formatDuur(zelfRondetijd) }),
-        document.createTextNode(` voor een ${zelf.aantal_spelers}-bal over ${AANTAL_HOLES} holes zou je nu ongeveer op de `),
-        el("b", { text: `${CHECKPOINT_LABEL[zelfPos.checkpoint]} van hole ${zelfPos.hole}` }),
-        document.createTextNode(` moeten zijn. ${conclusie.zin}`),
-      ]));
-    }
-    if (toonTipsKnop) {
-      meKinderen.push(el("button", { class: "tipsbtn", style: "color:" + kaartKleur, onclick: () => { trackerLocal.toontTipsPopup = true; render(); }, text: "Tips om sneller te spelen" }));
+    if (gpsPending) {
+      // Zolang de GPS-suggestie openstaat blijft de rest van de kaart (tijdlijn, conclusie, tips)
+      // bewust verborgen — ook als er van eerder vandaag al een melding staat — en verschijnt pas
+      // weer ná bevestiging/aanpassing van DEZE visit, zie zelfPositieBevestigenGps.
+      meKinderen.push(el("button", { class: "gpsbevestigbtn", style: "color:" + kaartKleur, onclick: zelfPositieBevestigenGps, text: "Bevestigen" }));
+    } else {
+      // Tijdlijn alleen tonen ná de eerste melding (zelfde reden als bij het niet vooraf markeren
+      // van een knop: vóór die eerste keuze niets suggereren) en alleen zolang de speler de live
+      // positie volgt (geen handmatige stepper-afwijking — anders zou de balk een andere hole tonen
+      // dan waar de steppers net naartoe zijn gezet).
+      const toonTijdlijn = heeftGekozen && trackerLocal.zelfHoleDraft === null;
+      if (toonTijdlijn) {
+        const restFractieNu = zelfWeergavePos.fractie - Math.floor(zelfWeergavePos.fractie);
+        meKinderen.push(el("div", { class: "tijdlijn" }, [
+          el("div", { class: "tijdlijnvak" }, [
+            el("div", { class: "tijdlijnvoortgang", id: "zelf-tijdlijn-voortgang", style: `width:${tijdlijnPercentage(restFractieNu)}%` }),
+          ]),
+        ]));
+      }
+      if (heeftGekozen) {
+        meKinderen.push(el("div", { class: "conclusieline" }, [
+          document.createTextNode("Op basis van een start om "),
+          el("b", { text: formatTijd(zelf.starttijd_effectief) }),
+          document.createTextNode(" en een gemiddelde rondetijd van "),
+          el("b", { text: formatDuur(zelfRondetijd) }),
+          document.createTextNode(` voor een ${zelf.aantal_spelers}-bal over ${AANTAL_HOLES} holes zou je nu ongeveer op de `),
+          el("b", { text: `${CHECKPOINT_LABEL[zelfPos.checkpoint]} van hole ${zelfPos.hole}` }),
+          document.createTextNode(` moeten zijn. ${conclusie.zin}`),
+        ]));
+      }
+      if (toonTipsKnop) {
+        meKinderen.push(el("button", { class: "tipsbtn", style: "color:" + kaartKleur, onclick: () => { trackerLocal.toontTipsPopup = true; render(); }, text: "Tips om sneller te spelen" }));
+      }
     }
   }
   const meCard = el("div", { class: "card me", style: "background:" + kaartKleur }, meKinderen);
@@ -1136,6 +1322,16 @@ async function renderTracker(app, opts = {}) {
       trackerLocal.bezig = false;
       render();
     }
+  }
+
+  // Bevestiging van een openstaande GPS-suggestie (zie gpsPending in de kaartopbouw hierboven):
+  // zet gpsBevestigd vóór de eigenlijke schrijfactie, zodat de suggestie-UI voor de rest van deze
+  // visit verborgen blijft, en hergebruikt daarna gewoon zelfPositieMelden() — exact dezelfde
+  // schrijfactie als een directe tik zonder GPS.
+  async function zelfPositieBevestigenGps() {
+    if (!trackerLocal.gpsCheckpointDraft) return;
+    trackerLocal.gpsBevestigd = true;
+    await zelfPositieMelden(trackerLocal.gpsCheckpointDraft, zelfHoleWeergave);
   }
 
   // Ronde afgerond (eigen flight): schrijft uitgestapt=true op de eigen rij, zodat deze flight
