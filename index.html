@@ -25,10 +25,16 @@
   .brandwrap{flex:1;min-width:0}
   .brand{font-size:15px;font-weight:800;color:var(--accent);letter-spacing:0.2px}
   .sub{font-size:13px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .screen{flex:1;display:flex;flex-direction:column;justify-content:center;padding:24px 0 40px 0;gap:16px}
-  .screen.tracker{justify-content:flex-start;padding-top:14px;gap:8px}
+  /* flex-start (ipv eerder: center) zodat het invoerveld bij een opkomend toetsenbord niet
+     onder de rand van het scherm verdwijnt — de inhoud begint nu gewoon bovenaan */
+  .screen{flex:1;display:flex;flex-direction:column;justify-content:flex-start;padding:24px 0 40px 0;gap:16px}
+  .screen.tracker{padding-top:14px;gap:8px}
   h1{font-size:22px;font-weight:800;margin:0 0 4px 0}
   p.help{font-size:14px;color:var(--muted-ink);line-height:1.45;margin:0 0 4px 0}
+  .authtitle{font-size:24px;font-weight:800;color:var(--ink);margin:0}
+  .authtagline{font-size:15px;font-weight:700;color:var(--accent);margin:2px 0 0 0}
+  .authdesc{font-size:14px;color:var(--muted-ink);line-height:1.5;margin:10px 0 0 0}
+  .authwelkom{font-size:17px;font-weight:700;color:var(--ink);margin:14px 0 0 0}
   label{font-size:13px;font-weight:700;color:var(--muted-ink);text-transform:uppercase;letter-spacing:0.3px}
   input[type=text], input[type=password], input[inputmode=numeric]{
     width:100%;font-size:22px;font-weight:700;letter-spacing:2px;padding:14px 16px;margin-top:6px;
@@ -78,14 +84,25 @@
     border:1.5px dashed rgba(168,94,28,0.4);cursor:pointer;margin-bottom:8px;font-size:14px;
     font-weight:700;color:var(--warn);text-align:center}
   /* Doorlaat-knop — duidelijk herkenbaar door een stevige rand + lichte tint, zonder een volle
-     blok accentkleur te zijn (dat trok te veel aandacht naast de groene middelste kaart) */
-  .doorlaatbtn{display:block;width:100%;box-sizing:border-box;padding:13px 14px;border-radius:14px;
-    cursor:pointer;text-align:center;background:var(--accent-soft);border:2px solid var(--accent);
-    transition:opacity 0.15s}
+     blok accentkleur te zijn (dat trok te veel aandacht naast de groene middelste kaart).
+     Breedte volgt nu de tekst (ipv de volle kaartbreedte) en staat gecentreerd, met wat meer
+     ruimte boven zich t.o.v. de tekst erboven. */
+  .doorlaatbtn{display:block;width:fit-content;max-width:100%;box-sizing:border-box;padding:13px 20px;
+    border-radius:14px;cursor:pointer;text-align:center;background:var(--accent-soft);
+    border:2px solid var(--accent);transition:opacity 0.15s;margin:16px auto 0 auto}
   .doorlaatbtn.vergrendeld{background:#F0EEE6;border-color:#C7C0AF;opacity:1;cursor:default}
-  .doorlaatbtn .tekst{font-size:15px;font-weight:800;color:var(--accent)}
+  .doorlaatbtn .tekst{font-size:15px;font-weight:800;color:var(--accent);white-space:nowrap}
   .doorlaatbtn.vergrendeld .tekst{color:#9B9585}
-  .gewisseldline{font-size:13px;color:#8A8470;margin-top:6px;line-height:1.35}
+  .gewisseldline{font-size:13px;color:#8A8470;margin-top:6px;line-height:1.35;text-align:center}
+
+  /* Bevestiging voor doorlaten ("Weet je het zeker?") */
+  .bevestigblok{margin:16px auto 0 auto;width:fit-content;max-width:100%}
+  .bevestigtekst{font-size:14px;font-weight:700;color:var(--accent);text-align:center;margin-bottom:8px}
+  .bevestigrow{display:flex;gap:8px;justify-content:center}
+  .bevestigbtn{box-sizing:border-box;padding:11px 16px;border-radius:12px;cursor:pointer;
+    font-size:14px;font-weight:800;text-align:center;white-space:nowrap}
+  .bevestigbtn.ja{background:var(--accent);border:2px solid var(--accent);color:#fff}
+  .bevestigbtn.annuleren{background:#fff;border:2px solid var(--border);color:var(--muted-ink)}
 
   /* Ronde voltooid (eigen kaart) */
   .rondeklaartekst{font-size:14px;color:rgba(255,255,255,0.92);line-height:1.45;margin-bottom:14px}
@@ -296,6 +313,8 @@ function nieuweTrackerLocal() {
   return {
     voorKnopVergrendeld: false,
     achterKnopVergrendeld: false,
+    voorBevestigen: false,    // true = toont "Weet je het zeker?" i.p.v. de doorlaat-knop zelf
+    achterBevestigen: false,
     zelfHoleDraft: null,       // null = volg de live berekende verwachte hole
     voorCorrectieHole: null,  // null = volg de live berekende positie van de flight voor je
     toontTipsPopup: false,
@@ -401,7 +420,10 @@ function renderPersoonscode(app) {
       state.speler = speler;
       state.flight = flight;
       state.fout = null;
-      state.scherm = "pincode";
+      // Bij de eerste keer inloggen is de pincode altijd de vaste standaardwaarde 0000 — die laten
+      // invoeren valideert niets (iedereen kent 'm), dus dan gaan we direct door naar het kiezen
+      // van een eigen pincode in plaats van eerst 0000 te laten intikken.
+      state.scherm = speler.pincode_gewijzigd ? "pincode" : "nieuwe_pincode";
       render();
     } catch (e) {
       state.fout = "Er ging iets mis bij het ophalen van je gegevens. Probeer het zo nog eens.";
@@ -415,9 +437,10 @@ function renderPersoonscode(app) {
   input.addEventListener("keydown", (ev) => { if (ev.key === "Enter") submit(); });
 
   app.append(
-    el("h1", { text: "Inloggen" }),
-    el("p", { class: "help", text: "Vul je persoonscode in — dezelfde code als op je tassenlabel." }),
-    el("label", { text: "Persoonscode" }),
+    el("h1", { class: "authtitle", text: "Welkom bij GoyerFlow" }),
+    el("p", { class: "authtagline", text: "De speelsnelheid tracker" }),
+    el("p", { class: "authdesc", text: "Met deze app zie je live of jouw flight op schema ligt, en kun je de flights voor en achter je eenvoudig laten doorgaan of laten doorlaten." }),
+    el("label", { text: "Goyer Lidcode" }),
     input,
     ...(err ? [err] : []),
     el("button", { class: "btn", id: "submit-persoonscode", onclick: submit, text: "Verder" })
@@ -427,7 +450,6 @@ function renderPersoonscode(app) {
 
 /* ---- Scherm 2: pincode ---- */
 function renderPincode(app) {
-  const voornaam = (state.speler.naam || "").split(" ")[0];
   const input = el("input", { type: "password", inputmode: "numeric", maxlength: "4", placeholder: "••••" });
   const err = meldingNode();
 
@@ -460,8 +482,9 @@ function renderPincode(app) {
   input.addEventListener("keydown", (ev) => { if (ev.key === "Enter") submit(); });
 
   app.append(
-    el("h1", { text: `Welkom, ${voornaam}` }),
-    el("p", { class: "help", text: state.speler.pincode_gewijzigd ? "Vul je pincode in." : "Vul de standaard pincode in (0000) — je wordt daarna gevraagd een eigen pincode te kiezen." }),
+    el("h1", { class: "authtitle", text: "Welkom bij GoyerFlow" }),
+    el("p", { class: "authtagline", text: "De speelsnelheid tracker" }),
+    el("p", { class: "authwelkom", text: `Welkom, ${state.speler.naam || ""}` }),
     el("label", { text: "Pincode" }),
     input,
     ...(err ? [err] : []),
@@ -635,13 +658,27 @@ async function renderTracker(app, opts = {}) {
 
 
     const voorVergrendeld = trackerLocal.voorKnopVergrendeld;
-    voorKinderen.push(el("button", {
-      class: "doorlaatbtn" + (voorVergrendeld ? " vergrendeld" : ""),
-      onclick: () => doorlaatWissel(voor, "voor"),
-    }, [
-      el("div", { class: "tekst", text: "Deze flight laat ons door" }),
-    ]));
-    if (voorVergrendeld) voorKinderen.push(el("div", { class: "gewisseldline", text: "Starttijden gewisseld — jullie spelen nu op elkaars schema." }));
+    if (voorVergrendeld) {
+      voorKinderen.push(el("button", { class: "doorlaatbtn vergrendeld" }, [
+        el("div", { class: "tekst", text: "Deze flight laat ons door" }),
+      ]));
+      voorKinderen.push(el("div", { class: "gewisseldline", text: "Starttijden gewisseld — jullie spelen nu op elkaars schema." }));
+    } else if (trackerLocal.voorBevestigen) {
+      voorKinderen.push(el("div", { class: "bevestigblok" }, [
+        el("div", { class: "bevestigtekst", text: "Weet je het zeker?" }),
+        el("div", { class: "bevestigrow" }, [
+          el("button", { class: "bevestigbtn annuleren", onclick: () => { trackerLocal.voorBevestigen = false; render(); }, text: "Annuleren" }),
+          el("button", { class: "bevestigbtn ja", onclick: () => doorlaatWissel(voor, "voor"), text: "Ja, doorlaten" }),
+        ]),
+      ]));
+    } else {
+      voorKinderen.push(el("button", {
+        class: "doorlaatbtn",
+        onclick: () => { trackerLocal.voorBevestigen = true; render(); },
+      }, [
+        el("div", { class: "tekst", text: "Deze flight laat ons door" }),
+      ]));
+    }
   }
   const voorCard = el("div", { class: "card" }, voorKinderen);
 
@@ -709,13 +746,27 @@ async function renderTracker(app, opts = {}) {
       document.createTextNode(` van hole ${achterPos.hole} zijn.`),
     ]));
     const achterVergrendeld = trackerLocal.achterKnopVergrendeld;
-    achterKinderen.push(el("button", {
-      class: "doorlaatbtn" + (achterVergrendeld ? " vergrendeld" : ""),
-      onclick: () => doorlaatWissel(achter, "achter"),
-    }, [
-      el("div", { class: "tekst", text: "Wij laten deze flight door" }),
-    ]));
-    if (achterVergrendeld) achterKinderen.push(el("div", { class: "gewisseldline", text: "Starttijden gewisseld — jullie spelen nu op elkaars schema." }));
+    if (achterVergrendeld) {
+      achterKinderen.push(el("button", { class: "doorlaatbtn vergrendeld" }, [
+        el("div", { class: "tekst", text: "Wij laten deze flight door" }),
+      ]));
+      achterKinderen.push(el("div", { class: "gewisseldline", text: "Starttijden gewisseld — jullie spelen nu op elkaars schema." }));
+    } else if (trackerLocal.achterBevestigen) {
+      achterKinderen.push(el("div", { class: "bevestigblok" }, [
+        el("div", { class: "bevestigtekst", text: "Weet je het zeker?" }),
+        el("div", { class: "bevestigrow" }, [
+          el("button", { class: "bevestigbtn annuleren", onclick: () => { trackerLocal.achterBevestigen = false; render(); }, text: "Annuleren" }),
+          el("button", { class: "bevestigbtn ja", onclick: () => doorlaatWissel(achter, "achter"), text: "Ja, doorlaten" }),
+        ]),
+      ]));
+    } else {
+      achterKinderen.push(el("button", {
+        class: "doorlaatbtn",
+        onclick: () => { trackerLocal.achterBevestigen = true; render(); },
+      }, [
+        el("div", { class: "tekst", text: "Wij laten deze flight door" }),
+      ]));
+    }
   }
   const achterCard = el("div", { class: "card" }, achterKinderen);
 
@@ -821,6 +872,7 @@ async function renderTracker(app, opts = {}) {
   async function doorlaatWissel(buur, kant) {
     if (trackerLocal.bezig || trackerLocal[`${kant}KnopVergrendeld`]) return;
     trackerLocal.bezig = true;
+    trackerLocal[`${kant}Bevestigen`] = false; // bevestigingsblok sluiten, ongeacht de uitkomst
     const zelfOudeStart = zelf.starttijd_effectief;
     try {
       await sb(`flights?id=eq.${zelf.id}`, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ starttijd_effectief: buur.starttijd_effectief }) });
