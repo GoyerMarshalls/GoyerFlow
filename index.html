@@ -87,11 +87,13 @@
   .stepvalue{font-size:26px;font-weight:800;color:var(--warn);min-width:34px;text-align:center}
   .stepvalue.big{font-size:52px;color:#fff;min-width:60px}
 
-  /* Marker-knoppen (Afslag/Fairway/Green) */
-  .markerrow{display:flex;gap:6px;margin-bottom:6px}
+  /* Marker-knoppen (Afslag/Fairway/Green). De niet-"big" variant (inhaal-correctierijen op de voor-/
+     achter-kaart) kreeg meer padding en tussenruimte (was 11px 4px / gap 6px) — te klein en te dicht
+     op elkaar, waardoor per ongeluk de verkeerde knop aangetikt werd (gemeld door Kay). */
+  .markerrow{display:flex;gap:10px;margin-bottom:6px}
   .markerrow.big{gap:8px}
-  .markerbtn{flex:1;box-sizing:border-box;padding:11px 4px;border-radius:10px;cursor:pointer;
-    font-size:14px;font-weight:700;text-align:center}
+  .markerbtn{flex:1;box-sizing:border-box;padding:15px 6px;border-radius:12px;cursor:pointer;
+    font-size:15px;font-weight:700;text-align:center}
   .markerbtn.big{padding:13px 6px;border-radius:14px;font-size:16px;border-width:2px}
 
   /* Inhaal-correctie (flight-voor-jou) */
@@ -127,6 +129,7 @@
     border:none;cursor:pointer;font-size:15px;font-weight:800;color:var(--accent);text-align:center}
 
   /* GPS-ondersteunde check-in (eigen kaart) — zie startGpsPositiebepaling()/gpsPending in index.html */
+  .gpssubregel{font-size:13px;font-weight:600;color:rgba(255,255,255,0.75);text-align:center;margin-bottom:10px}
   .gpsuitleg{font-size:13px;color:rgba(255,255,255,0.85);line-height:1.4;margin-bottom:10px}
   .gpsbevestigbtn{margin-top:12px;width:100%;box-sizing:border-box;padding:13px 14px;border-radius:14px;
     background:#fff;border:none;cursor:pointer;font-size:15px;font-weight:800;text-align:center}
@@ -223,7 +226,7 @@
 
 <script>
 /* ============================================================================================
-   GoyerFlow — v0.2.0
+   GoyerFlow — v0.3.1
    Versienummer bij elke volgende build op TWEE plekken bijwerken: deze kopregel-comment en de
    APP_VERSIE-constante hieronder (zelfde patroon als de Marshal App — zie diens bouwgeschiedenis
    voor de precedent-regel). De zichtbare versie-indicator naast "GoyerFlow" in de topbar wordt
@@ -236,11 +239,22 @@
    op de achtergrond een eenmalige, foreground GPS-fix opgevraagd (stilzwijgend bij weigering/
    time-out/geen ondersteuning — de kaart werkt dan exact als voorheen) en vergeleken met HOLE_GPS
    (door Kay zelf op de baan ingemeten, zie dat blok hieronder). Bij een gevonden match toont de
-   kaart een voorstel ("Je bent op de … van hole … — bevestig of pas aan") dat de speler altijd
+   kaart een voorstel ("Je bent op de … van hole …, bevestig of pas aan") dat de speler altijd
    zelf moet bevestigen of aanpassen — nooit een automatische melding. Zie
    claude/bouwgeschiedenis-goyerflow-app.md voor de volledige UX-specificatie.
+   v0.3.1: vier bugfixes/verbeteringen na Kay's eerste test van v0.3.0. (1) GPS-suggestie negeert nu
+   een fix die te ver van elk checkpoint ligt (GPS_MAX_AFSTAND_METER=400m) i.p.v. altijd de
+   "dichtstbijzijnde" te tonen, ook van kilometers afstand. (2) "Bevestig of pas aan" staat nu op een
+   eigen regel i.p.v. vastgeplakt aan de hole-tekst. (3) posVanMetMelding(): de voor-/achterkaart
+   gebruikt nu de EIGEN melding van die buurflight (indien aanwezig) i.p.v. altijd de pure
+   schema-positie — anders werd een al gemelde, van het schema afwijkende positie genegeerd voor de
+   doorlaat-/inhaal-logica. (4) doorlaatWissel() wisselt niet meer de ruwe starttijd_effectief 1-op-1
+   (sprong onrealistisch door bij een tempoverschil tussen de flights), maar berekent voor elke
+   flight een starttijd die, met haar EIGEN tempo, de fractie van de ander overneemt. Ook: de
+   inhaal-correctierijen (Afslag/Fairway/Green-knoppen op de voor-/achter-kaart) kregen meer padding
+   en tussenruimte — te klein/dicht op elkaar, waardoor per ongeluk de verkeerde knop werd aangetikt.
    ============================================================================================ */
-const APP_VERSIE = "0.3.0";
+const APP_VERSIE = "0.3.1";
 
 /* ============================================================================================
    CONFIGURATIE — eenmalig invullen (zelfde patroon als de Marshal App: deze waarden zijn
@@ -508,8 +522,19 @@ function holeCheckpointCoord(hole, checkpoint) {
   return { lat: (punten.afslag.lat + punten.green.lat) / 2, lon: (punten.afslag.lon + punten.green.lon) / 2 };
 }
 
+// Verst toegestane afstand (in meters) tussen een GPS-fix en het dichtstbijzijnde checkpoint voordat
+// die match nog als bruikbare suggestie geldt — zonder deze grens geeft dichtstbijzijndeCheckpoint()
+// ALTIJD een "dichtstbijzijnde" terug, ook van kilometers afstand (bijv. thuis getest, ver van de
+// baan), wat een onzinnige suggestie zou tonen. Op basis van de eigen inmeting: de langste afslag-
+// green-afstand binnen één hole is ~510m, de hele baan past in een rechthoek van ~1,15km diagonaal —
+// 400m is ruim boven wat je op de baan zelf tussen een punt en het dichtstbijzijnde checkpoint kunt
+// tegenkomen, maar ruim onder "duidelijk niet op de baan".
+const GPS_MAX_AFSTAND_METER = 400;
+
 // Dichtstbijzijnde van alle 18×3 checkpoints t.o.v. een gemeten positie — puur een suggestie, zie
-// de toelichting hierboven.
+// de toelichting hierboven. Geeft null terug als zelfs de dichtstbijzijnde match verder weg ligt dan
+// GPS_MAX_AFSTAND_METER (bijv. thuis getest) — de aanroeper behandelt dat hetzelfde als "geen GPS
+// beschikbaar", dus geen suggestie i.p.v. een misleidende.
 function dichtstbijzijndeCheckpoint(positie) {
   let beste = null;
   for (let hole = 1; hole <= AANTAL_HOLES; hole++) {
@@ -520,6 +545,7 @@ function dichtstbijzijndeCheckpoint(positie) {
       if (!beste || afstandMeter < beste.afstandMeter) beste = { hole, checkpoint, afstandMeter };
     }
   }
+  if (beste && beste.afstandMeter > GPS_MAX_AFSTAND_METER) return null;
   return beste;
 }
 
@@ -553,12 +579,14 @@ async function startGpsPositiebepaling() {
   trackerLocal.gpsBevestigd = false;
   const positie = await haalGpsPositieOp();
   if (state.scherm !== "tracker") return;
-  if (!positie) {
+  const suggestie = positie ? dichtstbijzijndeCheckpoint(positie) : null;
+  if (!suggestie) {
+    // Geen fix, of wel een fix maar te ver van elk checkpoint (zie GPS_MAX_AFSTAND_METER, bijv.
+    // thuis getest) — in beide gevallen geen suggestie tonen, kaart werkt als vandaag.
     trackerLocal.gpsStatus = "nietBeschikbaar";
     render();
     return;
   }
-  const suggestie = dichtstbijzijndeCheckpoint(positie);
   trackerLocal.gpsStatus = "beschikbaar";
   trackerLocal.gpsSuggestie = suggestie;
   trackerLocal.gpsCheckpointDraft = suggestie.checkpoint;
@@ -949,13 +977,35 @@ async function renderTracker(app, opts = {}) {
   const achter = index >= 0 && index < flights.length - 1 ? flights[index + 1] : null;
   const zelf = flights[index] || state.flight;
 
+  // Blijft PUUR schema-gebaseerd (starttijd_effectief, geen eigen melding) — nodig voor zelfPos
+  // hieronder, die bewust tegen het ORIGINELE rondeschema vergelijkt (zie de "op schema"-conclusie
+  // verderop), niet tegen een al gemelde/geprojecteerde positie.
   function posVan(flight) {
     const minutenPerHole = rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp) / AANTAL_HOLES;
     return { ...verwachtePositie(flight.starttijd_effectief, minutenPerHole, nu), minutenPerHole };
   }
 
-  const voorPos = voor ? posVan(voor) : null;
-  const achterPos = achter ? posVan(achter) : null;
+  // Voor de BUUR-flights (voor/achter): als die flight zelf al een positie gemeld heeft — via hun
+  // eigen inlog, dezelfde gerapporteerde_hole/checkpoint/tijdstip-velden als bij "zelf" — is dat een
+  // veel betrouwbaardere schatting dan de pure schema-aanname, zeker als hun werkelijke tempo van
+  // het schema afwijkt. Zelfde aanpak als bij de eigen kaart (projecteerVanafMelding), nu ook
+  // toegepast op de buurflights; valt terug op posVan() zolang er nog geen melding van DIE flight
+  // is. Bewust NIET gebruikt voor zelfPos (zie hierboven).
+  //
+  // Uitzondering: als deze flight al eens HANDMATIG gecorrigeerd is (gecorrigeerd=true, via
+  // correctieVanVoorMelden/-Achter hieronder), gaat die correctie voor op een eigen melding — een
+  // correctie is een bewuste, actuele waarneming van de naaste speler; zonder deze uitzondering zou
+  // een (mogelijk verouderde) eigen melding van de buurflight een correctie onzichtbaar maken (de
+  // correctie past alleen starttijd_effectief aan, niet de meldingsvelden van de buur).
+  function posVanMetMelding(flight) {
+    const basis = posVan(flight);
+    if (flight.gecorrigeerd) return basis;
+    const gemeld = projecteerVanafMelding(flight, basis.minutenPerHole, nu);
+    return gemeld ? { ...gemeld, minutenPerHole: basis.minutenPerHole } : basis;
+  }
+
+  const voorPos = voor ? posVanMetMelding(voor) : null;
+  const achterPos = achter ? posVanMetMelding(achter) : null;
   const zelfPos = posVan(zelf);
   const zelfRondetijd = rondetijdVoor(params, zelf.aantal_spelers, zelf.gemiddelde_hcp);
 
@@ -1131,9 +1181,14 @@ async function renderTracker(app, opts = {}) {
   const meKinderen = [el("div", {
     class: "eyebrow",
     text: gpsPending
-      ? `Je bent op de ${CHECKPOINT_LABEL[trackerLocal.gpsCheckpointDraft]} van hole ${zelfHoleWeergave} — bevestig of pas aan`
+      ? `Je bent op de ${CHECKPOINT_LABEL[trackerLocal.gpsCheckpointDraft]} van hole ${zelfHoleWeergave}`
       : (heeftGekozen ? "Waar is jouw flight nu?" : "Maak een keuze: waar is jouw flight nu?"),
   })];
+  if (gpsPending) {
+    // Losse regel i.p.v. aan de eyebrow-tekst vastgeplakt — op een klein scherm liep "...van hole 1
+    // — bevestig of pas aan" lelijk af over twee regels middenin de zin.
+    meKinderen.push(el("div", { class: "gpssubregel", text: "Bevestig of pas aan" }));
+  }
   if (zelfRondeVoltooid) {
     // Ronde voltooid: er is geen hole 19 om naar te schuiven, dus geen stepper/marker-knoppen meer —
     // alleen een expliciete bevestiging (zelfRondeAfgerond) sluit de ronde daadwerkelijk af en
@@ -1430,17 +1485,31 @@ async function renderTracker(app, opts = {}) {
     }
   }
 
-  // Generieke doorlaat-wissel: zelf en de buurflight (voor of achter) wisselen van starttijd. Welke
-  // van de twee daarna "voor"/"achter" is, volgt vanzelf uit de eerstvolgende sortering op
-  // starttijd_effectief — geen aparte queue-boekhouding nodig (zie opmerking hierboven bij voor/achter).
+  // Generieke doorlaat-wissel: zelf en de buurflight (voor of achter) wisselen van positie op de
+  // baan. Welke van de twee daarna "voor"/"achter" is, volgt vanzelf uit de eerstvolgende sortering
+  // op starttijd_effectief — geen aparte queue-boekhouding nodig (zie opmerking hierboven bij
+  // voor/achter).
+  //
+  // NIET de ruwe starttijd_effectief 1-op-1 omwisselen: zelf en de buurflight hebben vaak een
+  // ANDER tempo (minutenPerHole hangt af van flightgrootte/hcp — zie rondetijdVoor), dus dezelfde
+  // klokwaarde levert voor elke flight een andere live-positie op. Een 2-bal die de starttijd van
+  // een 4-bal overneemt "springt" zo meteen een paar holes door, puur door het tempoverschil — geen
+  // echte doorlaat. In plaats daarvan krijgt elke flight een nieuwe starttijd_effectief die, MET HAAR
+  // EIGEN tempo, NU precies op de fractie van de ander uitkomt: zelf neemt zo letterlijk de huidige
+  // positie van de buur over (en andersom), en beiden lopen vanaf nu verder op hun eigen tempo.
+  // Zelfde aanpak als correctieVanVoorMelden/-Achter hierboven ("doelFractie → nieuwe starttijd"),
+  // nu symmetrisch op beide flights toegepast. voorPos/achterPos/zelfWeergavePos komen uit de
+  // buitenste renderTracker-scope en reflecteren dus ook een eventuele eigen melding/correctie.
   async function doorlaatWissel(buur, kant) {
     if (trackerLocal.bezig || trackerLocal[`${kant}KnopVergrendeld`]) return;
     trackerLocal.bezig = true;
     trackerLocal[`${kant}Bevestigen`] = false; // bevestigingsblok sluiten, ongeacht de uitkomst
-    const zelfOudeStart = zelf.starttijd_effectief;
+    const buurPos = kant === "voor" ? voorPos : achterPos;
+    const nieuweStartZelf = new Date(nu.getTime() - buurPos.fractie * zelfPos.minutenPerHole * 60000).toISOString();
+    const nieuweStartBuur = new Date(nu.getTime() - zelfWeergavePos.fractie * buurPos.minutenPerHole * 60000).toISOString();
     try {
-      await sb(`flights?id=eq.${zelf.id}`, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ starttijd_effectief: buur.starttijd_effectief }) });
-      await sb(`flights?id=eq.${buur.id}`, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ starttijd_effectief: zelfOudeStart }) });
+      await sb(`flights?id=eq.${zelf.id}`, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ starttijd_effectief: nieuweStartZelf }) });
+      await sb(`flights?id=eq.${buur.id}`, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ starttijd_effectief: nieuweStartBuur }) });
       trackerLocal[`${kant}KnopVergrendeld`] = true;
       trackerLocal.fout = null;
       setTimeout(() => { trackerLocal[`${kant}KnopVergrendeld`] = false; render(); }, 4000);
