@@ -226,7 +226,7 @@
 
 <script>
 /* ============================================================================================
-   GoyerFlow — v0.3.1
+   GoyerFlow — v0.4.0
    Versienummer bij elke volgende build op TWEE plekken bijwerken: deze kopregel-comment en de
    APP_VERSIE-constante hieronder (zelfde patroon als de Marshal App — zie diens bouwgeschiedenis
    voor de precedent-regel). De zichtbare versie-indicator naast "GoyerFlow" in de topbar wordt
@@ -253,8 +253,33 @@
    flight een starttijd die, met haar EIGEN tempo, de fractie van de ander overneemt. Ook: de
    inhaal-correctierijen (Afslag/Fairway/Green-knoppen op de voor-/achter-kaart) kregen meer padding
    en tussenruimte — te klein/dicht op elkaar, waardoor per ongeluk de verkeerde knop werd aangetikt.
+   v0.4.0: doorlaatWissel() volledig herzien op Kay's model (24 okt 2026, zie bouwgeschiedenis). De
+   PASSERENDE flight (die doorgelaten wordt) past niets aan — speelt gewoon door op eigen tempo. Alle
+   kosten van de inhaalactie landen bij de flight die DOORLAAT: die staat stil op het checkpoint
+   waar de doorlaat plaatsvindt, precies zo lang als de passerende flight nodig heeft om het
+   volgende checkpoint te spelen (bijv. een doorlaat op de Fairway → de doorlatende flight staat
+   ongeveer twee keer zo lang op de Fairway als normaal). Vereist een nieuwe kolom-set in Supabase
+   (wacht_tot/wacht_hole/wacht_checkpoint) — zie schema.sql, Fase 2c. De vorige aanpak (symmetrische
+   fractie-wissel tussen beide flights, v0.3.1) is hiermee vervallen.
+   v0.5.0: eigen Teecontrol-sync (Edge Function, los van de Marshal App-NAS) om met échte data te
+   kunnen testen — zie claude/bouwgeschiedenis-goyerflow-app.md. Hierbij TIJDELIJK de pincode-check
+   uitgeschakeld (zie TIJDELIJK_SKIP_PINCODE_VOOR_VELDTEST hieronder), zodat Kay met échte lidcodes
+   van spelers die daadwerkelijk op de baan zijn kan inloggen zonder voor elk van hen eerst een
+   pincode te moeten zetten. Zet die vlag terug op false zodra de veldtest voorbij is.
    ============================================================================================ */
-const APP_VERSIE = "0.3.1";
+const APP_VERSIE = "0.5.0";
+
+/* ============================================================================================
+   TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
+   permanent bedoeld. Zolang dit op true staat, wordt het hele pincode-scherm overgeslagen: een
+   geldige persoonscode is op zichzelf genoeg om in te loggen (zie renderPersoonscode). Reden:
+   Kay test deze fase met échte lidcodes van spelers die nu op de baan zijn, en wil niet voor elk
+   van hen eerst handmatig een pincode moeten zetten. Dit verzwakt het (al UI-only, niet
+   cryptografisch) inlogmodel nog verder dan het al was — bewust tijdelijk, en zichtbaar gemaakt
+   met een waarschuwing op het inlogscherm zelf (zie renderPersoonscode) zodat dit nooit onopgemerkt
+   aan blijft staan. Zet dit terug op false zodra de veldtest voorbij is.
+   ============================================================================================ */
+const TIJDELIJK_SKIP_PINCODE_VOOR_VELDTEST = true;
 
 /* ============================================================================================
    CONFIGURATIE — eenmalig invullen (zelfde patroon als de Marshal App: deze waarden zijn
@@ -418,6 +443,60 @@ function checkpointOrdinaal(hole, checkpoint) {
 function doorlaatMarge(hole) {
   const par = HOLE_PAR[hole - 1] ?? 4;
   return par === 3 ? 2 : 3;
+}
+
+// Het checkpoint ONMIDDELLIJK NA het gegeven checkpoint, in de vaste Afslag → Fairway → Green →
+// volgende hole/Afslag-volgorde — gebruikt om de wachttijd bij een doorlaat te bepalen (zie
+// duurTotVolgendCheckpoint/doorlaatWissel hieronder). Klemt op de laatste green van de ronde (geen
+// hole 19).
+function volgendCheckpoint(hole, checkpoint) {
+  const idx = { afslag: 0, fairway: 1, green: 2 }[checkpoint] ?? 0;
+  const ordinaal = (hole - 1) * 3 + idx + 1;
+  const nieuweHole = Math.floor(ordinaal / 3) + 1;
+  if (nieuweHole > AANTAL_HOLES) return { hole: AANTAL_HOLES, checkpoint: "green" };
+  return { hole: nieuweHole, checkpoint: CHECKPOINT_VOLGORDE[ordinaal % 3] };
+}
+
+// Hoe lang (in minuten, met het EIGEN tempo van de spelende flight) het duurt om van het gegeven
+// checkpoint naar het volgende te spelen — zie doorlaatWissel: de flight die doorlaat staat precies
+// zo lang stil als de doorgelaten flight nodig heeft om dat volgende stuk te spelen. Levert 0 op bij
+// een holeovergang (green → afslag van de volgende hole): die overgang kost in dit rekenmodel
+// sowieso al geen tijd (checkpointFractie(green) van hole N en checkpointFractie(afslag) van hole
+// N+1 vallen op precies dezelfde fractie) — bestaande modelkeuze, geen nieuwe aanname hier.
+function duurTotVolgendCheckpoint(hole, checkpoint, minutenPerHole) {
+  const huidigeFractie = (hole - 1) + checkpointFractie(checkpoint);
+  const doel = volgendCheckpoint(hole, checkpoint);
+  const doelFractie = (doel.hole - 1) + checkpointFractie(doel.checkpoint);
+  return Math.max(0, doelFractie - huidigeFractie) * minutenPerHole;
+}
+
+// Wachttijd na een doorlaat (zie doorlaatWissel in renderTracker, en de kolommen wacht_tot/
+// wacht_hole/wacht_checkpoint in schema.sql — Fase 2c): Kay's model is dat de flight die doorlaat
+// stilstaat op het checkpoint waar dat gebeurt, en pas na wacht_tot haar eigen tempo weer laat
+// doortellen. Dat is EXACT (geen middelpunt-truc nodig, zoals bij projecteerVanafMelding — dit is
+// een bewuste, precieze waarneming op het moment van doorlaten, geen mogelijk-onnauwkeurige eigen
+// melding) tot wacht_tot, en loopt daarna normaal door vanaf dat ankerpunt — zelfde projectie-vorm
+// als projecteerVanafMelding, nu met wacht_tot als ankertijdstip in plaats van gerapporteerd_tijdstip.
+// Overschrijft bewust ELKE andere positiebron (schema, eigen melding, correctie) zolang hij actief
+// is: dit is de meest recente, fysiek geobserveerde waarheid. Raakt nooit de PURE schema-positie
+// (posVan/verwachtePositie zonder dit) die voor de "op schema"-vergelijking gebruikt wordt — die
+// moet de afwijking door het wachten juist laten zien, niet verbergen.
+function pasWachttijdToe(pos, flight, minutenPerHole, nu) {
+  if (!flight.wacht_tot) return pos;
+  const wachtTot = new Date(flight.wacht_tot).getTime();
+  const ankerFractie = (flight.wacht_hole - 1) + checkpointFractie(flight.wacht_checkpoint);
+  if (nu.getTime() < wachtTot) {
+    return { ...pos, hole: flight.wacht_hole, checkpoint: flight.wacht_checkpoint, fractie: ankerFractie };
+  }
+  const minutenSindsWachttot = (nu.getTime() - wachtTot) / 60000;
+  const fractie = ankerFractie + minutenSindsWachttot / minutenPerHole;
+  const holeIndex = Math.floor(fractie);
+  const rest = fractie - holeIndex;
+  let checkpoint = "afslag";
+  if (rest >= 0.75) checkpoint = "green";
+  else if (rest >= 0.25) checkpoint = "fairway";
+  const hole = Math.max(1, Math.min(AANTAL_HOLES, holeIndex + 1));
+  return { ...pos, hole, checkpoint, fractie };
 }
 
 // Ronde voltooid: de ONGECLEMDE fractie (dus los van de weergegeven hole, die bij
@@ -799,6 +878,15 @@ function renderPersoonscode(app) {
       state.speler = speler;
       state.flight = flight;
       state.fout = null;
+      if (TIJDELIJK_SKIP_PINCODE_VOOR_VELDTEST) {
+        // Veldtest-modus (zie bouwgeschiedenis, 24 oktober 2026): persoonscode alleen is genoeg,
+        // geen pincode-scherm en geen verplichte pincode-wijziging. Wel gewoon gelogd als geslaagde
+        // login, zodat login_log net als normaal bijhoudt wie er is ingelogd en wanneer.
+        loggen(code, "login", true);
+        state.scherm = "tracker";
+        render();
+        return;
+      }
       // Bij de eerste keer inloggen is de pincode altijd de vaste standaardwaarde 0000 — die laten
       // invoeren valideert niets (iedereen kent 'm), dus dan gaan we direct door naar het kiezen
       // van een eigen pincode in plaats van eerst 0000 te laten intikken.
@@ -821,6 +909,9 @@ function renderPersoonscode(app) {
       el("p", { class: "authtagline", text: "De speelsnelheid tracker" }),
     ]),
     el("p", { class: "authdesc", text: "Deze app biedt inzicht in de speelsnelheid van jouw flight op De Goyer." }),
+    ...(TIJDELIJK_SKIP_PINCODE_VOOR_VELDTEST
+      ? [el("p", { class: "msg warn", text: "⚠️ Veldtest-modus: de pincode-check is tijdelijk uitgeschakeld. Een lidcode is op zichzelf genoeg om in te loggen." })]
+      : []),
     el("label", { text: "Log in met je Goyer Lidcode" }),
     input,
     ...(err ? [err] : []),
@@ -1004,8 +1095,10 @@ async function renderTracker(app, opts = {}) {
     return gemeld ? { ...gemeld, minutenPerHole: basis.minutenPerHole } : basis;
   }
 
-  const voorPos = voor ? posVanMetMelding(voor) : null;
-  const achterPos = achter ? posVanMetMelding(achter) : null;
+  const voorPosVoorWacht = voor ? posVanMetMelding(voor) : null;
+  const voorPos = voorPosVoorWacht ? pasWachttijdToe(voorPosVoorWacht, voor, voorPosVoorWacht.minutenPerHole, nu) : null;
+  const achterPosVoorWacht = achter ? posVanMetMelding(achter) : null;
+  const achterPos = achterPosVoorWacht ? pasWachttijdToe(achterPosVoorWacht, achter, achterPosVoorWacht.minutenPerHole, nu) : null;
   const zelfPos = posVan(zelf);
   const zelfRondetijd = rondetijdVoor(params, zelf.aantal_spelers, zelf.gemiddelde_hcp);
 
@@ -1024,7 +1117,8 @@ async function renderTracker(app, opts = {}) {
   // sprong naar een andere hole), en loopt hij daarna vanzelf door. zelfPos zelf blijft ongewijzigd
   // en wordt verderop nog los gebruikt voor de "op schema"-vergelijking (deltaHoles/conclusie),
   // want dat vergelijkt een melding bewust tegen het ORIGINELE, ongecorrigeerde rondeschema.
-  const zelfWeergavePos = (heeftGekozen ? projecteerVanafMelding(zelf, zelfPos.minutenPerHole, nu) : null) ?? zelfPos;
+  const zelfWeergavePosVoorWacht = (heeftGekozen ? projecteerVanafMelding(zelf, zelfPos.minutenPerHole, nu) : null) ?? zelfPos;
+  const zelfWeergavePos = pasWachttijdToe(zelfWeergavePosVoorWacht, zelf, zelfPos.minutenPerHole, nu);
 
   // Ronde voltooid: vanaf hier toont elke kaart een eindstatus in plaats van door te blijven
   // rekenen aan een hole die niet bestaat (zie rondeVoltooid()). Voor de eigen kaart op basis van
@@ -1120,7 +1214,7 @@ async function renderTracker(app, opts = {}) {
       voorKinderen.push(el("button", { class: "doorlaatbtn vergrendeld" }, [
         el("div", { class: "tekst", text: "Doorgelaten? Klik hier." }),
       ]));
-      voorKinderen.push(el("div", { class: "gewisseldline", text: "Starttijden gewisseld — jullie spelen nu op elkaars schema." }));
+      voorKinderen.push(el("div", { class: "gewisseldline", text: "Wachttijd verwerkt — de flight voor je staat even stil, jij speelt gewoon door." }));
     } else if (trackerLocal.voorBevestigen) {
       voorKinderen.push(el("div", { class: "bevestigblok" }, [
         el("div", { class: "bevestigtekst", text: "Weet je het zeker?" }),
@@ -1289,7 +1383,7 @@ async function renderTracker(app, opts = {}) {
       achterKinderen.push(el("button", { class: "doorlaatbtn vergrendeld" }, [
         el("div", { class: "tekst", text: "Doorlaten? Klik hier." }),
       ]));
-      achterKinderen.push(el("div", { class: "gewisseldline", text: "Starttijden gewisseld — jullie spelen nu op elkaars schema." }));
+      achterKinderen.push(el("div", { class: "gewisseldline", text: "Wachttijd verwerkt — jij staat even stil, de flight achter je speelt gewoon door." }));
     } else if (trackerLocal.achterBevestigen) {
       achterKinderen.push(el("div", { class: "bevestigblok" }, [
         el("div", { class: "bevestigtekst", text: "Weet je het zeker?" }),
@@ -1485,31 +1579,47 @@ async function renderTracker(app, opts = {}) {
     }
   }
 
-  // Generieke doorlaat-wissel: zelf en de buurflight (voor of achter) wisselen van positie op de
-  // baan. Welke van de twee daarna "voor"/"achter" is, volgt vanzelf uit de eerstvolgende sortering
-  // op starttijd_effectief — geen aparte queue-boekhouding nodig (zie opmerking hierboven bij
-  // voor/achter).
+  // Generieke doorlaat-wissel (Kay's model, 24 okt 2026 — zie bouwgeschiedenis): de PASSERENDE
+  // flight (die doorgelaten wordt) past helemaal niets aan — ze speelt gewoon door op haar eigen
+  // tempo, geen kunstmatige sprong. Alle kosten van het inhaalmoment landen bij de flight die
+  // DOORLAAT: die staat stil op het checkpoint waar de doorlaat plaatsvindt, precies zo lang als de
+  // passerende flight nodig heeft (met HAAR EIGEN tempo) om het volgende checkpoint te spelen (zie
+  // duurTotVolgendCheckpoint) — bijvoorbeeld: een doorlaat op de Fairway betekent dat de doorlatende
+  // flight twee keer zo lang op de Fairway blijft staan als normaal, omdat de wachttijd ongeveer
+  // even lang is als de tijd die de doorlatende flight daar zelf al normaal zou doorbrengen.
   //
-  // NIET de ruwe starttijd_effectief 1-op-1 omwisselen: zelf en de buurflight hebben vaak een
-  // ANDER tempo (minutenPerHole hangt af van flightgrootte/hcp — zie rondetijdVoor), dus dezelfde
-  // klokwaarde levert voor elke flight een andere live-positie op. Een 2-bal die de starttijd van
-  // een 4-bal overneemt "springt" zo meteen een paar holes door, puur door het tempoverschil — geen
-  // echte doorlaat. In plaats daarvan krijgt elke flight een nieuwe starttijd_effectief die, MET HAAR
-  // EIGEN tempo, NU precies op de fractie van de ander uitkomt: zelf neemt zo letterlijk de huidige
-  // positie van de buur over (en andersom), en beiden lopen vanaf nu verder op hun eigen tempo.
-  // Zelfde aanpak als correctieVanVoorMelden/-Achter hierboven ("doelFractie → nieuwe starttijd"),
-  // nu symmetrisch op beide flights toegepast. voorPos/achterPos/zelfWeergavePos komen uit de
-  // buitenste renderTracker-scope en reflecteren dus ook een eventuele eigen melding/correctie.
+  // Opgeslagen als wacht_tot/wacht_hole/wacht_checkpoint op de doorlatende flight (zie
+  // pasWachttijdToe hierboven) i.p.v. een directe starttijd_effectief-aanpassing: een simpele
+  // tijdverschuiving van het hele schema zou de LIVE weergave tijdens het wachten zelf tijdelijk
+  // laten terugspringen naar een eerder checkpoint (wiskundig onvermijdelijk bij één rechte lijn
+  // door één ankerpunt) voordat hij weer bij de juiste positie uitkomt — met een los wacht_tot-
+  // ankerpunt blijft de kaart tijdens het hele wachten gewoon het juiste checkpoint tonen.
+  //
+  // kant "voor": de buurflight (voor) laat zelf door — buur wacht, zelf (de passerende partij)
+  // wordt niet aangepast. kant "achter": zelf laat de buurflight (achter) door — zelf wacht, buur
+  // (de passerende partij) wordt niet aangepast. voorPos/achterPos/zelfWeergavePos komen uit de
+  // buitenste renderTracker-scope en reflecteren dus ook een eventuele eigen melding/correctie/
+  // eerdere wachttijd.
   async function doorlaatWissel(buur, kant) {
     if (trackerLocal.bezig || trackerLocal[`${kant}KnopVergrendeld`]) return;
     trackerLocal.bezig = true;
     trackerLocal[`${kant}Bevestigen`] = false; // bevestigingsblok sluiten, ongeacht de uitkomst
-    const buurPos = kant === "voor" ? voorPos : achterPos;
-    const nieuweStartZelf = new Date(nu.getTime() - buurPos.fractie * zelfPos.minutenPerHole * 60000).toISOString();
-    const nieuweStartBuur = new Date(nu.getTime() - zelfWeergavePos.fractie * buurPos.minutenPerHole * 60000).toISOString();
+    const wachtendeFlight = kant === "voor" ? buur : zelf;
+    const wachtendePos = kant === "voor" ? voorPos : zelfWeergavePos;
+    const passerendePos = kant === "voor" ? zelfWeergavePos : achterPos;
+    // minutenPerHole apart opgevraagd (i.p.v. passerendePos.minutenPerHole): projecteerVanafMelding
+    // (gebruikt door zelfWeergavePos zodra er al een eigen melding is) geeft dat veld niet terug —
+    // zelfPos/achterPos hebben het altijd (zie posVan), en het tempo hangt sowieso alleen af van
+    // flightgrootte/hcp, nooit van de gemelde positie.
+    const passerendeMinutenPerHole = kant === "voor" ? zelfPos.minutenPerHole : achterPos.minutenPerHole;
+    const wachtMinuten = duurTotVolgendCheckpoint(passerendePos.hole, passerendePos.checkpoint, passerendeMinutenPerHole);
+    const wachtTot = new Date(nu.getTime() + wachtMinuten * 60000).toISOString();
     try {
-      await sb(`flights?id=eq.${zelf.id}`, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ starttijd_effectief: nieuweStartZelf }) });
-      await sb(`flights?id=eq.${buur.id}`, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ starttijd_effectief: nieuweStartBuur }) });
+      await sb(`flights?id=eq.${wachtendeFlight.id}`, {
+        method: "PATCH",
+        prefer: "return=minimal",
+        body: JSON.stringify({ wacht_tot: wachtTot, wacht_hole: wachtendePos.hole, wacht_checkpoint: wachtendePos.checkpoint }),
+      });
       trackerLocal[`${kant}KnopVergrendeld`] = true;
       trackerLocal.fout = null;
       setTimeout(() => { trackerLocal[`${kant}KnopVergrendeld`] = false; render(); }, 4000);
@@ -1637,7 +1747,7 @@ async function vulAdminTrackerTab(inhoud) {
     const minutenPerHole = rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp) / AANTAL_HOLES;
     const zelfPos = verwachtePositie(flight.starttijd_effectief, minutenPerHole, nu);
     const heeftMelding = flight.gerapporteerde_hole != null && flight.gerapporteerd_checkpoint != null;
-    const weergave = (heeftMelding ? projecteerVanafMelding(flight, minutenPerHole, nu) : null) ?? zelfPos;
+    const weergave = pasWachttijdToe((heeftMelding ? projecteerVanafMelding(flight, minutenPerHole, nu) : null) ?? zelfPos, flight, minutenPerHole, nu);
     const voltooid = rondeVoltooid(weergave);
     let conclusie = null;
     if (heeftMelding && !voltooid) {
