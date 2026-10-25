@@ -251,7 +251,7 @@
   <div class="topbar" id="topbar">
     <div class="brandwrap" id="brandwrap">
       <div class="brand">GoyerFlow</div>
-      <div class="sub" id="subline">Tempo-tracker voor leden</div>
+      <div class="sub" id="subline">Speeltempo-tracker voor leden</div>
     </div>
     <div class="versiebadge" id="versiebadge"></div>
   </div>
@@ -260,7 +260,7 @@
 
 <script>
 /* ============================================================================================
-   GoyerFlow — v0.9.0
+   GoyerFlow — v0.10.0
    Versienummer bij elke volgende build op TWEE plekken bijwerken: deze kopregel-comment en de
    APP_VERSIE-constante hieronder (zelfde patroon als de Marshal App — zie diens bouwgeschiedenis
    voor de precedent-regel). De zichtbare versie-indicator naast "GoyerFlow" in de topbar wordt
@@ -369,8 +369,19 @@
    aan.") boven de al-voorgeselecteerde stepper. Bevestigen kost de speler, net als altijd, maar één
    tik op Afslag/Fairway/Green — geen apart "Bevestigen"-knopje zoals bij GPS, want dat schrijft al
    direct weg. Geen schema- of sync-wijziging, puur weergavelogica in index.html.
+   v0.10.0: op Kay's verzoek (25 oktober 2026) drie wijzigingen. (1) Terminologie: "speelsnelheid"/
+   "tempo" overal vervangen door "speeltempo" (sluit aan bij de term die de NGF zelf gebruikt op haar
+   Ready Golf-pagina) — topbar-subline "Speeltempo-tracker voor leden", inlogscherm-tagline "De
+   Speeltempo-tracker", inlogscherm-omschrijving "Deze app biedt inzicht in het speeltempo van jouw
+   flight, eventueel met suggesties om dat te verbeteren." (2) Nieuwe knop "Ready Golf", altijd
+   zichtbaar onderaan het trackerscherm ná individuele inlog (dus los van de conclusie/pace-status,
+   in tegenstelling tot de bestaande "Tips om sneller te spelen"-knop die alleen bij te_langzaam/
+   veel_te_langzaam verschijnt). Opent dezelfde tips-popup met dezelfde TIPS-lijst — geen nieuwe
+   inhoud, geen apart popup-mechanisme. Popup-titel ("Tips om sneller te spelen") ongewijzigd gelaten
+   — niet expliciet door Kay gespecificeerd, dus bewust niet gegokt; indien gewenst kan deze alsnog
+   aangepast worden. Alleen tekst/nieuwe knop, geen schema- of sync-wijziging.
    ============================================================================================ */
-const APP_VERSIE = "0.9.0";
+const APP_VERSIE = "0.10.0";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -1033,7 +1044,7 @@ function render() {
       }, TRACKER_VERVERS_MS);
     }
   } else {
-    sub.textContent = "Tempo-tracker voor leden";
+    sub.textContent = "Speeltempo-tracker voor leden";
     if (trackerIntervalId) { clearInterval(trackerIntervalId); trackerIntervalId = null; }
     if (tijdlijnIntervalId) { clearInterval(tijdlijnIntervalId); tijdlijnIntervalId = null; }
     if (adminIntervalId) { clearInterval(adminIntervalId); adminIntervalId = null; }
@@ -1154,9 +1165,9 @@ function renderPersoonscode(app) {
   app.append(
     el("div", { class: "authheader" }, [
       el("h1", { class: "authtitle", text: "Welkom bij GoyerFlow" }),
-      el("p", { class: "authtagline", text: "De speelsnelheid tracker" }),
+      el("p", { class: "authtagline", text: "De Speeltempo-tracker" }),
     ]),
-    el("p", { class: "authdesc", text: "Deze app biedt inzicht in de speelsnelheid van jouw flight op De Goyer." }),
+    el("p", { class: "authdesc", text: "Deze app biedt inzicht in het speeltempo van jouw flight, eventueel met suggesties om dat te verbeteren." }),
     ...(TIJDELIJK_SKIP_PINCODE_VOOR_VELDTEST
       ? [el("p", { class: "msg warn", text: "⚠️ Veldtest-modus: de pincode-check is tijdelijk uitgeschakeld. Een lidcode is op zichzelf genoeg om in te loggen." })]
       : []),
@@ -1205,7 +1216,7 @@ function renderPincode(app) {
   app.append(
     el("div", { class: "authheader" }, [
       el("h1", { class: "authtitle", text: "Welkom bij GoyerFlow" }),
-      el("p", { class: "authtagline", text: "De speelsnelheid tracker" }),
+      el("p", { class: "authtagline", text: "De Speeltempo-tracker" }),
     ]),
     el("p", { class: "authwelkom", text: `Welkom, ${state.speler.naam || ""}` }),
     el("label", { text: "Pincode" }),
@@ -1720,6 +1731,16 @@ async function renderTracker(app, opts = {}) {
   ]);
 
   app.append(spelersKaart, voorCard, meCard, achterCard);
+
+  // Ready Golf-knop (v0.10.0, Kay's verzoek): altijd zichtbaar onderaan het trackerscherm, niet
+  // afhankelijk van de conclusie (in tegenstelling tot de knop "Tips om sneller te spelen" in de
+  // "zelf"-kaart, die alleen verschijnt bij te_langzaam/veel_te_langzaam). Opent dezelfde
+  // tips-popup met dezelfde TIPS-lijst — geen apart tweede tips-overzicht.
+  app.append(el("button", {
+    class: "btn secondary",
+    onclick: () => { trackerLocal.toontTipsPopup = true; render(); },
+    text: "Ready Golf",
+  }));
 
   // Tijdlijn-ticker: elke seconde alleen de breedte van de voortgangsbalk bijwerken (zie
   // tijdlijnPercentage), zonder een volledige render() — zo blijft de balk vloeiend meelopen
