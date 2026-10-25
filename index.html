@@ -31,8 +31,11 @@
      het versienummer blijft daar zichtbaar, met minder gereserveerde ruimte erboven/eronder. */
   .topbar.compact{padding:10px 0 2px 0}
   .topbar.compact .brandwrap{display:none}
-  .backbtn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:10px;
-    background:#fff;border:1px solid var(--border);cursor:pointer;flex-shrink:0;padding:0}
+  /* Uitlogknop (v0.7.0): vervangt het oude linker-pijltje (.backbtn, tot v0.6.0) — dat zag eruit als
+     "terug naar een ander menu" terwijl het eigenlijk uitlogde. Nu een expliciete tekstknop rechts in
+     de topbar, na het versienummer (zie de insertievolgorde in render()). */
+  .logoutbtn{flex-shrink:0;padding:7px 13px;border-radius:10px;background:#fff;border:1px solid var(--border);
+    cursor:pointer;font-size:13px;font-weight:700;color:var(--muted-ink);margin-left:8px}
   .brandwrap{flex:1;min-width:0}
   .brand{font-size:15px;font-weight:800;color:var(--accent);letter-spacing:0.2px}
   .sub{font-size:13px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -257,7 +260,7 @@
 
 <script>
 /* ============================================================================================
-   GoyerFlow — v0.6.0
+   GoyerFlow — v0.7.0
    Versienummer bij elke volgende build op TWEE plekken bijwerken: deze kopregel-comment en de
    APP_VERSIE-constante hieronder (zelfde patroon als de Marshal App — zie diens bouwgeschiedenis
    voor de precedent-regel). De zichtbare versie-indicator naast "GoyerFlow" in de topbar wordt
@@ -307,8 +310,20 @@
    25 oktober 2026, als correcte interpretatie van "verplaatsen" (zie claude/bouwgeschiedenis-
    goyerflow-app.md). Nieuw: spelers.hcp-kolom (Fase 2e, schema.sql) + de Teecontrol-sync-functie
    schrijft deze nu ook mee — vereist een migratie + een redeploy van de Edge Function (zie chat).
+   v0.7.0: vier verbeteringen op Kay's feedback bij v0.6.0 (25 oktober 2026). (1) Het leden-
+   trackerscherm toont nu ook het spelersoverzicht van de eigen flight (naam/lidcode/"Club lid"/hcp +
+   "Gem. handicap flight"), bovenaan het scherm — dezelfde lay-out als de admin-popup, nu via de
+   gedeelde bouwSpelersoverzicht()-functie in beide gebruikt. (2) In beide spelersoverzichten staan
+   lidcode en lidtype nu op dezelfde regel als de naam, niet meer op een eigen regel eronder.
+   (3) Persoonscode-login accepteert nu zowel "LIND 6" als "LIND6" (met of zonder spatie) — zie
+   zoekSpelerOpPersoonscode(): eerst een exacte match op precies wat is ingetypt (zoals altijd al
+   gebeurde), en pas als die niets oplevert alsnog de meest waarschijnlijke spatie-varianten
+   proberen — bewust niet blind herschreven naar één vast formaat, om geen kloppende exacte match
+   te missen bij een lidcode die toevallig anders is opgebouwd. (4) Het linker-
+   pijltje-knopje in de topbar (dat altijd al uitlogde, maar oogde als "terug naar een ander menu")
+   is vervangen door een expliciete "Uitloggen"-tekstknop rechts in de topbar.
    ============================================================================================ */
-const APP_VERSIE = "0.6.0";
+const APP_VERSIE = "0.7.0";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -846,16 +861,15 @@ function render() {
   app.className = "screen" + (state.scherm === "tracker" ? " tracker" : "") + (isAuthScherm ? " auth" : "");
   topbar.classList.toggle("compact", isAuthScherm);
 
-  // Topbar: op het tracker- en beheerderscherm een terug/uitlog-knop, net als de "terug naar
-  // inloggen"-pijl in de goedgekeurde mockup — en een contextregel in plaats van de generieke
-  // ondertitel.
-  const bestaandeBackbtn = document.getElementById("backbtn");
-  if (bestaandeBackbtn) bestaandeBackbtn.remove();
+  // Topbar: op het tracker- en beheerderscherm een expliciete "Uitloggen"-knop rechts (v0.7.0 —
+  // vervangt het linker-pijltje van v0.2.0-v0.6.0, dat de suggestie wekte dat je "terug" kon naar
+  // een ander menu terwijl het in werkelijkheid altijd uitlogde; Kay's feedback, 25 oktober 2026) —
+  // en een contextregel in plaats van de generieke ondertitel.
+  const bestaandeLogoutbtn = document.getElementById("logoutbtn");
+  if (bestaandeLogoutbtn) bestaandeLogoutbtn.remove();
   if (state.scherm === "tracker" && state.flight) {
-    const back = el("button", { class: "backbtn", id: "backbtn", "aria-label": "Uitloggen", onclick: logout }, [
-      chevronSvg("links", "#5B5648"),
-    ]);
-    topbar.insertBefore(back, topbar.firstChild);
+    const logoutBtn = el("button", { class: "logoutbtn", id: "logoutbtn", "aria-label": "Uitloggen", onclick: logout, text: "Uitloggen" });
+    topbar.appendChild(logoutBtn);
     sub.textContent = `${state.flight.aantal_spelers}-bal · gestart ${formatTijd(state.flight.starttijd_effectief)}`;
     if (!trackerIntervalId) {
       trackerIntervalId = setInterval(() => {
@@ -867,10 +881,8 @@ function render() {
       startGpsPositiebepaling();
     }
   } else if (state.scherm === "admin") {
-    const back = el("button", { class: "backbtn", id: "backbtn", "aria-label": "Uitloggen", onclick: adminUitloggen }, [
-      chevronSvg("links", "#5B5648"),
-    ]);
-    topbar.insertBefore(back, topbar.firstChild);
+    const logoutBtn = el("button", { class: "logoutbtn", id: "logoutbtn", "aria-label": "Uitloggen", onclick: adminUitloggen, text: "Uitloggen" });
+    topbar.appendChild(logoutBtn);
     sub.textContent = "Beheerder";
     if (trackerIntervalId) { clearInterval(trackerIntervalId); trackerIntervalId = null; }
     if (tijdlijnIntervalId) { clearInterval(tijdlijnIntervalId); tijdlijnIntervalId = null; }
@@ -904,6 +916,31 @@ function meldingNode() {
   return el("div", { class: "msg err", text: state.fout });
 }
 
+// Lidcode-opzoeking tolerant voor spaties (v0.7.0, Kay's feedback: "LIND6" of "LIND 6" moeten allebei
+// werken bij het inloggen). Lidcode-formaat volgens Kay en de live Teecontrol-data (zie
+// teecontrol-sync/index.ts, "RAPP 1"): vier letters, een spatie, dan een cijfer(s) — Teecontrol levert
+// 'm altijd MET die spatie aan en zo staat hij ook in de database (vindPersoonscode doet daar alleen
+// trim(), geen spatie-normalisatie). Bewust NIET de invoer blind herschrijven naar dat vaste formaat
+// (zou een score van toevallig anders opgebouwde codes kunnen missen) — in plaats daarvan eerst een
+// exacte match proberen op precies wat is ingetypt (na trim+uppercase, zoals altijd al gebeurde), en
+// pas als die niets oplevert de twee meest waarschijnlijke spatie-varianten alsnog proberen.
+async function zoekSpelerOpPersoonscode(ruw) {
+  const schoon = ruw.trim().toUpperCase();
+  const kandidaten = [schoon];
+  const zonderSpaties = schoon.replace(/\s+/g, "");
+  if (zonderSpaties !== schoon && !kandidaten.includes(zonderSpaties)) kandidaten.push(zonderSpaties);
+  if (zonderSpaties.length > 4) {
+    const metSpatieNaVier = zonderSpaties.slice(0, 4) + " " + zonderSpaties.slice(4);
+    if (!kandidaten.includes(metSpatieNaVier)) kandidaten.push(metSpatieNaVier);
+  }
+  for (const kandidaat of kandidaten) {
+    if (!kandidaat) continue;
+    const rows = await sb(`spelers?persoonscode=eq.${encodeURIComponent(kandidaat)}&select=*,flights(*)`);
+    if (rows && rows.length > 0) return { rows, gebruikteCode: kandidaat };
+  }
+  return { rows: [], gebruikteCode: schoon };
+}
+
 /* ---- Scherm 1: persoonscode ---- */
 function renderPersoonscode(app) {
   const input = el("input", { type: "text", id: "persoonscode", inputmode: "text", placeholder: "bv. 1234", maxlength: "12" });
@@ -911,12 +948,11 @@ function renderPersoonscode(app) {
 
   const submit = async () => {
     state.fout = null;
-    const code = input.value.trim().toUpperCase();
-    if (!code) return;
+    if (!input.value.trim()) return;
     const btn = document.getElementById("submit-persoonscode");
     btn.disabled = true;
     try {
-      const rows = await sb(`spelers?persoonscode=eq.${encodeURIComponent(code)}&select=*,flights(*)`);
+      const { rows, gebruikteCode: code } = await zoekSpelerOpPersoonscode(input.value);
       if (!rows || rows.length === 0) {
         loggen(code, "login", false);
         state.fout = "Geen geboekte flight gevonden voor deze persoonscode. Probeer het vanaf ongeveer 15 minuten voor je starttijd nog eens, of neem contact op met de caddymaster.";
@@ -1101,6 +1137,34 @@ function renderNieuwePincode(app) {
   i1.focus();
 }
 
+// Herbruikbare opbouw van het spelersoverzicht van een flight: per speler naam + lidcode + lidtype
+// op ÉÉN regel (v0.7.0 — stond tot dan op twee regels, Kay's feedback: "lidcode en lidtype achter
+// de naam op dezelfde regel") + hcp rechts, gevolgd door de "Gem. handicap flight"-regel. Gebruikt
+// door zowel het leden-trackerscherm (de eigen flight, zie renderTracker hieronder) als het admin-
+// flight-detailscherm (bouwFlightDetailModal, v0.6.0) — zodat beide exact dezelfde lay-out en hcp-
+// gemiddelde tonen, zoals Kay vroeg ("dezelfde lay-out als in de Admin tracker pop-up"). Alle hier
+// getoonde spelers zijn per definitie Goyer-leden ("Club lid" is daarom een vaste tekst) — zie
+// bouwFlightDetailModal's toelichting hierboven (v0.6.0) voor waarom.
+function bouwSpelersoverzicht(spelers) {
+  const lijst = spelers || [];
+  const spelerrijen = lijst.length === 0
+    ? [el("p", { class: "help", text: "Geen spelers gevonden voor deze flight." })]
+    : lijst.map((s) => el("div", { class: "spelerrij" }, [
+        el("div", { class: "spelernaamrow" }, [
+          el("span", { class: "spelernaampil", text: s.naam }),
+          el("span", { class: "spelermeta", text: `${s.persoonscode} · Club lid` }),
+        ]),
+        el("div", { class: "spelerhcp", text: s.hcp != null ? `hcp ${s.hcp}` : "hcp —" }),
+      ]));
+  const hcps = lijst.map((s) => s.hcp).filter((h) => h !== null && h !== undefined);
+  const gemHcp = hcps.length ? Math.round((hcps.reduce((a, b) => a + Number(b), 0) / hcps.length) * 10) / 10 : null;
+  const kinderen = [el("div", { class: "spelerlijst" }, spelerrijen)];
+  if (gemHcp != null) {
+    kinderen.push(el("div", { class: "gemhcprow" }, [document.createTextNode("Gem. handicap flight"), document.createTextNode(String(gemHcp))]));
+  }
+  return kinderen;
+}
+
 /* ---- Scherm 4: tracker ---- */
 async function renderTracker(app, opts = {}) {
   // "stil" = automatische achtergrondverversing (zie TRACKER_VERVERS_MS/trackerIntervalId in
@@ -1114,7 +1178,10 @@ async function renderTracker(app, opts = {}) {
   let params, flights;
   try {
     [params] = await sb("parameters?select=*&limit=1");
-    flights = await sb(`flights?lus=eq.${encodeURIComponent(state.flight.lus)}&uitgestapt=eq.false&select=*&order=starttijd_effectief.asc`);
+    // spelers(*) (v0.7.0): PostgREST-embed, nodig voor het nieuwe spelersoverzicht bovenaan dit
+    // scherm (zie bouwSpelersoverzicht) — haalt de spelers van ALLE flights op deze lus mee (voor/
+    // zelf/achter), maar alleen die van "zelf" worden gebruikt; geen aparte losse aanvraag nodig.
+    flights = await sb(`flights?lus=eq.${encodeURIComponent(state.flight.lus)}&uitgestapt=eq.false&select=*,spelers(*)&order=starttijd_effectief.asc`);
   } catch (e) {
     console.error(e);
     if (!stil) {
@@ -1468,7 +1535,14 @@ async function renderTracker(app, opts = {}) {
   }
   const achterCard = el("div", { class: "card" }, achterKinderen);
 
-  app.append(voorCard, meCard, achterCard);
+  // Spelersoverzicht van de EIGEN flight (v0.7.0), net onder de topbar — Kay's verzoek: dezelfde
+  // lay-out als de Admin-popup (naam t/m "Gem. handicap flight"), nu ook zichtbaar voor leden zelf.
+  const spelersKaart = el("div", { class: "card" }, [
+    el("div", { class: "eyebrow", text: "Jouw flight" }),
+    ...bouwSpelersoverzicht(zelf.spelers),
+  ]);
+
+  app.append(spelersKaart, voorCard, meCard, achterCard);
 
   // Tijdlijn-ticker: elke seconde alleen de breedte van de voortgangsbalk bijwerken (zie
   // tijdlijnPercentage), zonder een volledige render() — zo blijft de balk vloeiend meelopen
@@ -1903,20 +1977,12 @@ async function vulAdminTrackerTab(inhoud) {
 function bouwFlightDetailModal(positie, params, nu) {
   const { flight, weergave, voltooid, heeftMelding, conclusie, minutenPerHole } = positie;
   const spelers = flight.spelers || [];
-  const hcps = spelers.map((s) => s.hcp).filter((h) => h !== null && h !== undefined);
-  const gemHcp = hcps.length ? Math.round((hcps.reduce((a, b) => a + Number(b), 0) / hcps.length) * 10) / 10 : null;
 
   const sluiten = () => { adminLocal.flightDetailId = null; adminLocal.flightDetailFout = null; render(); };
 
-  const spelerrijen = spelers.length === 0
-    ? [el("p", { class: "help", text: "Geen spelers gevonden voor deze flight." })]
-    : spelers.map((s) => el("div", { class: "spelerrij" }, [
-        el("div", {}, [
-          el("div", { class: "spelernaamrow" }, [el("span", { class: "spelernaampil", text: s.naam })]),
-          el("div", { class: "spelermeta", text: `${s.persoonscode} · Club lid` }),
-        ]),
-        el("div", { class: "spelerhcp", text: s.hcp != null ? `hcp ${s.hcp}` : "hcp —" }),
-      ]));
+  // Spelersoverzicht + "Gem. handicap flight" (v0.7.0): gedeelde opbouw met renderTracker's eigen
+  // spelersoverzicht — zie bouwSpelersoverzicht hierboven.
+  const spelersoverzicht = bouwSpelersoverzicht(spelers);
 
   // Eigen flight-kaart (v0.6.0): zelfde opbouw/schrijflogica als renderTracker's "zelf"-kaart,
   // hier hergebruikt voor een door de beheerder gekozen flight i.p.v. de ingelogde speler. Draft-
@@ -1995,8 +2061,7 @@ function bouwFlightDetailModal(positie, params, nu) {
             const p = document.createElementNS("http://www.w3.org/2000/svg", "path"); p.setAttribute("d","M6 6l12 12M18 6L6 18"); p.setAttribute("stroke","#6B6558"); p.setAttribute("stroke-width","2"); p.setAttribute("stroke-linecap","round"); s.appendChild(p); return s; })(),
         ]),
       ]),
-      el("div", { class: "spelerlijst" }, spelerrijen),
-      gemHcp != null ? el("div", { class: "gemhcprow" }, [document.createTextNode("Gem. handicap flight"), document.createTextNode(String(gemHcp))]) : null,
+      ...spelersoverzicht,
       eigenKaart,
     ].filter(Boolean)),
   ]);
