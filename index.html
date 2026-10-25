@@ -260,7 +260,7 @@
 
 <script>
 /* ============================================================================================
-   GoyerFlow — v0.7.0
+   GoyerFlow — v0.8.0
    Versienummer bij elke volgende build op TWEE plekken bijwerken: deze kopregel-comment en de
    APP_VERSIE-constante hieronder (zelfde patroon als de Marshal App — zie diens bouwgeschiedenis
    voor de precedent-regel). De zichtbare versie-indicator naast "GoyerFlow" in de topbar wordt
@@ -322,8 +322,37 @@
    te missen bij een lidcode die toevallig anders is opgebouwd. (4) Het linker-
    pijltje-knopje in de topbar (dat altijd al uitlogde, maar oogde als "terug naar een ander menu")
    is vervangen door een expliciete "Uitloggen"-tekstknop rechts in de topbar.
+   v0.7.1: bugfix op Kay's melding (25 okt 2026, met screenshot) dat het beheerderscherm "de klok
+   stopzet" na een klik op een flight, en dat lid- en beheerderscherm voor dezelfde flight een
+   verschillend checkpoint tonen. Oorzaak: de admin Tracker-tab en het flight-detailscherm werden
+   alleen berekend bij tabwissel of bij een klik — anders dan het ledenscherm (trackerIntervalId) was
+   er voor het beheerderscherm nooit een ververs-interval. Nieuw: adminIntervalId, zelfde cadans
+   (TRACKER_VERVERS_MS) als het ledenscherm, actief zolang state.scherm === "admin" en de
+   Tracker-subtab open is; vulAdminTrackerTab() kreeg een "stil"-modus (zelfde patroon als
+   renderTracker) zodat een mislukte achtergrondophaling de bestaande weergave laat staan i.p.v. een
+   foutmelding te tonen. Geen schema- of sync-wijziging nodig.
+   v0.8.0: fix voor Kay's gerapporteerde issue (f) — op een 9-holes-ronde of een 18-holes-ronde die
+   bij hole 10 begint ("2de 9"-lus met crossover) toonde GoyerFlow het verkeerde holenummer en
+   rekende met de verkeerde pace, omdat alle tempo-/positielogica uitging van "hole 1 t/m 18, in die
+   volgorde" voor elke ronde. Op Kay's expliciete keuze (25 okt 2026: "1 natuurlijk" — fysieke
+   holenummers, gelijk aan de Marshal App, i.p.v. een eigen 1-N-telling) toont GoyerFlow nu overal
+   het FYSIEKE holenummer van de baan (incl. wrap-around: een "18holes_vanaf10"-ronde loopt
+   10,11,...,18,1,2,...,9), terwijl alle interne pace-/positieberekening en de database-velden
+   (gerapporteerde_hole, wacht_hole) bewust ronde-relatief (1..aantal holes van déze ronde) blijven —
+   dat is de enige manier om doorlaat-/inhaal-vergelijkingen tussen flights in dezelfde lus
+   wrap-veilig te houden. Nieuw: RONDE_INFO/rondeInfo()/fysiekeHole()/rondeIndexVanFysiek() (zie
+   net na HOLE_PAR), en flights.ronde_type (vier waarden: 18holes, 18holes_vanaf10, 9holes_voor,
+   9holes_achter) — zie schema.sql, Fase 2f. Alle pace-functies (rondetijdVoor, verwachtePositie,
+   pasWachttijdToe, rondeVoltooid, projecteerVanafMelding, volgendCheckpoint,
+   duurTotVolgendCheckpoint) kregen een rondeType-/holesInRonde-parameter i.p.v. de vaste
+   AANTAL_HOLES=18. Een flight zonder (nog) bekend ronde_type (NULL, bijv. nog niet opnieuw
+   gesynchroniseerd) valt automatisch terug op het oude 18holes-vanaf-hole-1-gedrag — dus geen
+   wijziging voor bestaande data totdat de sync opnieuw draait. Vereist van Kay: (1) de Fase 2f-
+   migratie in Supabase draaien, (2) de teecontrol-sync Edge Function opnieuw deployen (die bepaalt
+   nu ronde_type bij elke sync, met dezelfde classificatielogica als de Marshal App), (3) een nieuwe
+   sync triggeren — zie chat voor de volledige toelichting.
    ============================================================================================ */
-const APP_VERSIE = "0.7.0";
+const APP_VERSIE = "0.8.0";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -363,13 +392,63 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       definitief geldt.
    ============================================================================================ */
 const AANTAL_HOLES = 18;
-const PAR_VERDELING = { 3: 4, 4: 10, 5: 4 }; // aantal holes per par-type, aanname (zie boven)
+const PAR_VERDELING = { 3: 4, 4: 10, 5: 4 }; // aantal holes per par-type over de volle 18 holes — sinds v0.8.0 puur documentair/ter controle (HOLE_PAR klopt hiermee, zie basisRondetijdVoorRonde), niet meer zelf gebruikt in de rondetijd-berekening.
 const ZICHTBAARHEIDSVENSTER_MINUTEN = 15;    // zelfde venster als Marshal App v1.9.0
 
 // Par per hole, North Course (hole 1 t/m 18). Bevestigd tegen goyer.nl (per-hole pagina's) en de
 // GolfPass-scorekaart van deze baan — 4x par 3 (holes 2,5,11,14), 10x par 4, 4x par 5 (holes
 // 4,7,13,17), optellend tot par 72 over 18 holes, consistent met PAR_VERDELING hierboven.
 const HOLE_PAR = [4, 3, 4, 5, 3, 4, 5, 4, 4, 4, 3, 4, 5, 3, 4, 4, 5, 4];
+
+/* ============================================================================================
+   Rondetype-bewustzijn (v0.8.0) — zie claude/bouwgeschiedenis-goyerflow-app.md voor de volledige
+   analyse. Niet elke flight start op hole 1 en speelt 18 holes: Teecontrol levert per boeking een
+   lus ("North Course 1ste 9" / "2de 9") plus has_crossover/is_crossover, waaruit teecontrol-sync nu
+   (zie bepaalRondeType() in die Edge Function, geport van de Marshal App) één van vier rondetypes
+   afleidt en in flights.ronde_type zet:
+     "18holes"         — start hole 1,  speelt door, 18 holes
+     "18holes_vanaf10" — start hole 10, speelt door, 18 holes (holevolgorde WRAPT: 10..18,1..9)
+     "9holes_voor"     — start hole 1,  stopt na 9 holes
+     "9holes_achter"   — start hole 10, stopt na 9 holes
+   Alle interne tijd-/positieberekeningen (rondetijdVoor/verwachtePositie/projecteerVanafMelding/
+   pasWachttijdToe/rondeVoltooid, en checkpointOrdinaal voor de voor/achter-afstandsvergelijking)
+   blijven rekenen met een RONDE-RELATIEF holenummer (1 = eerste hole van DEZE ronde, zoals het al
+   altijd deed) — dat blijft correct en wrap-vrij zolang twee vergeleken flights dezelfde lus (dus
+   hetzelfde starthole) delen, wat voor voor/zelf/achter altijd het geval is. Pas op de twee plekken
+   waar een FYSIEK holenummer (zoals op de baan/in de Marshal App) nodig is — de par-opzoeking in
+   doorlaatMarge (HOLE_PAR is fysiek geïndexeerd) en alle schermteksten/stepper-labels — wordt
+   fysiekeHole() toegepast. Ontbrekend/onherkend ronde_type (oude data van vóór deze migratie) valt
+   terug op het oorspronkelijke gedrag: start hole 1, 18 holes — dus geen gedragsverandering voor
+   reeds bestaande flights totdat ze opnieuw gesynchroniseerd zijn.
+   ============================================================================================ */
+const RONDE_INFO = {
+  "18holes": { startHole: 1, holesInRonde: 18 },
+  "18holes_vanaf10": { startHole: 10, holesInRonde: 18 },
+  "9holes_voor": { startHole: 1, holesInRonde: 9 },
+  "9holes_achter": { startHole: 10, holesInRonde: 9 },
+};
+function rondeInfo(rondeType) {
+  return RONDE_INFO[rondeType] || { startHole: 1, holesInRonde: AANTAL_HOLES };
+}
+
+// Fysiek holenummer (1-18, zoals op de baan) voor de N-de hole van DEZE ronde (1-based: 1 = eerste
+// hole van de ronde). Wrapt vanzelf van 18 terug naar 1 bij een "vanaf 10"-ronde die over de 18 heen
+// doorspeelt.
+function fysiekeHole(rondeType, rondeHoleIndex) {
+  const { startHole } = rondeInfo(rondeType);
+  return ((startHole - 1 + rondeHoleIndex - 1) % 18) + 1;
+}
+
+// Inverse van fysiekeHole(): voor een fysiek holenummer (zoals een GPS-match, zie
+// dichtstbijzijndeCheckpoint hieronder — die scant altijd alle 18 fysieke holes), de hoeveelste hole
+// van DEZE ronde dat is (1-based), geklemd op de ronde zelf. Nodig op precies één plek: de
+// GPS-suggestie geeft een fysiek holenummer terug, terwijl de stepper/het gemelde holenummer
+// ronde-relatief is (zie de toelichting bij RONDE_INFO).
+function rondeIndexVanFysiek(rondeType, fysiekeHoleNr) {
+  const { startHole, holesInRonde } = rondeInfo(rondeType);
+  const ongeklemd = ((fysiekeHoleNr - startHole + 18) % 18) + 1;
+  return Math.max(1, Math.min(holesInRonde, ongeklemd));
+}
 
 // GPS-coördinaten per hole (North Course), zelf ingemeten door Kay op de baan (23 oktober 2026) —
 // live GPS-fixes via de blauwe stip in Google Maps, per checkpoint een screenshot genomen en
@@ -436,22 +515,37 @@ function loggen(persoonscode, type, succes) {
 /* ============================================================================================
    Rondetijd-berekening
    ============================================================================================ */
-function basisRondetijd(params) {
-  return PAR_VERDELING[3] * params.par3_minuten
-       + PAR_VERDELING[4] * params.par4_minuten
-       + PAR_VERDELING[5] * params.par5_minuten;
+// v0.8.0: was een vlak gemiddelde (PAR_VERDELING: 4x par3 + 10x par4 + 4x par5, ongeacht welke
+// holes daadwerkelijk gespeeld worden) — nu een exacte som over de FYSIEKE holes van déze ronde,
+// met het al bevestigde HOLE_PAR. Voor een volle 18-holes-ronde is de uitkomst identiek aan de oude
+// berekening (PAR_VERDELING is precies de par-verdeling die in HOLE_PAR zit, zie de toelichting
+// bovenaan dit bestand) — geen gedragsverandering daar. Voor een 9-holes-ronde (voor óf achter) was
+// er tot nu toe helemaal geen correcte basis: de vaste 18-holes-waarde zou de helft te hoog zijn.
+function basisRondetijdVoorRonde(params, rondeType) {
+  const { holesInRonde } = rondeInfo(rondeType);
+  let totaal = 0;
+  for (let i = 1; i <= holesInRonde; i++) {
+    const par = HOLE_PAR[fysiekeHole(rondeType, i) - 1] ?? 4;
+    totaal += par === 3 ? params.par3_minuten : par === 5 ? params.par5_minuten : params.par4_minuten;
+  }
+  return totaal;
 }
 
-function rondetijdVoor(params, aantalSpelers, gemiddeldeHcp) {
-  const basis = basisRondetijd(params);
+function rondetijdVoor(params, aantalSpelers, gemiddeldeHcp, rondeType) {
+  const { holesInRonde } = rondeInfo(rondeType);
+  const basis = basisRondetijdVoorRonde(params, rondeType);
   const hcpBovenTien = Math.max(0, gemiddeldeHcp - 10);
-  const hcpCorrectie = hcpBovenTien * params.hcp_correctie_per_punt_boven_10 * AANTAL_HOLES;
+  const hcpCorrectie = hcpBovenTien * params.hcp_correctie_per_punt_boven_10 * holesInRonde;
   const extraSpelers = Math.max(0, aantalSpelers - 2);
-  const flightCorrectie = extraSpelers * params.flightgrootte_correctie_per_speler_boven_2 * AANTAL_HOLES;
+  const flightCorrectie = extraSpelers * params.flightgrootte_correctie_per_speler_boven_2 * holesInRonde;
   return basis + hcpCorrectie + flightCorrectie;
 }
 
-function verwachtePositie(starttijdISO, minutenPerHole, nu) {
+// "hole" hierin (en in pasWachttijdToe/projecteerVanafMelding) blijft RONDE-RELATIEF (1 = eerste
+// hole van déze ronde) — zie de rondetype-toelichting bij RONDE_INFO hierboven. Pas bij weergave of
+// een par-opzoeking wordt dit via fysiekeHole() naar het fysieke holenummer vertaald.
+function verwachtePositie(starttijdISO, minutenPerHole, nu, rondeType) {
+  const { holesInRonde } = rondeInfo(rondeType);
   const starttijd = new Date(starttijdISO).getTime();
   const verstreken = (nu.getTime() - starttijd) / 60000; // minuten
   const fractie = verstreken / minutenPerHole;
@@ -460,7 +554,7 @@ function verwachtePositie(starttijdISO, minutenPerHole, nu) {
   let checkpoint = "afslag";
   if (rest >= 0.75) checkpoint = "green";
   else if (rest >= 0.25) checkpoint = "fairway";
-  const hole = Math.max(1, Math.min(AANTAL_HOLES, holeIndex + 1));
+  const hole = Math.max(1, Math.min(holesInRonde, holeIndex + 1));
   return { hole, checkpoint, verstreken, fractie };
 }
 
@@ -503,13 +597,15 @@ function doorlaatMarge(hole) {
 
 // Het checkpoint ONMIDDELLIJK NA het gegeven checkpoint, in de vaste Afslag → Fairway → Green →
 // volgende hole/Afslag-volgorde — gebruikt om de wachttijd bij een doorlaat te bepalen (zie
-// duurTotVolgendCheckpoint/doorlaatWissel hieronder). Klemt op de laatste green van de ronde (geen
-// hole 19).
-function volgendCheckpoint(hole, checkpoint) {
+// duurTotVolgendCheckpoint/doorlaatWissel hieronder). "hole" is hier, net als overal, RONDE-RELATIEF
+// — zie de rondetype-toelichting bij RONDE_INFO. Klemt op de laatste green van DEZE ronde (geen hole
+// na de laatste), vandaar rondeType hier nodig.
+function volgendCheckpoint(hole, checkpoint, rondeType) {
+  const { holesInRonde } = rondeInfo(rondeType);
   const idx = { afslag: 0, fairway: 1, green: 2 }[checkpoint] ?? 0;
   const ordinaal = (hole - 1) * 3 + idx + 1;
   const nieuweHole = Math.floor(ordinaal / 3) + 1;
-  if (nieuweHole > AANTAL_HOLES) return { hole: AANTAL_HOLES, checkpoint: "green" };
+  if (nieuweHole > holesInRonde) return { hole: holesInRonde, checkpoint: "green" };
   return { hole: nieuweHole, checkpoint: CHECKPOINT_VOLGORDE[ordinaal % 3] };
 }
 
@@ -519,9 +615,9 @@ function volgendCheckpoint(hole, checkpoint) {
 // een holeovergang (green → afslag van de volgende hole): die overgang kost in dit rekenmodel
 // sowieso al geen tijd (checkpointFractie(green) van hole N en checkpointFractie(afslag) van hole
 // N+1 vallen op precies dezelfde fractie) — bestaande modelkeuze, geen nieuwe aanname hier.
-function duurTotVolgendCheckpoint(hole, checkpoint, minutenPerHole) {
+function duurTotVolgendCheckpoint(hole, checkpoint, minutenPerHole, rondeType) {
   const huidigeFractie = (hole - 1) + checkpointFractie(checkpoint);
-  const doel = volgendCheckpoint(hole, checkpoint);
+  const doel = volgendCheckpoint(hole, checkpoint, rondeType);
   const doelFractie = (doel.hole - 1) + checkpointFractie(doel.checkpoint);
   return Math.max(0, doelFractie - huidigeFractie) * minutenPerHole;
 }
@@ -537,8 +633,9 @@ function duurTotVolgendCheckpoint(hole, checkpoint, minutenPerHole) {
 // is: dit is de meest recente, fysiek geobserveerde waarheid. Raakt nooit de PURE schema-positie
 // (posVan/verwachtePositie zonder dit) die voor de "op schema"-vergelijking gebruikt wordt — die
 // moet de afwijking door het wachten juist laten zien, niet verbergen.
-function pasWachttijdToe(pos, flight, minutenPerHole, nu) {
+function pasWachttijdToe(pos, flight, minutenPerHole, nu, rondeType) {
   if (!flight.wacht_tot) return pos;
+  const { holesInRonde } = rondeInfo(rondeType);
   const wachtTot = new Date(flight.wacht_tot).getTime();
   const ankerFractie = (flight.wacht_hole - 1) + checkpointFractie(flight.wacht_checkpoint);
   if (nu.getTime() < wachtTot) {
@@ -551,16 +648,16 @@ function pasWachttijdToe(pos, flight, minutenPerHole, nu) {
   let checkpoint = "afslag";
   if (rest >= 0.75) checkpoint = "green";
   else if (rest >= 0.25) checkpoint = "fairway";
-  const hole = Math.max(1, Math.min(AANTAL_HOLES, holeIndex + 1));
+  const hole = Math.max(1, Math.min(holesInRonde, holeIndex + 1));
   return { ...pos, hole, checkpoint, fractie };
 }
 
 // Ronde voltooid: de ONGECLEMDE fractie (dus los van de weergegeven hole, die bij
-// verwachtePositie() al op AANTAL_HOLES wordt vastgezet) is voorbij het totaal aantal holes —
-// er is geen hole 19, dus vanaf hier moet de tracker een eindstatus laten zien in plaats van
-// te blijven "hangen" op hole 18.
-function rondeVoltooid(pos) {
-  return pos.fractie >= AANTAL_HOLES;
+// verwachtePositie() al op het aantal holes van DEZE ronde wordt vastgezet) is voorbij het totaal
+// aantal holes van deze ronde — er is geen "hole na de laatste", dus vanaf hier moet de tracker een
+// eindstatus laten zien in plaats van te blijven "hangen" op de laatste hole.
+function rondeVoltooid(pos, rondeType) {
+  return pos.fractie >= rondeInfo(rondeType).holesInRonde;
 }
 
 // Projecteert de laatst gemelde positie vooruit in de tijd, met hetzelfde tempo (minutenPerHole)
@@ -572,10 +669,11 @@ function rondeVoltooid(pos) {
 // wat er net is gemeld, en loopt hij daarna vanzelf door (Afslag → Fairway → Green → volgende hole)
 // — precies het gedrag dat hoort bij "alleen een knopdruk mag een melding geven, de rest is live".
 // Geeft null terug als er nog geen melding is; de aanroeper valt dan terug op de pure live positie.
-function projecteerVanafMelding(zelf, minutenPerHole, nu) {
+function projecteerVanafMelding(zelf, minutenPerHole, nu, rondeType) {
   if (zelf.gerapporteerde_hole == null || zelf.gerapporteerd_checkpoint == null || !zelf.gerapporteerd_tijdstip) {
     return null;
   }
+  const { holesInRonde } = rondeInfo(rondeType);
   const gemeldeFractie = (zelf.gerapporteerde_hole - 1) + checkpointFractieMidden(zelf.gerapporteerd_checkpoint);
   const minutenSindsMelding = (nu.getTime() - new Date(zelf.gerapporteerd_tijdstip).getTime()) / 60000;
   const fractie = gemeldeFractie + minutenSindsMelding / minutenPerHole;
@@ -584,7 +682,7 @@ function projecteerVanafMelding(zelf, minutenPerHole, nu) {
   let checkpoint = "afslag";
   if (rest >= 0.75) checkpoint = "green";
   else if (rest >= 0.25) checkpoint = "fairway";
-  const hole = Math.max(1, Math.min(AANTAL_HOLES, holeIndex + 1));
+  const hole = Math.max(1, Math.min(holesInRonde, holeIndex + 1));
   return { hole, checkpoint, fractie };
 }
 
@@ -725,7 +823,9 @@ async function startGpsPositiebepaling() {
   trackerLocal.gpsStatus = "beschikbaar";
   trackerLocal.gpsSuggestie = suggestie;
   trackerLocal.gpsCheckpointDraft = suggestie.checkpoint;
-  trackerLocal.zelfHoleDraft = suggestie.hole;
+  // suggestie.hole is FYSIEK (dichtstbijzijndeCheckpoint scant alle 18 fysieke holes) — zelfHoleDraft
+  // is ronde-relatief, zie rondeIndexVanFysiek().
+  trackerLocal.zelfHoleDraft = rondeIndexVanFysiek(state.flight.ronde_type, suggestie.hole);
   render();
 }
 
@@ -852,6 +952,16 @@ let trackerIntervalId = null;
 // renderTracker()'s opbouw van de "tijdlijn" onder de Afslag/Fairway/Green-knoppen.
 let tijdlijnIntervalId = null;
 
+// v0.7.1 — Kay meldde (25 okt 2026, met screenshot) dat het beheerderscherm na het openen van een
+// flight "de klok stopzet": de Tracker-tab en het flight-detailscherm werden tot nu toe maar op twee
+// momenten berekend — bij het wisselen van tab en bij een klik op een flight — en daarna nooit meer,
+// in tegenstelling tot het ledenscherm (trackerIntervalId hierboven). Dit verklaarde zowel de
+// "bevroren klok" als de afwijkende checkpoint-highlight tussen lid- en beheerderscherm voor
+// dezelfde flight. Zelfde ververscadans (TRACKER_VERVERS_MS) als het ledenscherm, alleen actief
+// terwijl state.scherm === "admin" én de Tracker-subtab geopend is — zie render() en
+// vulAdminTrackerTab().
+let adminIntervalId = null;
+
 function render() {
   const app = document.getElementById("app");
   const sub = document.getElementById("subline");
@@ -880,16 +990,26 @@ function render() {
       // startGpsPositiebepaling() voor waarom dit hier en niet bij het inloggen gebeurt.
       startGpsPositiebepaling();
     }
+    if (adminIntervalId) { clearInterval(adminIntervalId); adminIntervalId = null; }
   } else if (state.scherm === "admin") {
     const logoutBtn = el("button", { class: "logoutbtn", id: "logoutbtn", "aria-label": "Uitloggen", onclick: adminUitloggen, text: "Uitloggen" });
     topbar.appendChild(logoutBtn);
     sub.textContent = "Beheerder";
     if (trackerIntervalId) { clearInterval(trackerIntervalId); trackerIntervalId = null; }
     if (tijdlijnIntervalId) { clearInterval(tijdlijnIntervalId); tijdlijnIntervalId = null; }
+    if (!adminIntervalId) {
+      adminIntervalId = setInterval(() => {
+        const inhoud = document.getElementById("admininhoud");
+        if (state.scherm === "admin" && adminLocal.tab === "tracker" && inhoud && !adminLocal.flightDetailBezig) {
+          vulAdminTrackerTab(inhoud, { stil: true });
+        }
+      }, TRACKER_VERVERS_MS);
+    }
   } else {
     sub.textContent = "Tempo-tracker voor leden";
     if (trackerIntervalId) { clearInterval(trackerIntervalId); trackerIntervalId = null; }
     if (tijdlijnIntervalId) { clearInterval(tijdlijnIntervalId); tijdlijnIntervalId = null; }
+    if (adminIntervalId) { clearInterval(adminIntervalId); adminIntervalId = null; }
   }
 
   if (state.scherm === "persoonscode") return renderPersoonscode(app);
@@ -1204,8 +1324,8 @@ async function renderTracker(app, opts = {}) {
   // hieronder, die bewust tegen het ORIGINELE rondeschema vergelijkt (zie de "op schema"-conclusie
   // verderop), niet tegen een al gemelde/geprojecteerde positie.
   function posVan(flight) {
-    const minutenPerHole = rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp) / AANTAL_HOLES;
-    return { ...verwachtePositie(flight.starttijd_effectief, minutenPerHole, nu), minutenPerHole };
+    const minutenPerHole = rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp, flight.ronde_type) / rondeInfo(flight.ronde_type).holesInRonde;
+    return { ...verwachtePositie(flight.starttijd_effectief, minutenPerHole, nu, flight.ronde_type), minutenPerHole };
   }
 
   // Voor de BUUR-flights (voor/achter): als die flight zelf al een positie gemeld heeft — via hun
@@ -1223,16 +1343,16 @@ async function renderTracker(app, opts = {}) {
   function posVanMetMelding(flight) {
     const basis = posVan(flight);
     if (flight.gecorrigeerd) return basis;
-    const gemeld = projecteerVanafMelding(flight, basis.minutenPerHole, nu);
+    const gemeld = projecteerVanafMelding(flight, basis.minutenPerHole, nu, flight.ronde_type);
     return gemeld ? { ...gemeld, minutenPerHole: basis.minutenPerHole } : basis;
   }
 
   const voorPosVoorWacht = voor ? posVanMetMelding(voor) : null;
-  const voorPos = voorPosVoorWacht ? pasWachttijdToe(voorPosVoorWacht, voor, voorPosVoorWacht.minutenPerHole, nu) : null;
+  const voorPos = voorPosVoorWacht ? pasWachttijdToe(voorPosVoorWacht, voor, voorPosVoorWacht.minutenPerHole, nu, voor.ronde_type) : null;
   const achterPosVoorWacht = achter ? posVanMetMelding(achter) : null;
-  const achterPos = achterPosVoorWacht ? pasWachttijdToe(achterPosVoorWacht, achter, achterPosVoorWacht.minutenPerHole, nu) : null;
+  const achterPos = achterPosVoorWacht ? pasWachttijdToe(achterPosVoorWacht, achter, achterPosVoorWacht.minutenPerHole, nu, achter.ronde_type) : null;
   const zelfPos = posVan(zelf);
-  const zelfRondetijd = rondetijdVoor(params, zelf.aantal_spelers, zelf.gemiddelde_hcp);
+  const zelfRondetijd = rondetijdVoor(params, zelf.aantal_spelers, zelf.gemiddelde_hcp, zelf.ronde_type);
 
   // Eigen gemelde positie: gedeeld per flight (zelfde rij, dus zichtbaar voor alle spelers van die
   // flight — "laatste melding wint"), opgeslagen in gerapporteerde_hole/gerapporteerd_checkpoint.
@@ -1249,15 +1369,15 @@ async function renderTracker(app, opts = {}) {
   // sprong naar een andere hole), en loopt hij daarna vanzelf door. zelfPos zelf blijft ongewijzigd
   // en wordt verderop nog los gebruikt voor de "op schema"-vergelijking (deltaHoles/conclusie),
   // want dat vergelijkt een melding bewust tegen het ORIGINELE, ongecorrigeerde rondeschema.
-  const zelfWeergavePosVoorWacht = (heeftGekozen ? projecteerVanafMelding(zelf, zelfPos.minutenPerHole, nu) : null) ?? zelfPos;
-  const zelfWeergavePos = pasWachttijdToe(zelfWeergavePosVoorWacht, zelf, zelfPos.minutenPerHole, nu);
+  const zelfWeergavePosVoorWacht = (heeftGekozen ? projecteerVanafMelding(zelf, zelfPos.minutenPerHole, nu, zelf.ronde_type) : null) ?? zelfPos;
+  const zelfWeergavePos = pasWachttijdToe(zelfWeergavePosVoorWacht, zelf, zelfPos.minutenPerHole, nu, zelf.ronde_type);
 
   // Ronde voltooid: vanaf hier toont elke kaart een eindstatus in plaats van door te blijven
   // rekenen aan een hole die niet bestaat (zie rondeVoltooid()). Voor de eigen kaart op basis van
   // de weergavepositie (dus inclusief een eventuele correctie), niet de ruwe schema-berekening.
-  const zelfRondeVoltooid = rondeVoltooid(zelfWeergavePos);
-  const voorRondeVoltooid = voor ? rondeVoltooid(voorPos) : false;
-  const achterRondeVoltooid = achter ? rondeVoltooid(achterPos) : false;
+  const zelfRondeVoltooid = rondeVoltooid(zelfWeergavePos, zelf.ronde_type);
+  const voorRondeVoltooid = voor ? rondeVoltooid(voorPos, voor.ronde_type) : false;
+  const achterRondeVoltooid = achter ? rondeVoltooid(achterPos, achter.ronde_type) : false;
 
   // Inhaal-signaal: je eigen melding bereikt of overschrijdt de geschatte positie van de flight
   // voor je (zie scopedocument, "Inhaal-signaal"). Alleen relevant als je al een positie hebt
@@ -1274,17 +1394,20 @@ async function renderTracker(app, opts = {}) {
 
   // Doorlaat-knoppen alleen tonen als de twee flights dicht genoeg bij elkaar zitten om een
   // doorlaat realistisch te maken (zie scopedocument "Doorlaat-afstand") — op basis van de
-  // weergavepositie (zelfWeergavePos), in checkpoint-stappen (checkpointOrdinaal), met een marge
-  // die afhangt van de par van de VOOROP liggende hole (doorlaatMarge). Een negatieve afstand
-  // (de vooropliggende flight is zelf al ingehaald) toont geen doorlaat — dat is het aparte
-  // inhaal-correctiescenario hierboven (loopJeTegenVoorAan).
+  // weergavepositie (zelfWeergavePos), in checkpoint-stappen (checkpointOrdinaal). checkpointOrdinaal
+  // blijft rekenen met het RONDE-RELATIEVE holenummer (correct en wrap-vrij: voor/zelf/achter delen
+  // altijd dezelfde lus, dus hetzelfde starthole — zie de rondetype-toelichting bij RONDE_INFO).
+  // doorlaatMarge heeft wél het FYSIEKE holenummer nodig (HOLE_PAR is fysiek geïndexeerd) — vandaar
+  // fysiekeHole() alleen op die ene plek. Een negatieve afstand (de vooropliggende flight is zelf al
+  // ingehaald) toont geen doorlaat — dat is het aparte inhaal-correctiescenario hierboven
+  // (loopJeTegenVoorAan).
   const toonVoorDoorlaat = !!voor && !voorRondeVoltooid && !zelfRondeVoltooid && (() => {
     const afstand = checkpointOrdinaal(voorPos.hole, voorPos.checkpoint) - checkpointOrdinaal(zelfWeergavePos.hole, zelfWeergavePos.checkpoint);
-    return afstand >= 0 && afstand <= doorlaatMarge(voorPos.hole);
+    return afstand >= 0 && afstand <= doorlaatMarge(fysiekeHole(voor.ronde_type, voorPos.hole));
   })();
   const toonAchterDoorlaat = !!achter && !achterRondeVoltooid && !zelfRondeVoltooid && (() => {
     const afstand = checkpointOrdinaal(zelfWeergavePos.hole, zelfWeergavePos.checkpoint) - checkpointOrdinaal(achterPos.hole, achterPos.checkpoint);
-    return afstand >= 0 && afstand <= doorlaatMarge(zelfWeergavePos.hole);
+    return afstand >= 0 && afstand <= doorlaatMarge(fysiekeHole(zelf.ronde_type, zelfWeergavePos.hole));
   })();
 
   // Draft-waarden van de steppers: volgen de weergavepositie totdat de speler er zelf aan heeft
@@ -1310,18 +1433,18 @@ async function renderTracker(app, opts = {}) {
     voorKinderen.push(el("div", { class: "posline" }, [
       document.createTextNode("Moet rond de "),
       el("b", { text: CHECKPOINT_LABEL[voorPos.checkpoint] }),
-      document.createTextNode(` van hole ${voorPos.hole} zijn.`),
+      document.createTextNode(` van hole ${fysiekeHole(voor.ronde_type, voorPos.hole)} zijn.`),
     ]));
 
     if (loopJeTegenVoorAan) {
       voorKinderen.push(el("div", { class: "correctiewarn", text: "Jouw gemelde positie is gelijk aan of verder dan die van de flight voor jou. Waar bevindt de flight voor jou zich in werkelijkheid?" }));
 
       const stepMin = el("button", { class: "stepbtn", "aria-label": "Een hole terug", onclick: () => { trackerLocal.voorCorrectieHole = Math.max(1, voorCorrectieHoleWeergave - 1); render(); } }, [chevronSvg("links", "#8A5A1C")]);
-      const stepPlus = el("button", { class: "stepbtn", "aria-label": "Een hole verder", onclick: () => { trackerLocal.voorCorrectieHole = Math.min(AANTAL_HOLES, voorCorrectieHoleWeergave + 1); render(); } }, [chevronSvg("rechts", "#8A5A1C")]);
+      const stepPlus = el("button", { class: "stepbtn", "aria-label": "Een hole verder", onclick: () => { trackerLocal.voorCorrectieHole = Math.min(rondeInfo(voor.ronde_type).holesInRonde, voorCorrectieHoleWeergave + 1); render(); } }, [chevronSvg("rechts", "#8A5A1C")]);
       voorKinderen.push(el("div", { class: "stepperrow" }, [
         stepMin,
         el("div", { class: "steplabel", text: "hole" }),
-        el("div", { class: "stepvalue", text: String(voorCorrectieHoleWeergave) }),
+        el("div", { class: "stepvalue", text: String(fysiekeHole(voor.ronde_type, voorCorrectieHoleWeergave)) }),
         stepPlus,
       ]));
 
@@ -1370,7 +1493,7 @@ async function renderTracker(app, opts = {}) {
      Kaart: jouw flight (eigen positie melden)
      --------------------------------------------------------------------------------------- */
   const stepMinZelf = el("button", { class: "stepbtn light", "aria-label": "Een hole terug", onclick: () => { trackerLocal.zelfHoleDraft = Math.max(1, zelfHoleWeergave - 1); render(); } }, [chevronSvg("links", "#fff")]);
-  const stepPlusZelf = el("button", { class: "stepbtn light", "aria-label": "Een hole verder", onclick: () => { trackerLocal.zelfHoleDraft = Math.min(AANTAL_HOLES, zelfHoleWeergave + 1); render(); } }, [chevronSvg("rechts", "#fff")]);
+  const stepPlusZelf = el("button", { class: "stepbtn light", "aria-label": "Een hole verder", onclick: () => { trackerLocal.zelfHoleDraft = Math.min(rondeInfo(zelf.ronde_type).holesInRonde, zelfHoleWeergave + 1); render(); } }, [chevronSvg("rechts", "#fff")]);
 
   // GPS-suggestie staat "open" (nog niet bevestigd/aangepast deze visit) zolang er een gevonden
   // match is, er nog niet bevestigd is, en de ronde niet al voltooid is (geen hole 19 om naar te
@@ -1407,7 +1530,7 @@ async function renderTracker(app, opts = {}) {
   const meKinderen = [el("div", {
     class: "eyebrow",
     text: gpsPending
-      ? `Je bent op de ${CHECKPOINT_LABEL[trackerLocal.gpsCheckpointDraft]} van hole ${zelfHoleWeergave}`
+      ? `Je bent op de ${CHECKPOINT_LABEL[trackerLocal.gpsCheckpointDraft]} van hole ${fysiekeHole(zelf.ronde_type, zelfHoleWeergave)}`
       : (heeftGekozen ? "Waar is jouw flight nu?" : "Maak een keuze: waar is jouw flight nu?"),
   })];
   if (gpsPending) {
@@ -1419,7 +1542,7 @@ async function renderTracker(app, opts = {}) {
     // Ronde voltooid: er is geen hole 19 om naar te schuiven, dus geen stepper/marker-knoppen meer —
     // alleen een expliciete bevestiging (zelfRondeAfgerond) sluit de ronde daadwerkelijk af en
     // haalt de flight uit de live lijst voor andere spelers.
-    meKinderen.push(el("div", { class: "rondeklaartekst", text: `Op basis van jullie starttijd zouden jullie alle ${AANTAL_HOLES} holes nu gespeeld moeten hebben.` }));
+    meKinderen.push(el("div", { class: "rondeklaartekst", text: `Op basis van jullie starttijd zouden jullie alle ${rondeInfo(zelf.ronde_type).holesInRonde} holes nu gespeeld moeten hebben.` }));
     meKinderen.push(el("button", { class: "rondeafgerondbtn", onclick: zelfRondeAfgerond, text: "Ronde afgerond" }));
   } else {
     // Terwijl de GPS-fix nog loopt: een korte, vaste uitleg waarom de locatie gevraagd wordt (zie
@@ -1428,7 +1551,7 @@ async function renderTracker(app, opts = {}) {
       meKinderen.push(el("div", { class: "gpsuitleg", text: "We gebruiken je locatie alleen om je ruwe positie te bepalen, jij bevestigt altijd zelf." }));
     }
     meKinderen.push(
-      el("div", { class: "stepperrow big" }, [stepMinZelf, el("div", { class: "stepvalue big", text: String(zelfHoleWeergave) }), stepPlusZelf]),
+      el("div", { class: "stepperrow big" }, [stepMinZelf, el("div", { class: "stepvalue big", text: String(fysiekeHole(zelf.ronde_type, zelfHoleWeergave)) }), stepPlusZelf]),
       el("div", { class: "markerrow big" }, markerKnoppenZelf)
     );
     if (gpsPending) {
@@ -1456,8 +1579,8 @@ async function renderTracker(app, opts = {}) {
           el("b", { text: formatTijd(zelf.starttijd_effectief) }),
           document.createTextNode(" en een gemiddelde rondetijd van "),
           el("b", { text: formatDuur(zelfRondetijd) }),
-          document.createTextNode(` voor een ${zelf.aantal_spelers}-bal over ${AANTAL_HOLES} holes zou je nu ongeveer op de `),
-          el("b", { text: `${CHECKPOINT_LABEL[zelfPos.checkpoint]} van hole ${zelfPos.hole}` }),
+          document.createTextNode(` voor een ${zelf.aantal_spelers}-bal over ${rondeInfo(zelf.ronde_type).holesInRonde} holes zou je nu ongeveer op de `),
+          el("b", { text: `${CHECKPOINT_LABEL[zelfPos.checkpoint]} van hole ${fysiekeHole(zelf.ronde_type, zelfPos.hole)}` }),
           document.createTextNode(` moeten zijn. ${conclusie.zin}`),
         ]));
       }
@@ -1480,18 +1603,18 @@ async function renderTracker(app, opts = {}) {
     achterKinderen.push(el("div", { class: "posline" }, [
       document.createTextNode("Moet rond de "),
       el("b", { text: CHECKPOINT_LABEL[achterPos.checkpoint] }),
-      document.createTextNode(` van hole ${achterPos.hole} zijn.`),
+      document.createTextNode(` van hole ${fysiekeHole(achter.ronde_type, achterPos.hole)} zijn.`),
     ]));
 
     if (loopAchterTegenJouAan) {
       achterKinderen.push(el("div", { class: "correctiewarn", text: "Jouw gemelde positie is gelijk aan of verder terug dan die van de flight achter jou. Waar bevindt de flight achter jou zich in werkelijkheid?" }));
 
       const stepMinAchter = el("button", { class: "stepbtn", "aria-label": "Een hole terug", onclick: () => { trackerLocal.achterCorrectieHole = Math.max(1, achterCorrectieHoleWeergave - 1); render(); } }, [chevronSvg("links", "#8A5A1C")]);
-      const stepPlusAchter = el("button", { class: "stepbtn", "aria-label": "Een hole verder", onclick: () => { trackerLocal.achterCorrectieHole = Math.min(AANTAL_HOLES, achterCorrectieHoleWeergave + 1); render(); } }, [chevronSvg("rechts", "#8A5A1C")]);
+      const stepPlusAchter = el("button", { class: "stepbtn", "aria-label": "Een hole verder", onclick: () => { trackerLocal.achterCorrectieHole = Math.min(rondeInfo(achter.ronde_type).holesInRonde, achterCorrectieHoleWeergave + 1); render(); } }, [chevronSvg("rechts", "#8A5A1C")]);
       achterKinderen.push(el("div", { class: "stepperrow" }, [
         stepMinAchter,
         el("div", { class: "steplabel", text: "hole" }),
-        el("div", { class: "stepvalue", text: String(achterCorrectieHoleWeergave) }),
+        el("div", { class: "stepvalue", text: String(fysiekeHole(achter.ronde_type, achterCorrectieHoleWeergave)) }),
         stepPlusAchter,
       ]));
 
@@ -1561,7 +1684,7 @@ async function renderTracker(app, opts = {}) {
     tijdlijnIntervalId = setInterval(() => {
       const live = document.getElementById("zelf-tijdlijn-voortgang");
       if (!live) { clearInterval(tijdlijnIntervalId); tijdlijnIntervalId = null; return; }
-      const pos = projecteerVanafMelding(zelf, zelfPos.minutenPerHole, new Date());
+      const pos = projecteerVanafMelding(zelf, zelfPos.minutenPerHole, new Date(), zelf.ronde_type);
       if (!pos) return;
       if (pos.hole !== zelfWeergavePos.hole || pos.checkpoint !== zelfWeergavePos.checkpoint) {
         clearInterval(tijdlijnIntervalId);
@@ -1751,7 +1874,8 @@ async function renderTracker(app, opts = {}) {
     // zelfPos/achterPos hebben het altijd (zie posVan), en het tempo hangt sowieso alleen af van
     // flightgrootte/hcp, nooit van de gemelde positie.
     const passerendeMinutenPerHole = kant === "voor" ? zelfPos.minutenPerHole : achterPos.minutenPerHole;
-    const wachtMinuten = duurTotVolgendCheckpoint(passerendePos.hole, passerendePos.checkpoint, passerendeMinutenPerHole);
+    const passerendeFlight = kant === "voor" ? zelf : buur;
+    const wachtMinuten = duurTotVolgendCheckpoint(passerendePos.hole, passerendePos.checkpoint, passerendeMinutenPerHole, passerendeFlight.ronde_type);
     const wachtTot = new Date(nu.getTime() + wachtMinuten * 60000).toISOString();
     try {
       await sb(`flights?id=eq.${wachtendeFlight.id}`, {
@@ -1880,12 +2004,12 @@ async function renderAdmin(app) {
 // WILLEKEURIGE flight (niet per se de ingelogde speler) — hergebruikt door zowel de Tracker-tab-
 // rijen als het flight-detailscherm, zodat beide altijd exact dezelfde cijfers tonen.
 function berekenFlightPositie(flight, params, nu) {
-  const minutenPerHole = rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp) / AANTAL_HOLES;
-  const zelfPos = verwachtePositie(flight.starttijd_effectief, minutenPerHole, nu);
+  const minutenPerHole = rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp, flight.ronde_type) / rondeInfo(flight.ronde_type).holesInRonde;
+  const zelfPos = verwachtePositie(flight.starttijd_effectief, minutenPerHole, nu, flight.ronde_type);
   const heeftMelding = flight.gerapporteerde_hole != null && flight.gerapporteerd_checkpoint != null;
-  const weergaveVoorWacht = (heeftMelding ? projecteerVanafMelding(flight, minutenPerHole, nu) : null) ?? zelfPos;
-  const weergave = pasWachttijdToe(weergaveVoorWacht, flight, minutenPerHole, nu);
-  const voltooid = rondeVoltooid(weergave);
+  const weergaveVoorWacht = (heeftMelding ? projecteerVanafMelding(flight, minutenPerHole, nu, flight.ronde_type) : null) ?? zelfPos;
+  const weergave = pasWachttijdToe(weergaveVoorWacht, flight, minutenPerHole, nu, flight.ronde_type);
+  const voltooid = rondeVoltooid(weergave, flight.ronde_type);
   let conclusie = null;
   if (heeftMelding && !voltooid) {
     const actueleFractie = (flight.gerapporteerde_hole - 1) + checkpointFractie(flight.gerapporteerd_checkpoint);
@@ -1907,11 +2031,24 @@ function flightTitel(spelers) {
   return `${achternaam} + ${rest} speler${rest === 1 ? "" : "s"}`;
 }
 
-async function vulAdminTrackerTab(inhoud) {
-  const [params] = await sb("parameters?select=*&limit=1");
-  // spelers(*) : PostgREST-embed via de bestaande spelers.flight_id-foreignkey — haalt per flight
-  // meteen de bijbehorende spelersrijen mee in één aanvraag, i.p.v. een aparte fetch per flight.
-  const flights = await sb("flights?uitgestapt=eq.false&select=*,spelers(*)&order=starttijd_effectief.asc");
+async function vulAdminTrackerTab(inhoud, opts = {}) {
+  // "stil" = automatische achtergrondverversing door adminIntervalId (v0.7.1, zie render()) — zelfde
+  // aanpak als renderTracker's "stil"-modus: bij een mislukte ophaalactie de bestaande weergave laten
+  // staan i.p.v. te vervangen door een foutmelding (de beheerder heeft niets aangeraakt). Bij de
+  // eerste, niet-stille load (tabwissel of initiële render) blijft het oude gedrag — gooi de fout
+  // door zodat renderAdmin()'s bestaande catch-blok de foutmelding toont — ongewijzigd.
+  const stil = !!opts.stil;
+  let params, flights;
+  try {
+    [params] = await sb("parameters?select=*&limit=1");
+    // spelers(*) : PostgREST-embed via de bestaande spelers.flight_id-foreignkey — haalt per flight
+    // meteen de bijbehorende spelersrijen mee in één aanvraag, i.p.v. een aparte fetch per flight.
+    flights = await sb("flights?uitgestapt=eq.false&select=*,spelers(*)&order=starttijd_effectief.asc");
+  } catch (e) {
+    console.error(e);
+    if (!stil) throw e;
+    return;
+  }
   inhoud.innerHTML = "";
 
   const nu = new Date();
@@ -1926,7 +2063,7 @@ async function vulAdminTrackerTab(inhoud) {
           const statustekst = voltooid ? "Ronde voltooid"
             : gestartNog ? `start om ${formatTijd(flight.starttijd_effectief)}`
             : (conclusie ? conclusie.label : "nog geen melding");
-          const bolTekst = voltooid ? "✓" : gestartNog ? formatTijd(flight.starttijd_effectief) : String(weergave.hole);
+          const bolTekst = voltooid ? "✓" : gestartNog ? formatTijd(flight.starttijd_effectief) : String(fysiekeHole(flight.ronde_type, weergave.hole));
           const restFractie = weergave.fractie - Math.floor(weergave.fractie);
           const voortgangPct = voltooid ? 100 : gestartNog ? 0 : tijdlijnPercentage(restFractie);
           const spelersVanFlight = flight.spelers || [];
@@ -1939,7 +2076,7 @@ async function vulAdminTrackerTab(inhoud) {
                 : el("div", { class: "flightnaampillen" }, spelersVanFlight.map((s) => el("span", { class: "flightnaampil", text: s.naam }))),
               el("div", { class: "flightmeta" }, [
                 clockSvg("#9A9385"),
-                document.createTextNode(` ${formatTijd(nu)}  ·  Hole ${weergave.hole}/${AANTAL_HOLES}  ·  ${statustekst}`),
+                document.createTextNode(` ${formatTijd(nu)}  ·  Hole ${fysiekeHole(flight.ronde_type, weergave.hole)}/${rondeInfo(flight.ronde_type).holesInRonde}  ·  ${statustekst}`),
               ]),
               el("div", { class: "flightprogressvak" }, [
                 el("div", { class: "flightprogressvoortgang", style: `width:${voortgangPct}%;background:${kleur}` }),
@@ -2012,7 +2149,7 @@ function bouwFlightDetailModal(positie, params, nu) {
   }
 
   const stepMin = el("button", { class: "stepbtn light", "aria-label": "Een hole terug", onclick: () => { adminLocal.flightDetailHoleDraft = Math.max(1, holeWeergave - 1); render(); } }, [chevronSvg("links", "#fff")]);
-  const stepPlus = el("button", { class: "stepbtn light", "aria-label": "Een hole verder", onclick: () => { adminLocal.flightDetailHoleDraft = Math.min(AANTAL_HOLES, holeWeergave + 1); render(); } }, [chevronSvg("rechts", "#fff")]);
+  const stepPlus = el("button", { class: "stepbtn light", "aria-label": "Een hole verder", onclick: () => { adminLocal.flightDetailHoleDraft = Math.min(rondeInfo(flight.ronde_type).holesInRonde, holeWeergave + 1); render(); } }, [chevronSvg("rechts", "#fff")]);
   const markerKnoppen = CHECKPOINT_VOLGORDE.map((key) => {
     const geselecteerd = heeftMelding && key === weergave.checkpoint && holeWeergave === weergave.hole;
     return el("button", {
@@ -2027,7 +2164,7 @@ function bouwFlightDetailModal(positie, params, nu) {
   const eigenKinderen = [el("div", { class: "eyebrow", text: voltooid ? "Ronde waarschijnlijk afgerond" : "Verplaats deze flight (melden namens de flight)" })];
   if (!voltooid) {
     eigenKinderen.push(
-      el("div", { class: "stepperrow big" }, [stepMin, el("div", { class: "stepvalue big", text: String(holeWeergave) }), stepPlus]),
+      el("div", { class: "stepperrow big" }, [stepMin, el("div", { class: "stepvalue big", text: String(fysiekeHole(flight.ronde_type, holeWeergave)) }), stepPlus]),
       el("div", { class: "markerrow big" }, markerKnoppen)
     );
     if (heeftMelding) {
@@ -2041,7 +2178,7 @@ function bouwFlightDetailModal(positie, params, nu) {
         document.createTextNode("Op basis van een start om "),
         el("b", { text: formatTijd(flight.starttijd_effectief) }),
         document.createTextNode(` zou deze flight nu ongeveer op de `),
-        el("b", { text: `${CHECKPOINT_LABEL[positie.zelfPos.checkpoint]} van hole ${positie.zelfPos.hole}` }),
+        el("b", { text: `${CHECKPOINT_LABEL[positie.zelfPos.checkpoint]} van hole ${fysiekeHole(flight.ronde_type, positie.zelfPos.hole)}` }),
         document.createTextNode(` moeten zijn. ${conclusie ? conclusie.zin : ""}`),
       ]));
     }
@@ -2054,7 +2191,7 @@ function bouwFlightDetailModal(positie, params, nu) {
       el("div", { class: "detailheader" }, [
         el("div", {}, [
           el("div", { class: "detailtitle", text: flightTitel(spelers) }),
-          el("div", { class: "detailsub", text: `Start ${formatTijd(flight.starttijd_effectief)} · Hole ${weergave.hole} · ${AANTAL_HOLES} holes` }),
+          el("div", { class: "detailsub", text: `Start ${formatTijd(flight.starttijd_effectief)} · Hole ${fysiekeHole(flight.ronde_type, weergave.hole)} · ${rondeInfo(flight.ronde_type).holesInRonde} holes` }),
         ]),
         el("button", { class: "detailclose", "aria-label": "Sluiten", onclick: sluiten }, [
           (() => { const s = document.createElementNS("http://www.w3.org/2000/svg", "svg"); s.setAttribute("width","13"); s.setAttribute("height","13"); s.setAttribute("viewBox","0 0 24 24"); s.setAttribute("fill","none");
@@ -2165,8 +2302,8 @@ async function vulAdminParametersTab(inhoud) {
       const nu = new Date();
       let opSchema = 0, voor = 0, achter = 0, somAfwijking = 0;
       for (const flight of metMelding) {
-        const minutenPerHole = rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp) / AANTAL_HOLES;
-        const zelfPos = verwachtePositie(flight.starttijd_effectief, minutenPerHole, nu);
+        const minutenPerHole = rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp, flight.ronde_type) / rondeInfo(flight.ronde_type).holesInRonde;
+        const zelfPos = verwachtePositie(flight.starttijd_effectief, minutenPerHole, nu, flight.ronde_type);
         const actueleFractie = (flight.gerapporteerde_hole - 1) + checkpointFractie(flight.gerapporteerd_checkpoint);
         const deltaHoles = actueleFractie - zelfPos.fractie;
         somAfwijking += deltaHoles;
