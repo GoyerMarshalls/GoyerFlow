@@ -260,7 +260,7 @@
 
 <script>
 /* ============================================================================================
-   GoyerFlow — v0.8.0
+   GoyerFlow — v0.8.1
    Versienummer bij elke volgende build op TWEE plekken bijwerken: deze kopregel-comment en de
    APP_VERSIE-constante hieronder (zelfde patroon als de Marshal App — zie diens bouwgeschiedenis
    voor de precedent-regel). De zichtbare versie-indicator naast "GoyerFlow" in de topbar wordt
@@ -351,8 +351,16 @@
    migratie in Supabase draaien, (2) de teecontrol-sync Edge Function opnieuw deployen (die bepaalt
    nu ronde_type bij elke sync, met dezelfde classificatielogica als de Marshal App), (3) een nieuwe
    sync triggeren — zie chat voor de volledige toelichting.
+   v0.8.1: op Kay's verzoek de "Verplaats deze flight"-kaart in het admin flight-detailscherm
+   tekstueel gelijkgetrokken met de ledenkaart ("waar is jouw flight nu?"-stijl). De vaste eyebrow-
+   tekst "Verplaats deze flight (melden namens de flight)" is vervangen door hetzelfde
+   voor-/na-keuze-onderscheid als de ledenkaart: "Maak een keuze: waar is deze flight nu?" vóór de
+   eerste melding, "Waar is deze flight nu?" erna. De conclusieregel miste t.o.v. de ledenkaart de
+   "en een gemiddelde rondetijd van X voor een Y-bal over Z holes"-component — nu toegevoegd (zelfde
+   rondetijdVoor()-aanroep als de ledenkaart, nu met de admin-detailscherm-eigen params/flight).
+   Alleen tekst/weergave gewijzigd, geen logica- of schemawijziging.
    ============================================================================================ */
-const APP_VERSIE = "0.8.0";
+const APP_VERSIE = "0.8.1";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -2161,7 +2169,12 @@ function bouwFlightDetailModal(positie, params, nu) {
     });
   });
 
-  const eigenKinderen = [el("div", { class: "eyebrow", text: voltooid ? "Ronde waarschijnlijk afgerond" : "Verplaats deze flight (melden namens de flight)" })];
+  const eigenKinderen = [el("div", {
+    class: "eyebrow",
+    text: voltooid
+      ? "Ronde waarschijnlijk afgerond"
+      : (heeftMelding ? "Waar is deze flight nu?" : "Maak een keuze: waar is deze flight nu?"),
+  })];
   if (!voltooid) {
     eigenKinderen.push(
       el("div", { class: "stepperrow big" }, [stepMin, el("div", { class: "stepvalue big", text: String(fysiekeHole(flight.ronde_type, holeWeergave)) }), stepPlus]),
@@ -2177,7 +2190,9 @@ function bouwFlightDetailModal(positie, params, nu) {
       eigenKinderen.push(el("div", { class: "conclusieline" }, [
         document.createTextNode("Op basis van een start om "),
         el("b", { text: formatTijd(flight.starttijd_effectief) }),
-        document.createTextNode(` zou deze flight nu ongeveer op de `),
+        document.createTextNode(" en een gemiddelde rondetijd van "),
+        el("b", { text: formatDuur(rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp, flight.ronde_type)) }),
+        document.createTextNode(` voor een ${flight.aantal_spelers}-bal over ${rondeInfo(flight.ronde_type).holesInRonde} holes zou deze flight nu ongeveer op de `),
         el("b", { text: `${CHECKPOINT_LABEL[positie.zelfPos.checkpoint]} van hole ${fysiekeHole(flight.ronde_type, positie.zelfPos.hole)}` }),
         document.createTextNode(` moeten zijn. ${conclusie ? conclusie.zin : ""}`),
       ]));
