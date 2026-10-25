@@ -174,15 +174,46 @@
     cursor:pointer;font-size:13px;font-weight:700;color:var(--muted-ink)}
   .tabbtn.actief{background:#fff;color:var(--accent);box-shadow:0 1px 4px rgba(0,0,0,0.08)}
 
-  /* Beheerder — Tracker-tab: overzicht van alle flights */
-  .flightrij{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+  /* Beheerder — Tracker-tab: overzicht van alle flights (v0.6.0: Marshal App-achtige lijstvorm —
+     cirkel-badge, naam-pills, klok+hole/status-regel, dunne voortgangsbalk — i.p.v. de platte
+     eerdere rij. Elke rij is nu ook klikbaar en opent het flight-detailscherm hieronder.) */
+  .flightrij{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);
+    cursor:pointer}
   .flightrij:last-child{border-bottom:none}
   .flightbol{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-    flex-shrink:0;font-size:14px;font-weight:800;color:#fff}
+    flex-shrink:0;font-size:13px;font-weight:800;color:#fff;text-align:center;line-height:1.1}
   .flightinfo{flex:1;min-width:0}
-  .flightnaam{font-size:14px;font-weight:700;color:var(--ink)}
-  .flightsub{font-size:12px;color:var(--muted-ink);margin-top:2px}
-  .flightstatus{font-size:12px;font-weight:800;text-align:right;flex-shrink:0;white-space:nowrap;max-width:110px}
+  .flightnaampillen{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px}
+  .flightnaampil{font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px;
+    background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+  .flightmeta{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted-ink)}
+  .flightmeta svg{flex-shrink:0}
+  .flightprogressvak{position:relative;height:4px;border-radius:2px;background:var(--border);
+    overflow:hidden;margin-top:7px}
+  .flightprogressvoortgang{position:absolute;top:0;left:0;height:100%;border-radius:2px;background:var(--blue)}
+
+  /* Beheerder — flight-detailscherm (popup bij klik op een flight in de Tracker-tab) */
+  .detailoverlay{position:fixed;inset:0;background:rgba(27,43,34,0.55);display:flex;align-items:center;
+    justify-content:center;padding:18px;z-index:50}
+  .detailmodal{background:#fff;border-radius:20px;padding:20px;width:100%;max-width:420px;
+    max-height:88vh;overflow-y:auto;box-shadow:0 12px 30px rgba(0,0,0,0.25)}
+  .detailheader{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:2px}
+  .detailtitle{font-size:18px;font-weight:800;color:var(--ink)}
+  .detailsub{font-size:13px;color:var(--muted-ink);margin-top:2px}
+  .detailclose{width:26px;height:26px;border-radius:8px;background:#F3F0E6;border:none;display:flex;
+    align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;padding:0;margin-top:2px}
+  .spelerlijst{margin-top:14px}
+  .spelerrij{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;
+    border-bottom:1px solid var(--border)}
+  .spelerrij:last-child{border-bottom:none}
+  .spelernaamrow{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+  .spelernaampil{font-size:12px;font-weight:700;padding:3px 9px;border-radius:8px;
+    background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+  .spelermeta{font-size:12px;color:var(--muted-ink)}
+  .spelerhcp{font-size:15px;font-weight:800;color:var(--ink);flex-shrink:0;white-space:nowrap}
+  .gemhcprow{display:flex;justify-content:space-between;align-items:center;font-size:14px;
+    font-weight:700;color:var(--ink);padding-top:11px;margin-top:3px;border-top:1.5px solid var(--border)}
+  .detaileigenkaart{margin-top:16px}
 
   /* Beheerder — Parameters-tab */
   .paramrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;
@@ -226,7 +257,7 @@
 
 <script>
 /* ============================================================================================
-   GoyerFlow — v0.4.0
+   GoyerFlow — v0.6.0
    Versienummer bij elke volgende build op TWEE plekken bijwerken: deze kopregel-comment en de
    APP_VERSIE-constante hieronder (zelfde patroon als de Marshal App — zie diens bouwgeschiedenis
    voor de precedent-regel). De zichtbare versie-indicator naast "GoyerFlow" in de topbar wordt
@@ -266,8 +297,18 @@
    uitgeschakeld (zie TIJDELIJK_SKIP_PINCODE_VOOR_VELDTEST hieronder), zodat Kay met échte lidcodes
    van spelers die daadwerkelijk op de baan zijn kan inloggen zonder voor elk van hen eerst een
    pincode te moeten zetten. Zet die vlag terug op false zodra de veldtest voorbij is.
+   v0.6.0: admin Tracker-tab herbouwd naar Marshal-App-achtige lay-out (naam-pillen, klok+tijd+hole-
+   meta-regel, dunne voortgangsbalk, klikbare rij over BEIDE lussen heen) + nieuw flight-detailscherm
+   bij een klik: spelersoverzicht (naam, lidcode, "Club lid", hcp) + "Gem. handicap flight", gevolgd
+   door GoyerFlow's eigen "waar is deze flight nu"-weergave voor UITSLUITEND die ene flight (geen
+   voor/achter-kaarten — dat hoort bij het leden-trackerscherm). Met "verplaatsen": de beheerder meldt
+   een positie namens de flight, exact dezelfde hole-stepper + Afslag/Fairway/Green-schrijfactie
+   (gerapporteerde_hole/checkpoint/tijdstip) als een speler op zijn eigen kaart — bevestigd met Kay,
+   25 oktober 2026, als correcte interpretatie van "verplaatsen" (zie claude/bouwgeschiedenis-
+   goyerflow-app.md). Nieuw: spelers.hcp-kolom (Fase 2e, schema.sql) + de Teecontrol-sync-functie
+   schrijft deze nu ook mee — vereist een migratie + een redeploy van de Edge Function (zie chat).
    ============================================================================================ */
-const APP_VERSIE = "0.5.0";
+const APP_VERSIE = "0.6.0";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -694,6 +735,22 @@ function chevronSvg(richting, kleur) {
   return svg;
 }
 
+// Klok-svg, voor de klok+tijd-regel in de admin Tracker-tab (v0.6.0).
+function clockSvg(kleur) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", "12"); svg.setAttribute("height", "12"); svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  circle.setAttribute("cx", "12"); circle.setAttribute("cy", "12"); circle.setAttribute("r", "9");
+  circle.setAttribute("stroke", kleur); circle.setAttribute("stroke-width", "2");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", "M12 7v5l3.5 2"); path.setAttribute("stroke", kleur);
+  path.setAttribute("stroke-width", "2"); path.setAttribute("stroke-linecap", "round");
+  path.setAttribute("stroke-linejoin", "round");
+  svg.appendChild(circle); svg.appendChild(path);
+  return svg;
+}
+
 // Vinkje-svg, voor de doorlaat-knoppen.
 function checkSvg(kleur) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -754,6 +811,14 @@ function nieuwAdminLocal() {
     wachtwoordFout: null, wachtwoordSucces: false, wachtwoordBezig: false,
     paramFout: null, paramSucces: false, paramBezig: false,
     analyseResultaat: null,      // gevuld na klik op "Analyseer huidige flights"
+    // Flight-detailscherm (v0.6.0): id van de flight waarvan de popup openstaat (null = dicht),
+    // plus de draft-hole-waarde van de stepper daarin en bezig/fout-status voor de meldactie —
+    // zelfde patroon als trackerLocal.zelfHoleDraft/bezig/fout, maar los daarvan omdat dit de
+    // beheerder is die een WILLEKEURIGE flight meldt, niet de ingelogde speler zijn eigen flight.
+    flightDetailId: null,
+    flightDetailHoleDraft: null,
+    flightDetailBezig: false,
+    flightDetailFout: null,
   };
 }
 let adminLocal = nieuwAdminLocal();
@@ -1737,44 +1802,205 @@ async function renderAdmin(app) {
 /* ---- Tab: Tracker — overzicht van ALLE flights (niet relatief t.o.v. voor/achter, in
    tegenstelling tot het leden-trackerscherm: als beheerder heb je al het totaaloverzicht nodig,
    geen "flight voor/achter jou"-redenering — zie Kay's toelichting bij deze fase). ---- */
+// Berekent dezelfde live positie/conclusie-set als renderTracker's "zelf"-kaart, maar dan voor een
+// WILLEKEURIGE flight (niet per se de ingelogde speler) — hergebruikt door zowel de Tracker-tab-
+// rijen als het flight-detailscherm, zodat beide altijd exact dezelfde cijfers tonen.
+function berekenFlightPositie(flight, params, nu) {
+  const minutenPerHole = rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp) / AANTAL_HOLES;
+  const zelfPos = verwachtePositie(flight.starttijd_effectief, minutenPerHole, nu);
+  const heeftMelding = flight.gerapporteerde_hole != null && flight.gerapporteerd_checkpoint != null;
+  const weergaveVoorWacht = (heeftMelding ? projecteerVanafMelding(flight, minutenPerHole, nu) : null) ?? zelfPos;
+  const weergave = pasWachttijdToe(weergaveVoorWacht, flight, minutenPerHole, nu);
+  const voltooid = rondeVoltooid(weergave);
+  let conclusie = null;
+  if (heeftMelding && !voltooid) {
+    const actueleFractie = (flight.gerapporteerde_hole - 1) + checkpointFractie(flight.gerapporteerd_checkpoint);
+    conclusie = conclusieVoor(actueleFractie - zelfPos.fractie);
+  }
+  const gestartNog = nu.getTime() < new Date(flight.starttijd_effectief).getTime();
+  return { flight, minutenPerHole, zelfPos, weergave, voltooid, heeftMelding, conclusie, gestartNog };
+}
+
+// Titel voor het flight-detailscherm, naar het voorbeeld van de Marshal App ("Wekking + 2
+// spelers"): achternaam (laatste woord van de naam) van de eerste speler + aantal overigen. Een
+// benadering, geen gegarandeerde 1-op-1 match met hoe de Marshal App dit precies bepaalt (die
+// broncode is niet in deze sessie beschikbaar) — bij één speler gewoon de volledige naam.
+function flightTitel(spelers) {
+  if (!spelers || spelers.length === 0) return "Flight";
+  if (spelers.length === 1) return spelers[0].naam;
+  const achternaam = spelers[0].naam.trim().split(/\s+/).pop();
+  const rest = spelers.length - 1;
+  return `${achternaam} + ${rest} speler${rest === 1 ? "" : "s"}`;
+}
+
 async function vulAdminTrackerTab(inhoud) {
   const [params] = await sb("parameters?select=*&limit=1");
-  const flights = await sb("flights?uitgestapt=eq.false&select=*&order=starttijd_effectief.asc");
+  // spelers(*) : PostgREST-embed via de bestaande spelers.flight_id-foreignkey — haalt per flight
+  // meteen de bijbehorende spelersrijen mee in één aanvraag, i.p.v. een aparte fetch per flight.
+  const flights = await sb("flights?uitgestapt=eq.false&select=*,spelers(*)&order=starttijd_effectief.asc");
   inhoud.innerHTML = "";
 
   const nu = new Date();
-  const rijen = flights.map((flight) => {
-    const minutenPerHole = rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp) / AANTAL_HOLES;
-    const zelfPos = verwachtePositie(flight.starttijd_effectief, minutenPerHole, nu);
-    const heeftMelding = flight.gerapporteerde_hole != null && flight.gerapporteerd_checkpoint != null;
-    const weergave = pasWachttijdToe((heeftMelding ? projecteerVanafMelding(flight, minutenPerHole, nu) : null) ?? zelfPos, flight, minutenPerHole, nu);
-    const voltooid = rondeVoltooid(weergave);
-    let conclusie = null;
-    if (heeftMelding && !voltooid) {
-      const actueleFractie = (flight.gerapporteerde_hole - 1) + checkpointFractie(flight.gerapporteerd_checkpoint);
-      conclusie = conclusieVoor(actueleFractie - zelfPos.fractie);
-    }
-    return { flight, weergave, voltooid, heeftMelding, conclusie };
-  });
+  const rijen = flights.map((flight) => berekenFlightPositie(flight, params, nu));
 
   const kaart = el("div", { class: "card" }, [
     el("div", { class: "eyebrow", text: "Alle flights" }),
     rijen.length === 0
       ? el("p", { class: "help", text: "Geen actieve flights gevonden." })
-      : el("div", {}, rijen.map(({ flight, weergave, voltooid, heeftMelding, conclusie }) => {
-          const kleur = voltooid ? "#9B9585" : (conclusie ? conclusie.kleur : "var(--blue)");
-          const statustekst = voltooid ? "Ronde voltooid" : (conclusie ? conclusie.label : "Nog geen melding");
-          return el("div", { class: "flightrij" }, [
-            el("div", { class: "flightbol", style: `background:${kleur}`, text: voltooid ? "✓" : String(weergave.hole) }),
+      : el("div", {}, rijen.map(({ flight, weergave, voltooid, heeftMelding, conclusie, gestartNog }) => {
+          const kleur = voltooid ? "#9B9585" : gestartNog ? "#B9B2A0" : (conclusie ? conclusie.kleur : "var(--blue)");
+          const statustekst = voltooid ? "Ronde voltooid"
+            : gestartNog ? `start om ${formatTijd(flight.starttijd_effectief)}`
+            : (conclusie ? conclusie.label : "nog geen melding");
+          const bolTekst = voltooid ? "✓" : gestartNog ? formatTijd(flight.starttijd_effectief) : String(weergave.hole);
+          const restFractie = weergave.fractie - Math.floor(weergave.fractie);
+          const voortgangPct = voltooid ? 100 : gestartNog ? 0 : tijdlijnPercentage(restFractie);
+          const spelersVanFlight = flight.spelers || [];
+
+          const rij = el("div", { class: "flightrij" }, [
+            el("div", { class: "flightbol", style: `background:${kleur}`, text: bolTekst }),
             el("div", { class: "flightinfo" }, [
-              el("div", { class: "flightnaam", text: `${flight.lus} · ${flight.aantal_spelers}-bal` }),
-              el("div", { class: "flightsub", text: `Gestart ${formatTijd(flight.starttijd_effectief)}` + (heeftMelding ? ` · laatste melding ${CHECKPOINT_LABEL[flight.gerapporteerd_checkpoint]} hole ${flight.gerapporteerde_hole}` : "") }),
+              spelersVanFlight.length === 0
+                ? el("div", { class: "flightnaampillen" }, [el("span", { class: "flightnaampil", text: `${flight.lus} · ${flight.aantal_spelers}-bal` })])
+                : el("div", { class: "flightnaampillen" }, spelersVanFlight.map((s) => el("span", { class: "flightnaampil", text: s.naam }))),
+              el("div", { class: "flightmeta" }, [
+                clockSvg("#9A9385"),
+                document.createTextNode(` ${formatTijd(nu)}  ·  Hole ${weergave.hole}/${AANTAL_HOLES}  ·  ${statustekst}`),
+              ]),
+              el("div", { class: "flightprogressvak" }, [
+                el("div", { class: "flightprogressvoortgang", style: `width:${voortgangPct}%;background:${kleur}` }),
+              ]),
             ]),
-            el("div", { class: "flightstatus", style: `color:${kleur}`, text: statustekst }),
           ]);
+          rij.addEventListener("click", () => {
+            adminLocal.flightDetailId = flight.id;
+            adminLocal.flightDetailHoleDraft = null;
+            adminLocal.flightDetailFout = null;
+            render();
+          });
+          return rij;
         })),
   ]);
   inhoud.append(kaart);
+
+  if (adminLocal.flightDetailId != null) {
+    const geselecteerd = rijen.find((r) => r.flight.id === adminLocal.flightDetailId);
+    if (geselecteerd) inhoud.append(bouwFlightDetailModal(geselecteerd, params, nu));
+  }
+}
+
+/* ---- Flight-detailscherm (popup, v0.6.0) -------------------------------------------------------
+   Bij klik op een flight in de Tracker-tab: spelersoverzicht (naam/lidcode/"Club lid"/hcp + gem.
+   hcp, naar het voorbeeld van de Marshal App-popup) plus GoyerFlow's eigen "waar is deze flight
+   nu"-weergave voor UITSLUITEND deze flight (geen voor/achter-kaarten, dat hoort bij het leden-
+   trackerscherm, niet bij dit overzicht). "Verplaatsen" = de beheerder meldt de positie namens de
+   flight, exact dezelfde hole-stepper + Afslag/Fairway/Green-knoppen en schrijfactie
+   (gerapporteerde_hole/checkpoint/tijdstip) als een speler op zijn eigen kaart gebruikt — bevestigd
+   met Kay, 25 oktober 2026. Alle spelers die hier getoond worden zijn per definitie Goyer-leden
+   ("Club lid"): GoyerFlow's spelers-tabel bevat uitsluitend leden met een persoonscode — greenfee-
+   /introducé-spelers worden door de sync al overgeslagen (zie v0.5.0) en komen hier dus nooit in
+   voor. "Club lid" is daarom een vaste tekst, geen apart gesynchroniseerd veld. -------------------- */
+function bouwFlightDetailModal(positie, params, nu) {
+  const { flight, weergave, voltooid, heeftMelding, conclusie, minutenPerHole } = positie;
+  const spelers = flight.spelers || [];
+  const hcps = spelers.map((s) => s.hcp).filter((h) => h !== null && h !== undefined);
+  const gemHcp = hcps.length ? Math.round((hcps.reduce((a, b) => a + Number(b), 0) / hcps.length) * 10) / 10 : null;
+
+  const sluiten = () => { adminLocal.flightDetailId = null; adminLocal.flightDetailFout = null; render(); };
+
+  const spelerrijen = spelers.length === 0
+    ? [el("p", { class: "help", text: "Geen spelers gevonden voor deze flight." })]
+    : spelers.map((s) => el("div", { class: "spelerrij" }, [
+        el("div", {}, [
+          el("div", { class: "spelernaamrow" }, [el("span", { class: "spelernaampil", text: s.naam })]),
+          el("div", { class: "spelermeta", text: `${s.persoonscode} · Club lid` }),
+        ]),
+        el("div", { class: "spelerhcp", text: s.hcp != null ? `hcp ${s.hcp}` : "hcp —" }),
+      ]));
+
+  // Eigen flight-kaart (v0.6.0): zelfde opbouw/schrijflogica als renderTracker's "zelf"-kaart,
+  // hier hergebruikt voor een door de beheerder gekozen flight i.p.v. de ingelogde speler. Draft-
+  // waarde van de stepper staat in adminLocal.flightDetailHoleDraft (los van trackerLocal, zie
+  // nieuwAdminLocal()).
+  const holeWeergave = adminLocal.flightDetailHoleDraft ?? weergave.hole;
+  const kaartKleur = voltooid ? "var(--accent)" : (conclusie ? conclusie.kleur : "var(--accent)");
+
+  async function adminPositieMelden(checkpoint, hole) {
+    if (adminLocal.flightDetailBezig) return;
+    adminLocal.flightDetailBezig = true;
+    try {
+      await sb(`flights?id=eq.${flight.id}`, {
+        method: "PATCH",
+        prefer: "return=minimal",
+        body: JSON.stringify({ gerapporteerde_hole: hole, gerapporteerd_checkpoint: checkpoint, gerapporteerd_tijdstip: new Date().toISOString() }),
+      });
+      adminLocal.flightDetailHoleDraft = null;
+      adminLocal.flightDetailFout = null;
+    } catch (e) {
+      adminLocal.flightDetailFout = "Verplaatsen is niet gelukt. Probeer het nog eens.";
+      console.error(e);
+    } finally {
+      adminLocal.flightDetailBezig = false;
+      render();
+    }
+  }
+
+  const stepMin = el("button", { class: "stepbtn light", "aria-label": "Een hole terug", onclick: () => { adminLocal.flightDetailHoleDraft = Math.max(1, holeWeergave - 1); render(); } }, [chevronSvg("links", "#fff")]);
+  const stepPlus = el("button", { class: "stepbtn light", "aria-label": "Een hole verder", onclick: () => { adminLocal.flightDetailHoleDraft = Math.min(AANTAL_HOLES, holeWeergave + 1); render(); } }, [chevronSvg("rechts", "#fff")]);
+  const markerKnoppen = CHECKPOINT_VOLGORDE.map((key) => {
+    const geselecteerd = heeftMelding && key === weergave.checkpoint && holeWeergave === weergave.hole;
+    return el("button", {
+      class: "markerbtn big",
+      style: geselecteerd ? "background:#fff;border-color:#fff;color:" + kaartKleur
+                           : "background:rgba(255,255,255,0.14);border-color:rgba(255,255,255,0.3);color:rgba(255,255,255,0.85)",
+      onclick: () => adminPositieMelden(key, holeWeergave),
+      text: CHECKPOINT_KNOPLABEL[key],
+    });
+  });
+
+  const eigenKinderen = [el("div", { class: "eyebrow", text: voltooid ? "Ronde waarschijnlijk afgerond" : "Verplaats deze flight (melden namens de flight)" })];
+  if (!voltooid) {
+    eigenKinderen.push(
+      el("div", { class: "stepperrow big" }, [stepMin, el("div", { class: "stepvalue big", text: String(holeWeergave) }), stepPlus]),
+      el("div", { class: "markerrow big" }, markerKnoppen)
+    );
+    if (heeftMelding) {
+      const restFractieNu = weergave.fractie - Math.floor(weergave.fractie);
+      eigenKinderen.push(el("div", { class: "tijdlijn" }, [
+        el("div", { class: "tijdlijnvak" }, [
+          el("div", { class: "tijdlijnvoortgang", style: `width:${tijdlijnPercentage(restFractieNu)}%` }),
+        ]),
+      ]));
+      eigenKinderen.push(el("div", { class: "conclusieline" }, [
+        document.createTextNode("Op basis van een start om "),
+        el("b", { text: formatTijd(flight.starttijd_effectief) }),
+        document.createTextNode(` zou deze flight nu ongeveer op de `),
+        el("b", { text: `${CHECKPOINT_LABEL[positie.zelfPos.checkpoint]} van hole ${positie.zelfPos.hole}` }),
+        document.createTextNode(` moeten zijn. ${conclusie ? conclusie.zin : ""}`),
+      ]));
+    }
+    if (adminLocal.flightDetailFout) eigenKinderen.push(el("div", { class: "msg err", text: adminLocal.flightDetailFout }));
+  }
+  const eigenKaart = el("div", { class: "card me detaileigenkaart", style: "background:" + kaartKleur }, eigenKinderen);
+
+  const modal = el("div", { class: "detailoverlay" }, [
+    el("div", { class: "detailmodal" }, [
+      el("div", { class: "detailheader" }, [
+        el("div", {}, [
+          el("div", { class: "detailtitle", text: flightTitel(spelers) }),
+          el("div", { class: "detailsub", text: `Start ${formatTijd(flight.starttijd_effectief)} · Hole ${weergave.hole} · ${AANTAL_HOLES} holes` }),
+        ]),
+        el("button", { class: "detailclose", "aria-label": "Sluiten", onclick: sluiten }, [
+          (() => { const s = document.createElementNS("http://www.w3.org/2000/svg", "svg"); s.setAttribute("width","13"); s.setAttribute("height","13"); s.setAttribute("viewBox","0 0 24 24"); s.setAttribute("fill","none");
+            const p = document.createElementNS("http://www.w3.org/2000/svg", "path"); p.setAttribute("d","M6 6l12 12M18 6L6 18"); p.setAttribute("stroke","#6B6558"); p.setAttribute("stroke-width","2"); p.setAttribute("stroke-linecap","round"); s.appendChild(p); return s; })(),
+        ]),
+      ]),
+      el("div", { class: "spelerlijst" }, spelerrijen),
+      gemHcp != null ? el("div", { class: "gemhcprow" }, [document.createTextNode("Gem. handicap flight"), document.createTextNode(String(gemHcp))]) : null,
+      eigenKaart,
+    ].filter(Boolean)),
+  ]);
+  return modal;
 }
 
 /* ---- Tab: Parameters — checkpointtijden bewerken + "analyse"-functie. LET OP: de analyse hier is
