@@ -260,7 +260,7 @@
 
 <script>
 /* ============================================================================================
-   GoyerFlow — v0.8.1
+   GoyerFlow — v0.9.0
    Versienummer bij elke volgende build op TWEE plekken bijwerken: deze kopregel-comment en de
    APP_VERSIE-constante hieronder (zelfde patroon als de Marshal App — zie diens bouwgeschiedenis
    voor de precedent-regel). De zichtbare versie-indicator naast "GoyerFlow" in de topbar wordt
@@ -359,8 +359,18 @@
    "en een gemiddelde rondetijd van X voor een Y-bal over Z holes"-component — nu toegevoegd (zelfde
    rondetijdVoor()-aanroep als de ledenkaart, nu met de admin-detailscherm-eigen params/flight).
    Alleen tekst/weergave gewijzigd, geen logica- of schemawijziging.
+   v0.9.0: herbevestig-hint na een verouderde eigen melding (Kay's feedback 25 oktober 2026, tijdens
+   het live testen op de baan). Tot nu toe toonde de "zelf"-kaart na de EERSTE melding altijd meteen
+   een conclusie ("Dus je loopt op schema"), geprojecteerd vanaf die melding — ook als die melding
+   intussen allang verouderd was. Nieuw: zodra er HERBEVESTIG_DREMPEL_HOLES (= 2) of meer holes
+   speeltijd verstreken zijn sinds de laatste melding (op het EIGEN tempo van de flight, dus niet een
+   vast aantal minuten), verbergt de kaart tijdlijn/conclusieregel/tips-knop en toont in plaats
+   daarvan een hint ("Dit is nog gebaseerd op je laatste melding. Klopt dit nog? Bevestig of pas
+   aan.") boven de al-voorgeselecteerde stepper. Bevestigen kost de speler, net als altijd, maar één
+   tik op Afslag/Fairway/Green — geen apart "Bevestigen"-knopje zoals bij GPS, want dat schrijft al
+   direct weg. Geen schema- of sync-wijziging, puur weergavelogica in index.html.
    ============================================================================================ */
-const APP_VERSIE = "0.8.1";
+const APP_VERSIE = "0.9.0";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -771,6 +781,15 @@ function holeCheckpointCoord(hole, checkpoint) {
 // 400m is ruim boven wat je op de baan zelf tussen een punt en het dichtstbijzijnde checkpoint kunt
 // tegenkomen, maar ruim onder "duidelijk niet op de baan".
 const GPS_MAX_AFSTAND_METER = 400;
+
+// Na hoeveel holes sinds de laatste eigen melding de "op schema"-conclusie niet langer stilzwijgend
+// getoond wordt, maar eerst opnieuw bevestigd moet worden (zie renderTracker, moetOpnieuwBevestigen
+// — Kay's feedback 25 oktober 2026: een oude melding kan een inmiddels verkeerde conclusie laten
+// zien, en bevestigen kost de speler maar één tik op de al-voorgeselecteerde Afslag/Fairway/Green-
+// knop). In HOLES, niet in minuten — zo krijgt een langzame flight dezelfde "holes speeltijd" voordat
+// er opnieuw gevraagd wordt als een snelle flight, in plaats van dat een vast aantal minuten voor een
+// langzame flight te snel of voor een snelle flight te laat zou aanvoelen.
+const HERBEVESTIG_DREMPEL_HOLES = 2;
 
 // Dichtstbijzijnde van alle 18×3 checkpoints t.o.v. een gemeten positie — puur een suggestie, zie
 // de toelichting hierboven. Geeft null terug als zelfs de dichtstbijzijnde match verder weg ligt dan
@@ -1387,6 +1406,19 @@ async function renderTracker(app, opts = {}) {
   const voorRondeVoltooid = voor ? rondeVoltooid(voorPos, voor.ronde_type) : false;
   const achterRondeVoltooid = achter ? rondeVoltooid(achterPos, achter.ronde_type) : false;
 
+  // Herbevestiging na een verouderde melding (Kay's feedback 25 oktober 2026, zie
+  // HERBEVESTIG_DREMPEL_HOLES hierboven): zolang de laatste melding vers genoeg is, blijft het
+  // bestaande gedrag gewoon (conclusie meteen zichtbaar). Pas als er HERBEVESTIG_DREMPEL_HOLES of
+  // meer holes speeltijd (op het EIGEN tempo van de flight) verstreken zijn sinds die melding, wordt
+  // de conclusie verborgen tot de speler opnieuw een knop aantikt — zie "Kaart: jouw flight"
+  // hieronder. Niet relevant zonder melding (heeftGekozen=false toont toch al geen conclusie) of na
+  // een voltooide ronde (geen volgende melding meer te doen).
+  const minutenSindsMelding = heeftGekozen && zelf.gerapporteerd_tijdstip
+    ? (nu.getTime() - new Date(zelf.gerapporteerd_tijdstip).getTime()) / 60000
+    : null;
+  const moetOpnieuwBevestigen = heeftGekozen && !zelfRondeVoltooid && minutenSindsMelding != null
+    && minutenSindsMelding / zelfPos.minutenPerHole >= HERBEVESTIG_DREMPEL_HOLES;
+
   // Inhaal-signaal: je eigen melding bereikt of overschrijdt de geschatte positie van de flight
   // voor je (zie scopedocument, "Inhaal-signaal"). Alleen relevant als je al een positie hebt
   // gemeld en er een flight voor je is.
@@ -1545,6 +1577,10 @@ async function renderTracker(app, opts = {}) {
     // Losse regel i.p.v. aan de eyebrow-tekst vastgeplakt — op een klein scherm liep "...van hole 1
     // — bevestig of pas aan" lelijk af over twee regels middenin de zin.
     meKinderen.push(el("div", { class: "gpssubregel", text: "Bevestig of pas aan" }));
+  } else if (moetOpnieuwBevestigen) {
+    // Zelfde subregel-stijl hergebruikt (puur visueel identiek aan de GPS-variant hierboven) voor
+    // de herbevestig-hint — zie HERBEVESTIG_DREMPEL_HOLES hierboven.
+    meKinderen.push(el("div", { class: "gpssubregel", text: "Dit is nog gebaseerd op je laatste melding. Klopt dit nog? Bevestig of pas aan." }));
   }
   if (zelfRondeVoltooid) {
     // Ronde voltooid: er is geen hole 19 om naar te schuiven, dus geen stepper/marker-knoppen meer —
@@ -1567,6 +1603,16 @@ async function renderTracker(app, opts = {}) {
       // bewust verborgen — ook als er van eerder vandaag al een melding staat — en verschijnt pas
       // weer ná bevestiging/aanpassing van DEZE visit, zie zelfPositieBevestigenGps.
       meKinderen.push(el("button", { class: "gpsbevestigbtn", style: "color:" + kaartKleur, onclick: zelfPositieBevestigenGps, text: "Bevestigen" }));
+    } else if (moetOpnieuwBevestigen) {
+      // Herbevestiging na een verouderde melding (Kay's feedback 25 oktober 2026, zie
+      // HERBEVESTIG_DREMPEL_HOLES): tijdlijn/conclusie/tips bewust verborgen — die zouden een
+      // conclusie trekken op basis van een melding die inmiddels HERBEVESTIG_DREMPEL_HOLES of meer
+      // holes oud is, en dus best kan afwijken van de werkelijkheid. De stepper/marker-knoppen staan
+      // (hierboven, buiten dit blok) al op de laatst bekende/geprojecteerde positie — de speler hoeft
+      // dus, net als bij de GPS-suggestie, maar één tik te geven om een verse melding te doen (of
+      // eerst de stepper te corrigeren als die positie niet meer klopt). Zodra dat gebeurt, zet
+      // zelfPositieMelden gerapporteerd_tijdstip op nu, waarmee moetOpnieuwBevestigen vanzelf weer
+      // false wordt bij de eerstvolgende render — geen aparte "bevestigd deze visit"-vlag nodig.
     } else {
       // Tijdlijn alleen tonen ná de eerste melding (zelfde reden als bij het niet vooraf markeren
       // van een knop: vóór die eerste keuze niets suggereren) en alleen zolang de speler de live
