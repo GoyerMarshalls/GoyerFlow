@@ -136,6 +136,13 @@
   .gpsuitleg{font-size:13px;color:rgba(255,255,255,0.85);line-height:1.4;margin-bottom:10px}
   .gpsbevestigbtn{margin-top:12px;width:100%;box-sizing:border-box;padding:13px 14px;border-radius:14px;
     background:#fff;border:none;cursor:pointer;font-size:15px;font-weight:800;text-align:center}
+  /* GPS mislukt (toegevoegd 27 oktober 2026, Kay's feedback tijdens veldtest): voorheen faalde een
+     GPS-poging volledig stil — geen melding, geen manier om het opnieuw te proberen, de speler kon
+     niet zien of de functie er überhaupt was. Zie gpsStatus === "nietBeschikbaar" in renderTracker. */
+  .gpsmisluktregel{font-size:13px;color:rgba(255,255,255,0.75);line-height:1.4;margin-bottom:8px;text-align:center}
+  .gpsretrybtn{margin-bottom:12px;width:100%;box-sizing:border-box;padding:10px 14px;border-radius:14px;
+    background:transparent;border:1.5px solid rgba(255,255,255,0.5);cursor:pointer;font-size:13px;
+    font-weight:700;color:rgba(255,255,255,0.92);text-align:center}
 
   /* Tijdlijn onder Afslag/Fairway/Green — vordert live mee met de klok, puur visueel (zie
      tijdlijnPercentage()); de knoppen erboven zijn drie gelijke kolommen, dus de balk komt exact
@@ -189,6 +196,10 @@
   .flightnaampillen{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px}
   .flightnaampil{font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px;
     background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+  /* Wedstrijdflight-indicatie (v0.13.0, zie teecontrol-sync/index.ts + schema.sql "Fase 2g") — zelfde
+     stijl (trofee-emoji + blauw, vet) als de Marshal App dit toont. */
+  .flighttoernooi{font-size:11px;font-weight:700;color:var(--blue);margin-bottom:4px}
+  .detailtoernooi{font-size:13px;font-weight:700;color:var(--blue);margin-top:3px}
   .flightmeta{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted-ink)}
   .flightmeta svg{flex-shrink:0}
   .flightprogressvak{position:relative;height:4px;border-radius:2px;background:var(--border);
@@ -260,7 +271,7 @@
 
 <script>
 /* ============================================================================================
-   GoyerFlow — v0.11.0
+   GoyerFlow — v0.11.1
    Versienummer bij elke volgende build op TWEE plekken bijwerken: deze kopregel-comment en de
    APP_VERSIE-constante hieronder (zelfde patroon als de Marshal App — zie diens bouwgeschiedenis
    voor de precedent-regel). De zichtbare versie-indicator naast "GoyerFlow" in de topbar wordt
@@ -395,8 +406,43 @@
    flight-detailscherm blijft een flight tonen die de beheerder al open had staan, ook als die
    inmiddels buiten het venster is gevallen (zoekt in `allePosities`, niet in de gefilterde `rijen`).
    Kaarttitel "Alle flights" → "Flights nu en binnenkort"; lege-staat-tekst idem aangepast.
+   v0.11.1: bugfix, door Kay akkoord bevonden na opnieuw opgemerkt tijdens testen. De "Gem. handicap
+   flight"-regel in `bouwSpelersoverzicht` (speleroverzicht-scherm + admin flight-detailmodal) plakte
+   het label en het getal aan elkaar zonder spatie ("Gem. handicap flight19.2"). Oorzaak: twee kale
+   document.createTextNode's naast elkaar in een flexbox met justify-content:space-between worden
+   door de layout-engine als ÉÉN enkel anoniem flex-item behandeld, waardoor space-between niets had
+   om uit elkaar te duwen. Fix: beide tekststukken in een eigen <span> gezet, zodat het weer twee
+   losse flex-items zijn en de bedoelde links/rechts-uitlijning (label links, getal rechts) terugkomt
+   — niet alleen een losse spatie toegevoegd. Geen functionele wijziging, volledige regressietest
+   opnieuw gedraaid zonder afwijkingen. (Tegelijk bevestigd: de Ready Golf-popup krijgt geen eigen
+   titel — Kay vond één gedeelde titel voor beide knoppen prima, geen codewijziging nodig.)
+   v0.12.0: bundel bugfixes + kleine features na Kay's eerste veldtest op de baan (27 oktober 2026,
+   zie bouwgeschiedenis). (1) Login met een lidcode van 3 (of 5+) letters i.p.v. de aangenomen vaste
+   4 ("WEL 1") werkte niet zonder zelf de spatie te typen — zoekSpelerOpPersoonscode() gebruikt nu de
+   werkelijke grens tussen letters en cijfers i.p.v. een vaste prefixlengte. (2) "Voor jou"/"achter
+   jou" konden voor onbepaalde tijd de plek innemen van een allang uitgespeelde, nooit afgesloten
+   buur-flight — nieuwe kandidaatVoltooid()-check slaat zulke buren nu over bij het kiezen van de
+   échte dichtstbijzijnde nog spelende flight. (3) Nieuwe "Flight klaarmelden"-knop in het Admin-
+   flight-detailscherm (adminMarkeerAlsKlaar) — voorheen kon een beheerder een flight niet handmatig
+   afsluiten. (4) In de Tracker-lijst (leden + admin) stond een nog spelende flight soms ONDER een al
+   afgeronde flight op dezelfde hole — trackerSelecteerEnSorteer sorteert nu actief vóór voltooid op
+   gelijke hole. (5) Een mislukte GPS-poging faalde volledig stil — nieuwe "Probeer locatie opnieuw"-
+   knop + melding (gpsStatus === "nietBeschikbaar"). (6) "Dus je loopt veel te snel" klonk als
+   verwijt — conclusieVoor() toont nu een neutrale, feitelijke "X,X holes voor/achter op schema"-tekst
+   i.p.v. een waardeoordeel. Zie ook teecontrol-sync/index.ts (apart gedocumenteerd, geen eigen
+   APP_VERSIE): een "spookflight zonder spelers"-bug in de sync zelf opgelost.
+   v0.13.0: wedstrijdflight-indicatie (27 oktober 2026, zie bouwgeschiedenis). Kay's eerdere vraag
+   "waarom zie ik dit niet zoals in de Marshal App" leidde tot de onjuiste conclusie dat de Marshal
+   App dit niet in de tracker had — Kay corrigeerde dat (zijn screenshot toonde de trofee-badges
+   duidelijk), en bij hernieuwd onderzoek bleek de eerdere check te oppervlakkig: alleen index.html
+   nagekeken, niet de Marshal App's eigen teecontrol-edge-function, waar de data vandaan blijkt te
+   komen (Teecontrol's "blockings"-eindpunt, gekoppeld via tournament_moment_uuid — zie
+   teecontrol-sync/index.ts). Nu geport: elke flight-rij in de Admin-Tracker-tab en het
+   flight-detailscherm toont "🏆 <toernooinaam>" zodra flights.toernooi_naam gevuld is (nieuwe kolom,
+   schema.sql "Fase 2g" — migratie nog door Kay uit te voeren). Geen wijziging aan het leden-eigen
+   trackerscherm (renderTracker) — de badge staat alleen waar Kay 'm miste, de beheerderskant.
    ============================================================================================ */
-const APP_VERSIE = "0.11.0";
+const APP_VERSIE = "0.13.0";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -754,13 +800,24 @@ function formatDuur(minuten) {
   return `${h} uur ${m} minuten`;
 }
 
-// Conclusie bij een zelf-gemelde positie — zelfde vijf categorieën en kleuren als de goedgekeurde
-// mockup (Tracker.dc.html): veel_te_snel/te_snel/op_schema/te_langzaam/veel_te_langzaam.
+// Conclusie bij een zelf-gemelde positie — zelfde vijf categorieën/kleuren/drempels als de
+// goedgekeurde mockup (Tracker.dc.html): veel_te_snel/te_snel/op_schema/te_langzaam/
+// veel_te_langzaam (key/kleur/toonTipsKnop-logica elders blijven ongewijzigd).
+// Label/zin AANGEPAST (27 oktober 2026, Kay's feedback tijdens de veldtest): "veel te snel" klinkt
+// als een verwijt, terwijl voorlopen op schema op zich niets verkeerds is zolang je niemand in de
+// weg loopt. Vervangen door een neutrale, feitelijke holes-voor/achter-op-schema-indicatie met het
+// werkelijke verschil (bijv. "1,2 holes voor op schema") i.p.v. een waardeoordeel — zowel in de
+// korte badge-tekst (label) als de volzin (zin) in de kaart.
 function conclusieVoor(deltaHoles) {
-  if (deltaHoles >= 1.0) return { key: "veel_te_snel", label: "Veel te snel", kleur: "var(--blue-dark)", zin: "Dus je loopt veel te snel." };
-  if (deltaHoles >= 0.4) return { key: "te_snel", label: "Te snel", kleur: "var(--blue)", zin: "Dus je loopt te snel." };
-  if (deltaHoles <= -1.0) return { key: "veel_te_langzaam", label: "Veel te langzaam", kleur: "var(--err)", zin: "Dus je loopt veel te langzaam." };
-  if (deltaHoles <= -0.4) return { key: "te_langzaam", label: "Te langzaam", kleur: "var(--warn)", zin: "Dus je loopt te langzaam." };
+  const afgerond = Math.round(Math.abs(deltaHoles) * 10) / 10;
+  // Nederlandse decimaalnotatie (komma), consistent met de rest van de app (bijv. hcp-weergave).
+  const getal = String(afgerond).replace(".", ",");
+  const voorText = `${getal} holes voor op schema`;
+  const achterText = `${getal} holes achter op schema`;
+  if (deltaHoles >= 1.0) return { key: "veel_te_snel", label: voorText, kleur: "var(--blue-dark)", zin: `Dus je loopt ${voorText}.` };
+  if (deltaHoles >= 0.4) return { key: "te_snel", label: voorText, kleur: "var(--blue)", zin: `Dus je loopt ${voorText}.` };
+  if (deltaHoles <= -1.0) return { key: "veel_te_langzaam", label: achterText, kleur: "var(--err)", zin: `Dus je loopt ${achterText}.` };
+  if (deltaHoles <= -0.4) return { key: "te_langzaam", label: achterText, kleur: "var(--warn)", zin: `Dus je loopt ${achterText}.` };
   return { key: "op_schema", label: "Op schema", kleur: "var(--accent)", zin: "Dus je loopt op schema." };
 }
 
@@ -1102,9 +1159,17 @@ async function zoekSpelerOpPersoonscode(ruw) {
   const kandidaten = [schoon];
   const zonderSpaties = schoon.replace(/\s+/g, "");
   if (zonderSpaties !== schoon && !kandidaten.includes(zonderSpaties)) kandidaten.push(zonderSpaties);
-  if (zonderSpaties.length > 4) {
-    const metSpatieNaVier = zonderSpaties.slice(0, 4) + " " + zonderSpaties.slice(4);
-    if (!kandidaten.includes(metSpatieNaVier)) kandidaten.push(metSpatieNaVier);
+  // Spatie invoegen op de grens tussen het letterdeel en het cijferdeel (bugfix 27 oktober 2026,
+  // gevonden tijdens Kay's veldtest: "WEL 1" — een lidcode met maar DRIE letters, want gebaseerd op
+  // de korte achternaam "Wel" — kon niet inloggen zonder zelf de spatie te typen). De oude aanpak
+  // ging uit van een VASTE 4-letter-prefix (zonderSpaties.slice(0,4) + " " + slice(4)) en probeerde
+  // die bovendien alleen bij een lengte > 4 — bij "WEL1" (lengte 4) werd deze variant dus nooit
+  // geprobeerd. Nu op basis van de werkelijke grens tussen letters en cijfers, ongeacht hun aantal —
+  // werkt dus voor elke combinatie (3, 4, 5+ letters).
+  const grensMatch = zonderSpaties.match(/^([A-Z]+)(\d+)$/);
+  if (grensMatch) {
+    const metSpatieOpGrens = grensMatch[1] + " " + grensMatch[2];
+    if (!kandidaten.includes(metSpatieOpGrens)) kandidaten.push(metSpatieOpGrens);
   }
   for (const kandidaat of kandidaten) {
     if (!kandidaat) continue;
@@ -1333,7 +1398,16 @@ function bouwSpelersoverzicht(spelers) {
   const gemHcp = hcps.length ? Math.round((hcps.reduce((a, b) => a + Number(b), 0) / hcps.length) * 10) / 10 : null;
   const kinderen = [el("div", { class: "spelerlijst" }, spelerrijen)];
   if (gemHcp != null) {
-    kinderen.push(el("div", { class: "gemhcprow" }, [document.createTextNode("Gem. handicap flight"), document.createTextNode(String(gemHcp))]));
+    // Bugfix (27 oktober 2026, Kay akkoord): twee kale document.createTextNode's naast elkaar werden
+    // door de flexbox-layout (.gemhcprow heeft justify-content:space-between) als ÉÉN enkel anoniem
+    // flex-item behandeld — vandaar "Gem. handicap flight15.9" aan elkaar geplakt, zonder spatie én
+    // zonder de bedoelde rechts-uitgelijnde getalwaarde. Elk stuk tekst in een eigen <span> zet ze om
+    // in twee echte flex-items, zodat space-between weer werkt zoals bedoeld (label links, getal
+    // rechts) — niet alleen een losse spatie toevoegen.
+    kinderen.push(el("div", { class: "gemhcprow" }, [
+      el("span", { text: "Gem. handicap flight" }),
+      el("span", { text: String(gemHcp) }),
+    ]));
   }
   return kinderen;
 }
@@ -1366,11 +1440,6 @@ async function renderTracker(app, opts = {}) {
 
   const nu = new Date();
   const index = flights.findIndex((f) => f.id === state.flight.id);
-  // "Voor jou"/"achter jou" volgen simpelweg uit de live, op starttijd gesorteerde lijst — geen
-  // aparte queue-/buffer-logica nodig (anders dan in de mockup): elke doorlaat-wissel, correctie of
-  // "uitgestapt"-markering herschikt deze lijst vanzelf bij de eerstvolgende herberekening.
-  const voor = index > 0 ? flights[index - 1] : null;
-  const achter = index >= 0 && index < flights.length - 1 ? flights[index + 1] : null;
   const zelf = flights[index] || state.flight;
 
   // Blijft PUUR schema-gebaseerd (starttijd_effectief, geen eigen melding) — nodig voor zelfPos
@@ -1399,6 +1468,30 @@ async function renderTracker(app, opts = {}) {
     const gemeld = projecteerVanafMelding(flight, basis.minutenPerHole, nu, flight.ronde_type);
     return gemeld ? { ...gemeld, minutenPerHole: basis.minutenPerHole } : basis;
   }
+
+  // Een kandidaat-buurflight die zelf al (vrijwel zeker) klaar is overslaan bij het kiezen van
+  // "voor"/"achter" (toegevoegd 27 oktober 2026, Kay's feedback tijdens de veldtest op de baan).
+  // Reden: "voor"/"achter" kwamen tot nu toe puur uit de buren-op-starttijd in de lijst, ongeacht of
+  // die buur zelf nog speelt. Een flight die is uitgespeeld maar waarvan niemand op "Ronde afgerond"
+  // heeft gedrukt (heel gewoon — spelers loggen na afloop lang niet altijd nog even in om dat te
+  // bevestigen, zie ook de nieuwe "klaar"-knop in Admin) bleef daardoor voor onbepaalde tijd de
+  // voor/achter-plek van zijn startijd-buren innemen, terwijl de ECHTE dichtstbijzijnde nog spelende
+  // flight buiten beeld bleef — dat verklaart de verwarrende meldingen tijdens het testen ("deze
+  // flight is toch al klaar, hoe kan die dan nog een correctiemelding geven"). Gebruikt dezelfde
+  // rondeVoltooid()-berekening als voorRondeVoltooid/achterRondeVoltooid verderop, dus een kandidaat
+  // die hier wordt overgeslagen zou toch al als "waarschijnlijk afgerond" zijn getoond — dit zorgt
+  // er alleen voor dat zo'n flight niet meer de plek van een echte buur inneemt.
+  function kandidaatVoltooid(flight) {
+    const pos = posVanMetMelding(flight);
+    const metWacht = pasWachttijdToe(pos, flight, pos.minutenPerHole, nu, flight.ronde_type);
+    return rondeVoltooid(metWacht, flight.ronde_type);
+  }
+  let voorIndex = index - 1;
+  while (voorIndex >= 0 && kandidaatVoltooid(flights[voorIndex])) voorIndex--;
+  const voor = voorIndex >= 0 ? flights[voorIndex] : null;
+  let achterIndex = index >= 0 ? index + 1 : flights.length;
+  while (achterIndex < flights.length && kandidaatVoltooid(flights[achterIndex])) achterIndex++;
+  const achter = index >= 0 && achterIndex < flights.length ? flights[achterIndex] : null;
 
   const voorPosVoorWacht = voor ? posVanMetMelding(voor) : null;
   const voorPos = voorPosVoorWacht ? pasWachttijdToe(voorPosVoorWacht, voor, voorPosVoorWacht.minutenPerHole, nu, voor.ronde_type) : null;
@@ -1619,6 +1712,18 @@ async function renderTracker(app, opts = {}) {
     // het permissie-schot van de browser zelf) — exacte tekst door Kay bevestigd.
     if (trackerLocal.gpsStatus === "bezig") {
       meKinderen.push(el("div", { class: "gpsuitleg", text: "We gebruiken je locatie alleen om je ruwe positie te bepalen, jij bevestigt altijd zelf." }));
+    } else if (trackerLocal.gpsStatus === "nietBeschikbaar") {
+      // Vroeger hier stil niets — de speler zag geen verschil tussen "geen GPS geprobeerd" en "GPS
+      // geprobeerd maar mislukt/geweigerd/geen match binnen bereik". Niet-blokkerend (de kaart werkt
+      // gewoon door met de gewone stepper/marker-knoppen eronder), maar wel zichtbaar + een manier om
+      // het zonder het scherm te verlaten opnieuw te proberen (bijv. na een nieuwe locatietoestemming
+      // of een beter GPS-signaal verderop op de baan).
+      meKinderen.push(el("div", { class: "gpsmisluktregel", text: "Locatie ophalen lukte niet — je kunt hieronder gewoon zelf je positie melden." }));
+      meKinderen.push(el("button", {
+        class: "gpsretrybtn",
+        onclick: () => { startGpsPositiebepaling(); render(); },
+        text: "Probeer locatie opnieuw",
+      }));
     }
     meKinderen.push(
       el("div", { class: "stepperrow big" }, [stepMinZelf, el("div", { class: "stepvalue big", text: String(fysiekeHole(zelf.ronde_type, zelfHoleWeergave)) }), stepPlusZelf]),
@@ -2169,6 +2274,12 @@ function trackerSelecteerEnSorteer(allePosities, params, nu) {
     const tb = new Date(b.positie.flight.starttijd_effectief).getTime();
     // Beide aankomend: laatste start bovenaan, eerstvolgende onderaan (dichter bij "nu").
     if (a.aankomend && b.aankomend) return tb - ta;
+    // Beide actief (niet aankomend): nog spelende flights boven al afgeronde flights op dezelfde
+    // hole (Kay's feedback 27 oktober 2026, testronde op de baan — door de kale starttijd-sortering
+    // kon een net afgeronde flight boven een nog spelende flight op dezelfde hole staan, verwarrend
+    // bij het scannen van de lijst). Geldt alleen binnen dezelfde hole — zie trackerSortHole
+    // hierboven, die een afgeronde flight al op zijn laatste (fysieke) hole vastzet.
+    if (a.positie.voltooid !== b.positie.voltooid) return a.positie.voltooid ? 1 : -1;
     // Beide actief: gewone sortering op starttijd.
     return ta - tb;
   });
@@ -2219,6 +2330,7 @@ async function vulAdminTrackerTab(inhoud, opts = {}) {
           const rij = el("div", { class: "flightrij" }, [
             el("div", { class: "flightbol", style: `background:${kleur}`, text: bolTekst }),
             el("div", { class: "flightinfo" }, [
+              flight.toernooi_naam ? el("div", { class: "flighttoernooi", text: `🏆 ${flight.toernooi_naam}` }) : null,
               spelersVanFlight.length === 0
                 ? el("div", { class: "flightnaampillen" }, [el("span", { class: "flightnaampil", text: `${flight.lus} · ${flight.aantal_spelers}-bal` })])
                 : el("div", { class: "flightnaampillen" }, spelersVanFlight.map((s) => el("span", { class: "flightnaampil", text: s.naam }))),
@@ -2229,7 +2341,7 @@ async function vulAdminTrackerTab(inhoud, opts = {}) {
               el("div", { class: "flightprogressvak" }, [
                 el("div", { class: "flightprogressvoortgang", style: `width:${voortgangPct}%;background:${kleur}` }),
               ]),
-            ]),
+            ].filter(Boolean)),
           ]);
           rij.addEventListener("click", () => {
             adminLocal.flightDetailId = flight.id;
@@ -2275,6 +2387,28 @@ function bouwFlightDetailModal(positie, params, nu) {
   // nieuwAdminLocal()).
   const holeWeergave = adminLocal.flightDetailHoleDraft ?? weergave.hole;
   const kaartKleur = voltooid ? "var(--accent)" : (conclusie ? conclusie.kleur : "var(--accent)");
+
+  // Flight handmatig klaarmelden (toegevoegd 27 oktober 2026, Kay's feedback tijdens de veldtest:
+  // "zie geen knop in admin om flight klaar te kiezen"). Zelfde schrijfactie als de speler-eigen
+  // "Ronde afgerond"-knop (zie zelfRondeAfgerond in renderTracker: uitgestapt=true), nu ook
+  // beschikbaar voor de beheerder — nodig omdat spelers na afloop lang niet altijd nog even inloggen
+  // om dat zelf te bevestigen, waardoor een allang uitgespeelde flight anders voor onbepaalde tijd
+  // in de lijst (en als "voor"/"achter"-buur van anderen, zie trackerSelecteerEnSorteer/de voor-
+  // achterselectie hierboven) kan blijven staan.
+  async function adminMarkeerAlsKlaar() {
+    if (adminLocal.flightDetailBezig) return;
+    adminLocal.flightDetailBezig = true;
+    try {
+      await sb(`flights?id=eq.${flight.id}`, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ uitgestapt: true }) });
+      adminLocal.flightDetailBezig = false;
+      sluiten();
+    } catch (e) {
+      adminLocal.flightDetailFout = "Klaarmelden is niet gelukt. Probeer het nog eens.";
+      console.error(e);
+      adminLocal.flightDetailBezig = false;
+      render();
+    }
+  }
 
   async function adminPositieMelden(checkpoint, hole) {
     if (adminLocal.flightDetailBezig) return;
@@ -2347,7 +2481,8 @@ function bouwFlightDetailModal(positie, params, nu) {
         el("div", {}, [
           el("div", { class: "detailtitle", text: flightTitel(spelers) }),
           el("div", { class: "detailsub", text: `Start ${formatTijd(flight.starttijd_effectief)} · Hole ${fysiekeHole(flight.ronde_type, weergave.hole)} · ${rondeInfo(flight.ronde_type).holesInRonde} holes` }),
-        ]),
+          flight.toernooi_naam ? el("div", { class: "detailtoernooi", text: `🏆 ${flight.toernooi_naam}` }) : null,
+        ].filter(Boolean)),
         el("button", { class: "detailclose", "aria-label": "Sluiten", onclick: sluiten }, [
           (() => { const s = document.createElementNS("http://www.w3.org/2000/svg", "svg"); s.setAttribute("width","13"); s.setAttribute("height","13"); s.setAttribute("viewBox","0 0 24 24"); s.setAttribute("fill","none");
             const p = document.createElementNS("http://www.w3.org/2000/svg", "path"); p.setAttribute("d","M6 6l12 12M18 6L6 18"); p.setAttribute("stroke","#6B6558"); p.setAttribute("stroke-width","2"); p.setAttribute("stroke-linecap","round"); s.appendChild(p); return s; })(),
@@ -2355,6 +2490,12 @@ function bouwFlightDetailModal(positie, params, nu) {
       ]),
       ...spelersoverzicht,
       eigenKaart,
+      el("button", {
+        class: "btn secondary",
+        style: "margin-top:12px",
+        onclick: adminMarkeerAlsKlaar,
+        text: adminLocal.flightDetailBezig ? "Bezig…" : "Flight klaarmelden",
+      }),
     ].filter(Boolean)),
   ]);
   return modal;
