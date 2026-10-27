@@ -455,8 +455,29 @@
    Het leden-eigen trackerscherm (renderTracker, bouwSpelersoverzicht) is NIET aangeraakt: dat blijft
    uitsluitend de gekoppelde leden-rijen tonen, ongewijzigd — deze uitbreiding is bewust beperkt tot de
    beheerderskant, zoals Kay vroeg.
+   v0.14.1: bugfix, door Kay opgemerkt tijdens testen (27 oktober 2026). Het klokicoontje in de
+   Admin-Tracker-tab-flightrij toonde ${formatTijd(nu)} — het moment van renderen, dus letterlijk
+   dezelfde tijd op elke rij (Kay's screenshot: "17:06" bij alle flights). Kay: "Ik zou daar de
+   starttijd verwachten. Is dat niet veel logischer?" Gecontroleerd tegen de Marshal App's eigen
+   bron (renderFlightItem/renderFlightItemAankomend in Marshal App.html): die koppelt het klokicoon
+   dáár altijd aan f.starttijd, nooit aan "nu" — GoyerFlow was hier dus afgeweken van het patroon dat
+   het beweerde over te nemen. Fix: formatTijd(nu) → formatTijd(flight.starttijd_effectief). Puur een
+   weergavefix, geen wijziging aan de onderliggende berekeningen (die gebruiken nu al correct
+   flight.starttijd_effectief, los van dit tekstveld).
+   v0.14.2: beheerder kan nu ALTIJD de positie van een flight corrigeren, ook als die als "waarschijn-
+   lijk afgerond" wordt beoordeeld (27 oktober 2026, Kay's "Test afgerond"-observatie: "Als ronde niet
+   is afgerond, hoe zet ik ze dan op de juiste plek?"). Oorzaak: voltooid wordt puur op verstreken tijd
+   t.o.v. de verwachte rondetijd bepaald zodra er nog geen melding is (rondeVoltooid/
+   berekenFlightPositie) — dat kan dus ten onrechte "klaar" concluderen terwijl de flight nog gewoon
+   speelt. bouwFlightDetailModal verborg de stepper/marker-knoppen echter volledig zodra voltooid=
+   true, dus was er geen enkele weg terug. Fix: stepper + markerknoppen staan nu altijd (ongeacht
+   voltooid), met een aangepaste eyebrow-tekst die daar expliciet naar verwijst. Een melding via de
+   markerknoppen zet gerapporteerde_hole/-checkpoint/-tijdstip, waarna de volgende render via
+   projecteerVanafMelding() rekent i.p.v. de pure schema-berekening — ligt de gemelde positie niet ook
+   voorbij de laatste hole, dan vervalt "voltooid" daarmee automatisch. De tijdlijn/conclusie-tekst
+   (die alleen zinvol is als conclusie niet null is) en de "Flight klaarmelden"-knop blijven ongewijzigd.
    ============================================================================================ */
-const APP_VERSIE = "0.14.0";
+const APP_VERSIE = "0.14.2";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -2406,7 +2427,12 @@ async function vulAdminTrackerTab(inhoud, opts = {}) {
                   })),
               el("div", { class: "flightmeta" }, [
                 clockSvg("#9A9385"),
-                document.createTextNode(` ${formatTijd(nu)}  ·  Hole ${fysiekeHole(flight.ronde_type, weergave.hole)}/${rondeInfo(flight.ronde_type).holesInRonde}  ·  ${statustekst}`),
+                // v0.14.1: was formatTijd(nu) — toonde het moment van renderen, dus op elke rij
+                // hetzelfde en dus nooit onderscheidend (Kay merkte dit op: "die tijd is altijd de
+                // huidige tijd"). De Marshal App's eigen renderFlightItem/renderFlightItemAankomend
+                // koppelt het klokicoon altijd aan f.starttijd (🕐 ${f.starttijd}), nooit aan "nu" —
+                // hier dus gecorrigeerd naar het GoyerFlow-equivalent: flight.starttijd_effectief.
+                document.createTextNode(` ${formatTijd(flight.starttijd_effectief)}  ·  Hole ${fysiekeHole(flight.ronde_type, weergave.hole)}/${rondeInfo(flight.ronde_type).holesInRonde}  ·  ${statustekst}`),
               ]),
               el("div", { class: "flightprogressvak" }, [
                 el("div", { class: "flightprogressvoortgang", style: `width:${voortgangPct}%;background:${kleur}` }),
@@ -2516,36 +2542,42 @@ function bouwFlightDetailModal(positie, params, nu) {
     });
   });
 
+  // v0.14.2: stepper/marker-knoppen staan voortaan ALTIJD, ook als voltooid===true (Kay's "Test
+  // afgerond"-observatie: een flight die het systeem als "waarschijnlijk afgerond" beoordeelt — puur
+  // op basis van verstreken tijd, zonder dat er ooit een melding is geweest, zie rondeVoltooid()/
+  // berekenFlightPositie hierboven — gaf de beheerder voorheen geen enkele manier om dat te
+  // corrigeren als het niet klopte: de stepper/marker-rij verdween volledig zodra voltooid=true).
+  // Een melding via adminPositieMelden hieronder zet gerapporteerde_hole/-checkpoint/-tijdstip, dus
+  // de volgende render gaat via projecteerVanafMelding() i.p.v. de pure schema-berekening — als de
+  // gemelde positie niet ook alweer voorbij de laatste hole ligt, vervalt voltooid daarmee vanzelf.
   const eigenKinderen = [el("div", {
     class: "eyebrow",
     text: voltooid
-      ? "Ronde waarschijnlijk afgerond"
+      ? "Ronde waarschijnlijk afgerond — klopt dit niet? Corrigeer de positie hieronder."
       : (heeftMelding ? "Waar is deze flight nu?" : "Maak een keuze: waar is deze flight nu?"),
   })];
-  if (!voltooid) {
-    eigenKinderen.push(
-      el("div", { class: "stepperrow big" }, [stepMin, el("div", { class: "stepvalue big", text: String(fysiekeHole(flight.ronde_type, holeWeergave)) }), stepPlus]),
-      el("div", { class: "markerrow big" }, markerKnoppen)
-    );
-    if (heeftMelding) {
-      const restFractieNu = weergave.fractie - Math.floor(weergave.fractie);
-      eigenKinderen.push(el("div", { class: "tijdlijn" }, [
-        el("div", { class: "tijdlijnvak" }, [
-          el("div", { class: "tijdlijnvoortgang", style: `width:${tijdlijnPercentage(restFractieNu)}%` }),
-        ]),
-      ]));
-      eigenKinderen.push(el("div", { class: "conclusieline" }, [
-        document.createTextNode("Op basis van een start om "),
-        el("b", { text: formatTijd(flight.starttijd_effectief) }),
-        document.createTextNode(" en een gemiddelde rondetijd van "),
-        el("b", { text: formatDuur(rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp, flight.ronde_type)) }),
-        document.createTextNode(` voor een ${flight.aantal_spelers}-bal over ${rondeInfo(flight.ronde_type).holesInRonde} holes zou deze flight nu ongeveer op de `),
-        el("b", { text: `${CHECKPOINT_LABEL[positie.zelfPos.checkpoint]} van hole ${fysiekeHole(flight.ronde_type, positie.zelfPos.hole)}` }),
-        document.createTextNode(` moeten zijn. ${conclusie ? conclusie.zin : ""}`),
-      ]));
-    }
-    if (adminLocal.flightDetailFout) eigenKinderen.push(el("div", { class: "msg err", text: adminLocal.flightDetailFout }));
+  eigenKinderen.push(
+    el("div", { class: "stepperrow big" }, [stepMin, el("div", { class: "stepvalue big", text: String(fysiekeHole(flight.ronde_type, holeWeergave)) }), stepPlus]),
+    el("div", { class: "markerrow big" }, markerKnoppen)
+  );
+  if (heeftMelding && !voltooid) {
+    const restFractieNu = weergave.fractie - Math.floor(weergave.fractie);
+    eigenKinderen.push(el("div", { class: "tijdlijn" }, [
+      el("div", { class: "tijdlijnvak" }, [
+        el("div", { class: "tijdlijnvoortgang", style: `width:${tijdlijnPercentage(restFractieNu)}%` }),
+      ]),
+    ]));
+    eigenKinderen.push(el("div", { class: "conclusieline" }, [
+      document.createTextNode("Op basis van een start om "),
+      el("b", { text: formatTijd(flight.starttijd_effectief) }),
+      document.createTextNode(" en een gemiddelde rondetijd van "),
+      el("b", { text: formatDuur(rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp, flight.ronde_type)) }),
+      document.createTextNode(` voor een ${flight.aantal_spelers}-bal over ${rondeInfo(flight.ronde_type).holesInRonde} holes zou deze flight nu ongeveer op de `),
+      el("b", { text: `${CHECKPOINT_LABEL[positie.zelfPos.checkpoint]} van hole ${fysiekeHole(flight.ronde_type, positie.zelfPos.hole)}` }),
+      document.createTextNode(` moeten zijn. ${conclusie ? conclusie.zin : ""}`),
+    ]));
   }
+  if (adminLocal.flightDetailFout) eigenKinderen.push(el("div", { class: "msg err", text: adminLocal.flightDetailFout }));
   const eigenKaart = el("div", { class: "card me detaileigenkaart", style: "background:" + kaartKleur }, eigenKinderen);
 
   const modal = el("div", { class: "detailoverlay" }, [
