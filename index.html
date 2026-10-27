@@ -441,8 +441,22 @@
    flight-detailscherm toont "🏆 <toernooinaam>" zodra flights.toernooi_naam gevuld is (nieuwe kolom,
    schema.sql "Fase 2g" — migratie nog door Kay uit te voeren). Geen wijziging aan het leden-eigen
    trackerscherm (renderTracker) — de badge staat alleen waar Kay 'm miste, de beheerderskant.
+   v0.14.0: volledige Teecontrol-spelerslijst in beheerder-schermen (27 oktober 2026, zie
+   bouwgeschiedenis). Aanleiding: Kay's "anonieme 1-bal"-observatie (een flight met één gast zonder
+   lidcode toonde geen naam) en zijn vraag waarom GoyerFlow niet dezelfde kleur-/typecodering als de
+   Marshal App gebruikt. Kay's terechte correctie op mijn eerste voorstel: tonen en inloggen zijn twee
+   aparte dingen — de spelers-tabel (login, persoonscode verplicht/uniek) hoeft niet aangeraakt te
+   worden om een gast zichtbaar te maken. Nieuwe kolom `flights.teecontrol_spelers` (schema.sql "Fase
+   2h") bevat voortaan ALLE spelers van een flight zoals Teecontrol ze aanlevert — leden én gasten —
+   met naam, hcp, en Teecontrol's eigen kleur/typelabel (`color`/`player_type`, 1-op-1 dezelfde velden
+   als de Marshal App's teecontrol-edge-function). Nieuwe functie `bouwSpelersoverzichtBeheer` +
+   `TC_KLEUR_MAP`/`tcKleur()` (letterlijk overgenomen kleurentabel uit de Marshal App) renderen dit in
+   de Admin-Tracker-tab-rijen en het flight-detailscherm — "Club lid" als vaste tekst is daar vervallen.
+   Het leden-eigen trackerscherm (renderTracker, bouwSpelersoverzicht) is NIET aangeraakt: dat blijft
+   uitsluitend de gekoppelde leden-rijen tonen, ongewijzigd — deze uitbreiding is bewust beperkt tot de
+   beheerderskant, zoals Kay vroeg.
    ============================================================================================ */
-const APP_VERSIE = "0.13.0";
+const APP_VERSIE = "0.14.0";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -1412,6 +1426,56 @@ function bouwSpelersoverzicht(spelers) {
   return kinderen;
 }
 
+// Teecontrol-kleurcodering (v0.14.0, zie schema.sql "Fase 2h") — 1-op-1 overgenomen uit de Marshal
+// App (TC_KLEUR_MAP/tcKleur), zelfde hex-waarden. Dit zijn Teecontrol's eigen kleurcodes per speler
+// (lidgroep/gasttype), geen GoyerFlow-eigen stijlkeuze — vandaar bewust identiek aan de Marshal App.
+const TC_KLEUR_MAP = {
+  pink:     { bg: "#fce8e8", fg: "#7a2020" },
+  darkBlue: { bg: "#1e3a5f", fg: "#ffffff" },
+  beige:    { bg: "#ede0c4", fg: "#5a4020" },
+  green:    { bg: "#2d6a4f", fg: "#ffffff" },
+  orange:   { bg: "#e07828", fg: "#ffffff" },
+  yellow:   { bg: "#e8c030", fg: "#5a4400" },
+  gold:     { bg: "#b8880c", fg: "#ffffff" },
+};
+function tcKleur(kleur) {
+  return TC_KLEUR_MAP[kleur] || TC_KLEUR_MAP.pink;
+}
+
+// Spelersoverzicht voor BEHEERDER-schermen (v0.14.0, Kay's verzoek 27 oktober 2026 — zie
+// bouwgeschiedenis: "anonieme 1-bal" + "waarom geen kleurcodes zoals de Marshal App"). In
+// tegenstelling tot bouwSpelersoverzicht() hierboven (die blijft ONGEWIJZIGD, leden-eigen
+// trackerscherm, alleen gekoppelde spelers-rijen met persoonscode) toont dit ALLE spelers van de
+// flight zoals Teecontrol ze aanlevert — leden én gasten — met Teecontrol's eigen kleur + typelabel
+// i.p.v. de vaste tekst "Club lid". Bron: flight.teecontrol_spelers (schema.sql "Fase 2h"), puur
+// weergavedata, raakt de login-tabel `spelers` niet. Leeg/null (bv. oude seed-flights, of flights van
+// vóór de migratie) valt terug op dezelfde "lus · aantal-bal"-tekst als de Tracker-tab-rijen.
+function bouwSpelersoverzichtBeheer(teecontrolSpelers, legeTekst) {
+  const lijst = teecontrolSpelers || [];
+  const spelerrijen = lijst.length === 0
+    ? [el("p", { class: "help", text: legeTekst || "Geen spelers gevonden voor deze flight." })]
+    : lijst.map((s) => {
+        const kleur = tcKleur(s.kleur);
+        return el("div", { class: "spelerrij" }, [
+          el("div", { class: "spelernaamrow" }, [
+            el("span", { class: "spelernaampil", style: `background:${kleur.bg};color:${kleur.fg}`, text: s.naam }),
+            s.type ? el("span", { class: "spelermeta", text: s.type }) : null,
+          ].filter(Boolean)),
+          el("div", { class: "spelerhcp", text: s.hcp != null ? `hcp ${s.hcp}` : "hcp —" }),
+        ]);
+      });
+  const hcps = lijst.map((s) => s.hcp).filter((h) => h !== null && h !== undefined);
+  const gemHcp = hcps.length ? Math.round((hcps.reduce((a, b) => a + Number(b), 0) / hcps.length) * 10) / 10 : null;
+  const kinderen = [el("div", { class: "spelerlijst" }, spelerrijen)];
+  if (gemHcp != null) {
+    kinderen.push(el("div", { class: "gemhcprow" }, [
+      el("span", { text: "Gem. handicap flight" }),
+      el("span", { text: String(gemHcp) }),
+    ]));
+  }
+  return kinderen;
+}
+
 /* ---- Scherm 4: tracker ---- */
 async function renderTracker(app, opts = {}) {
   // "stil" = automatische achtergrondverversing (zie TRACKER_VERVERS_MS/trackerIntervalId in
@@ -2325,7 +2389,10 @@ async function vulAdminTrackerTab(inhoud, opts = {}) {
           const bolTekst = voltooid ? "✓" : gestartNog ? formatTijd(flight.starttijd_effectief) : String(fysiekeHole(flight.ronde_type, weergave.hole));
           const restFractie = weergave.fractie - Math.floor(weergave.fractie);
           const voortgangPct = voltooid ? 100 : gestartNog ? 0 : tijdlijnPercentage(restFractie);
-          const spelersVanFlight = flight.spelers || [];
+          // v0.14.0: beheerder-weergave toont de VOLLEDIGE Teecontrol-spelerslijst (leden én gasten,
+          // met Teecontrol's eigen kleur) i.p.v. alleen de gekoppelde (leden-only) spelers-rijen — zie
+          // bouwSpelersoverzichtBeheer hierboven voor de toelichting/aanleiding.
+          const spelersVanFlight = flight.teecontrol_spelers || [];
 
           const rij = el("div", { class: "flightrij" }, [
             el("div", { class: "flightbol", style: `background:${kleur}`, text: bolTekst }),
@@ -2333,7 +2400,10 @@ async function vulAdminTrackerTab(inhoud, opts = {}) {
               flight.toernooi_naam ? el("div", { class: "flighttoernooi", text: `🏆 ${flight.toernooi_naam}` }) : null,
               spelersVanFlight.length === 0
                 ? el("div", { class: "flightnaampillen" }, [el("span", { class: "flightnaampil", text: `${flight.lus} · ${flight.aantal_spelers}-bal` })])
-                : el("div", { class: "flightnaampillen" }, spelersVanFlight.map((s) => el("span", { class: "flightnaampil", text: s.naam }))),
+                : el("div", { class: "flightnaampillen" }, spelersVanFlight.map((s) => {
+                    const spelerKleur = tcKleur(s.kleur);
+                    return el("span", { class: "flightnaampil", style: `background:${spelerKleur.bg};color:${spelerKleur.fg}`, text: s.naam });
+                  })),
               el("div", { class: "flightmeta" }, [
                 clockSvg("#9A9385"),
                 document.createTextNode(` ${formatTijd(nu)}  ·  Hole ${fysiekeHole(flight.ronde_type, weergave.hole)}/${rondeInfo(flight.ronde_type).holesInRonde}  ·  ${statustekst}`),
@@ -2361,25 +2431,28 @@ async function vulAdminTrackerTab(inhoud, opts = {}) {
 }
 
 /* ---- Flight-detailscherm (popup, v0.6.0) -------------------------------------------------------
-   Bij klik op een flight in de Tracker-tab: spelersoverzicht (naam/lidcode/"Club lid"/hcp + gem.
-   hcp, naar het voorbeeld van de Marshal App-popup) plus GoyerFlow's eigen "waar is deze flight
-   nu"-weergave voor UITSLUITEND deze flight (geen voor/achter-kaarten, dat hoort bij het leden-
-   trackerscherm, niet bij dit overzicht). "Verplaatsen" = de beheerder meldt de positie namens de
-   flight, exact dezelfde hole-stepper + Afslag/Fairway/Green-knoppen en schrijfactie
-   (gerapporteerde_hole/checkpoint/tijdstip) als een speler op zijn eigen kaart gebruikt — bevestigd
-   met Kay, 25 oktober 2026. Alle spelers die hier getoond worden zijn per definitie Goyer-leden
-   ("Club lid"): GoyerFlow's spelers-tabel bevat uitsluitend leden met een persoonscode — greenfee-
-   /introducé-spelers worden door de sync al overgeslagen (zie v0.5.0) en komen hier dus nooit in
-   voor. "Club lid" is daarom een vaste tekst, geen apart gesynchroniseerd veld. -------------------- */
+   Bij klik op een flight in de Tracker-tab: spelersoverzicht (naam/type/hcp + gem. hcp, naar het
+   voorbeeld van de Marshal App-popup) plus GoyerFlow's eigen "waar is deze flight nu"-weergave voor
+   UITSLUITEND deze flight (geen voor/achter-kaarten, dat hoort bij het leden-trackerscherm, niet bij
+   dit overzicht). "Verplaatsen" = de beheerder meldt de positie namens de flight, exact dezelfde
+   hole-stepper + Afslag/Fairway/Green-knoppen en schrijfactie (gerapporteerde_hole/checkpoint/
+   tijdstip) als een speler op zijn eigen kaart gebruikt — bevestigd met Kay, 25 oktober 2026.
+   Spelersoverzicht (v0.14.0, zie bouwSpelersoverzichtBeheer hierboven): toont ALLE spelers zoals
+   Teecontrol ze aanlevert — leden én gasten, met Teecontrol's eigen kleur/typelabel — niet langer
+   beperkt tot alleen gekoppelde leden-rijen zoals vóór v0.14.0 ("Club lid" was toen een vaste tekst
+   omdat gasten structureel ontbraken; dat gold specifiek voor déze beheerder-weergave, niet voor de
+   spelers-tabel zelf, die nog steeds uitsluitend leden met een persoonscode bevat — zie schema.sql
+   "Fase 2h"). -------------------------------------------------------------------------------------- */
 function bouwFlightDetailModal(positie, params, nu) {
   const { flight, weergave, voltooid, heeftMelding, conclusie, minutenPerHole } = positie;
-  const spelers = flight.spelers || [];
+  const spelers = flight.teecontrol_spelers || [];
 
   const sluiten = () => { adminLocal.flightDetailId = null; adminLocal.flightDetailFout = null; render(); };
 
-  // Spelersoverzicht + "Gem. handicap flight" (v0.7.0): gedeelde opbouw met renderTracker's eigen
-  // spelersoverzicht — zie bouwSpelersoverzicht hierboven.
-  const spelersoverzicht = bouwSpelersoverzicht(spelers);
+  // Spelersoverzicht + "Gem. handicap flight" (v0.14.0): zie bouwSpelersoverzichtBeheer hierboven —
+  // ALLE Teecontrol-spelers van deze flight, niet (meer) de gedeelde bouwSpelersoverzicht() die het
+  // leden-eigen trackerscherm nog wel gebruikt.
+  const spelersoverzicht = bouwSpelersoverzichtBeheer(spelers, `${flight.lus} · ${flight.aantal_spelers}-bal`);
 
   // Eigen flight-kaart (v0.6.0): zelfde opbouw/schrijflogica als renderTracker's "zelf"-kaart,
   // hier hergebruikt voor een door de beheerder gekozen flight i.p.v. de ingelogde speler. Draft-
