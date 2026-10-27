@@ -260,7 +260,7 @@
 
 <script>
 /* ============================================================================================
-   GoyerFlow — v0.10.0
+   GoyerFlow — v0.11.0
    Versienummer bij elke volgende build op TWEE plekken bijwerken: deze kopregel-comment en de
    APP_VERSIE-constante hieronder (zelfde patroon als de Marshal App — zie diens bouwgeschiedenis
    voor de precedent-regel). De zichtbare versie-indicator naast "GoyerFlow" in de topbar wordt
@@ -380,8 +380,23 @@
    inhoud, geen apart popup-mechanisme. Popup-titel ("Tips om sneller te spelen") ongewijzigd gelaten
    — niet expliciet door Kay gespecificeerd, dus bewust niet gegokt; indien gewenst kan deze alsnog
    aangepast worden. Alleen tekst/nieuwe knop, geen schema- of sync-wijziging.
+   v0.11.0: op Kay's verzoek (27 oktober 2026, met screenshots van beide apps naast elkaar) de admin
+   Tracker-tab laten werken "zoals we het in de Marshal App deden" — EERST de daadwerkelijke Marshal
+   App-broncode gelezen (renderTracker() in "Marshal App.html"), niet gegokt. Twee wijzigingen: (1)
+   de lijst toont niet langer ALLE niet-uitgestapte flights (ook flights die pas over uren starten),
+   maar alleen nog ACTIEVE flights (gestart, max. 30 min voorbij de verwachte rondetijd — eenzelfde
+   grace-periode als de Marshal App) en AANKOMENDE flights (starten binnen 16 minuten). (2) nieuwe
+   sortering op FYSIEK holenummer i.p.v. op starttijd: aankomende flights sorteren op hun fysieke
+   starthole (1 of 10, rechtstreeks uit RONDE_INFO — GoyerFlow had deze 1-vs-10-kennis al dankzij de
+   v0.8.0-holenummering), actieve flights op hun live verwachte fysieke hole; op dezelfde hole staan
+   aankomende flights boven actieve, en bij meerdere aankomende flights op dezelfde starthole de
+   laatst vertrekkende bovenaan (dichtstbijzijnde onderaan, vlak boven de actieve flights). Nieuwe
+   functies `trackerIsActief`/`trackerIsAankomend`/`trackerSortHole`/`trackerSelecteerEnSorteer`. Het
+   flight-detailscherm blijft een flight tonen die de beheerder al open had staan, ook als die
+   inmiddels buiten het venster is gevallen (zoekt in `allePosities`, niet in de gefilterde `rijen`).
+   Kaarttitel "Alle flights" → "Flights nu en binnenkort"; lege-staat-tekst idem aangepast.
    ============================================================================================ */
-const APP_VERSIE = "0.10.0";
+const APP_VERSIE = "0.11.0";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -2106,6 +2121,60 @@ function flightTitel(spelers) {
   return `${achternaam} + ${rest} speler${rest === 1 ? "" : "s"}`;
 }
 
+// Selectie + sortering van de Tracker-tab (v0.11.0, Kay's verzoek 27 oktober 2026: "zoals we het in
+// de Marshal App deden"). Eerst de daadwerkelijke Marshal App-broncode gelezen (renderTracker() in
+// "Marshal App.html") i.p.v. te gokken — dit is een 1-op-1 vertaling van die logica naar GoyerFlow's
+// eigen datamodel:
+// - ACTIEF: de flight is gestart, en nog niet meer dan ACTIEF_GRACE_MIN minuten voorbij de
+//   verwachte rondetijd (rondetijdVoor()) — zo blijft een net afgeronde flight nog even zichtbaar,
+//   in plaats van voor altijd in de lijst te blijven staan tot iemand 'm handmatig op "Uitgestapt" zet.
+// - AANKOMEND: de flight start over hoogstens AANKOMEND_VENSTER_MIN minuten (en is nog niet gestart).
+// Een flight die in geen van beide vensters valt (te ver in de toekomst, of allang voorbij de
+// grace-periode) wordt niet getoond — dit is de kernwijziging t.o.v. voorheen, toen ELKE
+// niet-uitgestapte flight altijd zichtbaar bleef, ongeacht hoe ver in de toekomst de starttijd lag.
+const AANKOMEND_VENSTER_MIN = 16; // zelfde venster als de Marshal App ("binnen 16 minuten")
+const ACTIEF_GRACE_MIN = 30; // zelfde grace-periode als de Marshal App
+
+function trackerIsActief(positie, params, nu) {
+  if (positie.gestartNog) return false;
+  const verstrekenMin = (nu.getTime() - new Date(positie.flight.starttijd_effectief).getTime()) / 60000;
+  const rondetijdMin = rondetijdVoor(params, positie.flight.aantal_spelers, positie.flight.gemiddelde_hcp, positie.flight.ronde_type);
+  return verstrekenMin < rondetijdMin + ACTIEF_GRACE_MIN;
+}
+function trackerIsAankomend(flight, nu) {
+  const resterendMin = (new Date(flight.starttijd_effectief).getTime() - nu.getTime()) / 60000;
+  return resterendMin > 0 && resterendMin <= AANKOMEND_VENSTER_MIN;
+}
+// Sorteersleutel: voor een actieve flight het FYSIEKE holenummer waar hij nu zou moeten zijn (zodat
+// een H1- en een H10-ronde gewoon door elkaar heen op fysieke positie staan); voor een aankomende
+// flight het fysieke starthole (1 of 10 — rechtstreeks uit RONDE_INFO, GEEN aparte "sortHole"-functie
+// nodig zoals in de Marshal App, want GoyerFlow had deze 1-vs-10-kennis al voor de holenummering).
+function trackerSortHole(positie, aankomend) {
+  if (aankomend) return rondeInfo(positie.flight.ronde_type).startHole;
+  return fysiekeHole(positie.flight.ronde_type, positie.weergave.hole);
+}
+function trackerSelecteerEnSorteer(allePosities, params, nu) {
+  const items = [];
+  for (const positie of allePosities) {
+    if (trackerIsActief(positie, params, nu)) items.push({ positie, aankomend: false });
+    else if (trackerIsAankomend(positie.flight, nu)) items.push({ positie, aankomend: true });
+  }
+  items.sort((a, b) => {
+    const ha = trackerSortHole(a.positie, a.aankomend);
+    const hb = trackerSortHole(b.positie, b.aankomend);
+    if (ha !== hb) return ha - hb;
+    // Op dezelfde hole: aankomende flights altijd boven actieve.
+    if (a.aankomend !== b.aankomend) return a.aankomend ? -1 : 1;
+    const ta = new Date(a.positie.flight.starttijd_effectief).getTime();
+    const tb = new Date(b.positie.flight.starttijd_effectief).getTime();
+    // Beide aankomend: laatste start bovenaan, eerstvolgende onderaan (dichter bij "nu").
+    if (a.aankomend && b.aankomend) return tb - ta;
+    // Beide actief: gewone sortering op starttijd.
+    return ta - tb;
+  });
+  return items.map((i) => i.positie);
+}
+
 async function vulAdminTrackerTab(inhoud, opts = {}) {
   // "stil" = automatische achtergrondverversing door adminIntervalId (v0.7.1, zie render()) — zelfde
   // aanpak als renderTracker's "stil"-modus: bij een mislukte ophaalactie de bestaande weergave laten
@@ -2127,12 +2196,16 @@ async function vulAdminTrackerTab(inhoud, opts = {}) {
   inhoud.innerHTML = "";
 
   const nu = new Date();
-  const rijen = flights.map((flight) => berekenFlightPositie(flight, params, nu));
+  // Alle posities blijven berekend (nodig voor het flight-detailscherm hieronder, óók als die
+  // specifieke flight inmiddels buiten het actief/aankomend-venster is gevallen terwijl de
+  // beheerder 'm open had staan) — alleen de KAART-lijst wordt tot het venster beperkt.
+  const allePosities = flights.map((flight) => berekenFlightPositie(flight, params, nu));
+  const rijen = trackerSelecteerEnSorteer(allePosities, params, nu);
 
   const kaart = el("div", { class: "card" }, [
-    el("div", { class: "eyebrow", text: "Alle flights" }),
+    el("div", { class: "eyebrow", text: "Flights nu en binnenkort" }),
     rijen.length === 0
-      ? el("p", { class: "help", text: "Geen actieve flights gevonden." })
+      ? el("p", { class: "help", text: "Geen actieve of binnenkort startende flights gevonden." })
       : el("div", {}, rijen.map(({ flight, weergave, voltooid, heeftMelding, conclusie, gestartNog }) => {
           const kleur = voltooid ? "#9B9585" : gestartNog ? "#B9B2A0" : (conclusie ? conclusie.kleur : "var(--blue)");
           const statustekst = voltooid ? "Ronde voltooid"
@@ -2170,7 +2243,7 @@ async function vulAdminTrackerTab(inhoud, opts = {}) {
   inhoud.append(kaart);
 
   if (adminLocal.flightDetailId != null) {
-    const geselecteerd = rijen.find((r) => r.flight.id === adminLocal.flightDetailId);
+    const geselecteerd = allePosities.find((r) => r.flight.id === adminLocal.flightDetailId);
     if (geselecteerd) inhoud.append(bouwFlightDetailModal(geselecteerd, params, nu));
   }
 }
