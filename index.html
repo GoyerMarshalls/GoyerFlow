@@ -565,8 +565,31 @@
    v0.17.1: STARTBUUR_MAX_VERSCHIL_MINUTEN was bij v0.17.0 nog een ongeverifieerde placeholder (12
        minuten) — Kay bevestigde het echte vertrekinterval op De Goyer (om de 8 minuten), constante
        aangepast naar 8. Verder geen gedragswijziging.
+   v0.18.0: strakkere, wiskundig zuiverdere pace-of-play-benchmark (Kay's verzoek 28 oktober 2026,
+       "digitale marshal", geen verlaging van de lat via een vage gedragsfactor):
+   (1) rondetijdVoor() corrigeert de hcp-/flightgrootte-toeslag nu PER HOLE-TYPE (par 3/4/5) i.p.v.
+       één vlakke toeslag voor de hele ronde — een extra speler/slag kost op een par 5 nu eenmaal
+       meer tijd dan op een par 3. Nieuwe parameters hcp_correctie_par3/4/5_per_punt en
+       flightgrootte_correctie_par3/4/5_per_speler (schema.sql "Fase 2j"), de oude twee vlakke
+       kolommen blijven ongebruikt staan (niet-destructief, zelfde conventie als Fase 2i).
+   (2) conclusieVoor() gaat van een holes-relatieve 5-categorieën-indeling naar een ABSOLUTE
+       minuten-buffer in 3 banden: groen/"op_schema" (<5 min achter), oranje/"achter" (5-10 min
+       achter), rood/"ver_achter" (>10 min achter) — Kay's eigen banden. Vooruitlopen krijgt bewust
+       geen eigen band meer (valt onder groen, consistent met de v0.12.0-keuze dat voorlopen geen
+       probleem is). Toon blijft BEWUST neutraal/feitelijk (Kay's expliciete keuze) — geen
+       directieve taal, alleen de nieuwe minutenbuffer/kleurbanden.
+   (3) Alle aanroepers van conclusieVoor() (de eigen kaart, het beheerder-flightdetailscherm/
+       Tracker-rijen via berekenFlightPositie, en de "Analyseer huidige flights"-telling) rekenen nu
+       hun deltaHoles × minutenPerHole om naar minuten vóór het doorgeven. Het gat-signaal (v0.17.0)
+       is meeverhuisd naar de nieuwe key-naam (conclusie.key !== "op_schema" i.p.v. de twee oude
+       "te_langzaam"/"veel_te_langzaam"-keys).
+   (4) Admin Parameters-tab: 2 correctievelden → 6 (hcp × 3 hole-types, flightgrootte × 3 hole-
+       types), live voorbeeldrij-herberekening ongewijzigd van patroon.
+   (5) Opruiming: de losse hulpfunctie basisRondetijdVoorRonde() verviel — de per-hole par-opzoeking
+       zit nu rechtstreeks in rondetijdVoor() (punt 1), en basisRondetijdVoorRonde() had daardoor
+       geen call-site meer over.
    ============================================================================================ */
-const APP_VERSIE = "0.17.1";
+const APP_VERSIE = "0.18.0";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -730,29 +753,35 @@ function loggen(persoonscode, type, succes) {
    Rondetijd-berekening
    ============================================================================================ */
 // v0.8.0: was een vlak gemiddelde (PAR_VERDELING: 4x par3 + 10x par4 + 4x par5, ongeacht welke
-// holes daadwerkelijk gespeeld worden) — nu een exacte som over de FYSIEKE holes van déze ronde,
-// met het al bevestigde HOLE_PAR. Voor een volle 18-holes-ronde is de uitkomst identiek aan de oude
-// berekening (PAR_VERDELING is precies de par-verdeling die in HOLE_PAR zit, zie de toelichting
-// bovenaan dit bestand) — geen gedragsverandering daar. Voor een 9-holes-ronde (voor óf achter) was
-// er tot nu toe helemaal geen correcte basis: de vaste 18-holes-waarde zou de helft te hoog zijn.
-function basisRondetijdVoorRonde(params, rondeType) {
+// holes daadwerkelijk gespeeld worden) — werd toen een exacte som over de FYSIEKE holes van déze
+// ronde, met het al bevestigde HOLE_PAR (voor een volle 18-holes-ronde identiek aan de oude
+// berekening — PAR_VERDELING is precies de par-verdeling die in HOLE_PAR zit, zie de toelichting
+// bovenaan dit bestand). Sinds v0.18.0 zit die per-hole par-opzoeking rechtstreeks in
+// rondetijdVoor() hieronder (de eerdere losse hulpfunctie basisRondetijdVoorRonde() verviel, omdat
+// hij na het splitsen van de hcp-/flightgrootte-correctie per hole-type geen eigen call-site meer
+// had — zie de bouwgeschiedenis, v0.18.0).
+
+// v0.18.0 (Kay's verzoek 28 oktober 2026): de hcp-/flightgrootte-correctie was tot nu toe één vlak
+// bedrag per hole, ongeacht of die hole een par 3, 4 of 5 is — terwijl een extra speler of extra
+// slag op een par 5 nu eenmaal meer tijd kost dan op een korte par 3. Corrigeert nu PER HOLE, met
+// een eigen hcp-/flightgrootte-toeslag per par-type (hcp_correctie_par3/4/5_per_punt,
+// flightgrootte_correctie_par3/4/5_per_speler — zie schema.sql "Fase 2j"), opgeteld in dezelfde lus
+// als de par-basistijd i.p.v. achteraf als één vlakke `* holesInRonde`-vermenigvuldiging. Voor een
+// vlakke parameterset (alle drie par-correcties gelijk) is de uitkomst identiek aan de oude
+// berekening — dit is dus een precisering, geen principiële gedragsverandering.
+function rondetijdVoor(params, aantalSpelers, gemiddeldeHcp, rondeType) {
   const { holesInRonde } = rondeInfo(rondeType);
+  const hcpBovenTien = Math.max(0, gemiddeldeHcp - 10);
+  const extraSpelers = Math.max(0, aantalSpelers - 2);
   let totaal = 0;
   for (let i = 1; i <= holesInRonde; i++) {
     const par = HOLE_PAR[fysiekeHole(rondeType, i) - 1] ?? 4;
-    totaal += par === 3 ? params.par3_minuten : par === 5 ? params.par5_minuten : params.par4_minuten;
+    const basis = par === 3 ? params.par3_minuten : par === 5 ? params.par5_minuten : params.par4_minuten;
+    const hcpCorrectie = hcpBovenTien * (par === 3 ? params.hcp_correctie_par3_per_punt : par === 5 ? params.hcp_correctie_par5_per_punt : params.hcp_correctie_par4_per_punt);
+    const flightCorrectie = extraSpelers * (par === 3 ? params.flightgrootte_correctie_par3_per_speler : par === 5 ? params.flightgrootte_correctie_par5_per_speler : params.flightgrootte_correctie_par4_per_speler);
+    totaal += basis + hcpCorrectie + flightCorrectie;
   }
   return totaal;
-}
-
-function rondetijdVoor(params, aantalSpelers, gemiddeldeHcp, rondeType) {
-  const { holesInRonde } = rondeInfo(rondeType);
-  const basis = basisRondetijdVoorRonde(params, rondeType);
-  const hcpBovenTien = Math.max(0, gemiddeldeHcp - 10);
-  const hcpCorrectie = hcpBovenTien * params.hcp_correctie_per_punt_boven_10 * holesInRonde;
-  const extraSpelers = Math.max(0, aantalSpelers - 2);
-  const flightCorrectie = extraSpelers * params.flightgrootte_correctie_per_speler_boven_2 * holesInRonde;
-  return basis + hcpCorrectie + flightCorrectie;
 }
 
 // "hole" hierin (en in pasWachttijdToe/projecteerVanafMelding) blijft RONDE-RELATIEF (1 = eerste
@@ -849,25 +878,21 @@ function formatDuur(minuten) {
   return `${h} uur ${m} minuten`;
 }
 
-// Conclusie bij een zelf-gemelde positie — zelfde vijf categorieën/kleuren/drempels als de
-// goedgekeurde mockup (Tracker.dc.html): veel_te_snel/te_snel/op_schema/te_langzaam/
-// veel_te_langzaam (key/kleur/toonTipsKnop-logica elders blijven ongewijzigd).
-// Label/zin AANGEPAST (27 oktober 2026, Kay's feedback tijdens de veldtest): "veel te snel" klinkt
-// als een verwijt, terwijl voorlopen op schema op zich niets verkeerds is zolang je niemand in de
-// weg loopt. Vervangen door een neutrale, feitelijke holes-voor/achter-op-schema-indicatie met het
-// werkelijke verschil (bijv. "1,2 holes voor op schema") i.p.v. een waardeoordeel — zowel in de
-// korte badge-tekst (label) als de volzin (zin) in de kaart.
-function conclusieVoor(deltaHoles) {
-  const afgerond = Math.round(Math.abs(deltaHoles) * 10) / 10;
-  // Nederlandse decimaalnotatie (komma), consistent met de rest van de app (bijv. hcp-weergave).
-  const getal = String(afgerond).replace(".", ",");
-  const voorText = `${getal} holes voor op schema`;
-  const achterText = `${getal} holes achter op schema`;
-  if (deltaHoles >= 1.0) return { key: "veel_te_snel", label: voorText, kleur: "var(--blue-dark)", zin: `Dus je loopt ${voorText}.` };
-  if (deltaHoles >= 0.4) return { key: "te_snel", label: voorText, kleur: "var(--blue)", zin: `Dus je loopt ${voorText}.` };
-  if (deltaHoles <= -1.0) return { key: "veel_te_langzaam", label: achterText, kleur: "var(--err)", zin: `Dus je loopt ${achterText}.` };
-  if (deltaHoles <= -0.4) return { key: "te_langzaam", label: achterText, kleur: "var(--warn)", zin: `Dus je loopt ${achterText}.` };
-  return { key: "op_schema", label: "Op schema", kleur: "var(--accent)", zin: "Dus je loopt op schema." };
+// Conclusie bij een zelf-gemelde positie. Tot v0.17.1 een holes-relatieve indeling in 5 categorieën
+// (veel_te_snel/te_snel/op_schema/te_langzaam/veel_te_langzaam). Vanaf v0.18.0 (Kay's verzoek 28
+// oktober 2026, "strakke benchmark, maar wiskundig zuiver"): een ABSOLUTE minuten-buffer in 3
+// banden — groen (minder dan 5 min achter), oranje (5-10 min achter), rood (meer dan 10 min achter).
+// Vooruitlopen op schema krijgt bewust geen eigen band meer (valt onder groen/"op_schema") —
+// consistent met de v0.12.0-keuze dat voorlopen op zich geen probleem is. Toon BEWUST neutraal
+// gehouden (Kay's expliciete keuze, 28 oktober 2026): wel de nieuwe minutenbuffer/kleurbanden, geen
+// directieve/sturende taal ("Let op: pak de bal op...") — zelfde feitelijke stijl als de bestaande
+// "X holes achter op schema"-tekst uit v0.12.0, nu in minuten i.p.v. holes.
+function conclusieVoor(deltaMinuten) {
+  const minutenAchter = Math.round(Math.max(0, -deltaMinuten));
+  const achterText = `${minutenAchter} minuten achter op schema`;
+  if (deltaMinuten > -5) return { key: "op_schema", label: "Op schema", kleur: "var(--accent)", zin: "Dus je loopt op schema." };
+  if (deltaMinuten > -10) return { key: "achter", label: achterText, kleur: "var(--warn)", zin: `Dus je loopt ${achterText}.` };
+  return { key: "ver_achter", label: achterText, kleur: "var(--err)", zin: `Dus je loopt ${achterText}.` };
 }
 
 /* ============================================================================================
@@ -1626,10 +1651,12 @@ async function renderTracker(app, opts = {}) {
   // flight — "laatste melding wint"), opgeslagen in gerapporteerde_hole/gerapporteerd_checkpoint.
   const heeftGekozen = zelf.gerapporteerde_hole != null && zelf.gerapporteerd_checkpoint != null;
   const actueleFractie = heeftGekozen ? (zelf.gerapporteerde_hole - 1) + checkpointFractie(zelf.gerapporteerd_checkpoint) : null;
-  const deltaHoles = heeftGekozen ? actueleFractie - zelfPos.fractie : null;
-  const conclusie = heeftGekozen ? conclusieVoor(deltaHoles) : null;
+  // v0.18.0: conclusieVoor() rekent nu in minuten i.p.v. holes — hier omgezet met het eigen tempo
+  // (zelfPos.minutenPerHole) van deze flight, zie de toelichting bij conclusieVoor().
+  const deltaMinuten = heeftGekozen ? (actueleFractie - zelfPos.fractie) * zelfPos.minutenPerHole : null;
+  const conclusie = heeftGekozen ? conclusieVoor(deltaMinuten) : null;
   const kaartKleur = conclusie ? conclusie.kleur : "var(--accent)";
-  const toonTipsKnop = conclusie && (conclusie.key === "te_langzaam" || conclusie.key === "veel_te_langzaam");
+  const toonTipsKnop = conclusie && conclusie.key !== "op_schema";
 
   // Weergavepositie: zonder melding de pure live berekening (zelfPos, vanaf starttijd_effectief).
   // Mét melding: diezelfde melding vooruit geprojecteerd in de tijd (zie projecteerVanafMelding) —
@@ -1812,7 +1839,7 @@ async function renderTracker(app, opts = {}) {
               class: "gatvraagbtn ja",
               onclick: () => {
                 trackerLocal.gatVraagTonen = false;
-                trackerLocal.gatResultaat = (conclusie && (conclusie.key === "te_langzaam" || conclusie.key === "veel_te_langzaam")) ? "achter" : "opschema";
+                trackerLocal.gatResultaat = (conclusie && conclusie.key !== "op_schema") ? "achter" : "opschema";
                 render();
               },
               text: "Ja",
@@ -2116,7 +2143,8 @@ function berekenFlightPositie(flight, params, nu) {
   let conclusie = null;
   if (heeftMelding && !voltooid) {
     const actueleFractie = (flight.gerapporteerde_hole - 1) + checkpointFractie(flight.gerapporteerd_checkpoint);
-    conclusie = conclusieVoor(actueleFractie - zelfPos.fractie);
+    // v0.18.0: conclusieVoor() rekent in minuten — zie de toelichting bij renderTracker's gebruik.
+    conclusie = conclusieVoor((actueleFractie - zelfPos.fractie) * minutenPerHole);
   }
   const gestartNog = nu.getTime() < new Date(flight.starttijd_effectief).getTime();
   return { flight, minutenPerHole, zelfPos, weergave, voltooid, heeftMelding, conclusie, gestartNog };
@@ -2440,8 +2468,15 @@ async function vulAdminParametersTab(inhoud) {
   const iPar3 = el("input", { class: "paraminput", type: "number", step: "0.1", value: params.par3_minuten });
   const iPar4 = el("input", { class: "paraminput", type: "number", step: "0.1", value: params.par4_minuten });
   const iPar5 = el("input", { class: "paraminput", type: "number", step: "0.1", value: params.par5_minuten });
-  const iHcp = el("input", { class: "paraminput", type: "number", step: "0.01", value: params.hcp_correctie_per_punt_boven_10 });
-  const iFlight = el("input", { class: "paraminput", type: "number", step: "0.1", value: params.flightgrootte_correctie_per_speler_boven_2 });
+  // v0.18.0 (Kay's verzoek 28 oktober 2026): hcp-/flightgrootte-correctie nu per hole-type i.p.v. één
+  // vlakke correctie voor de hele ronde — een extra speler/slag kost op een par 5 nu eenmaal meer
+  // tijd dan op een par 3. Zie schema.sql "Fase 2j" en rondetijdVoor() hierboven.
+  const iHcpPar3 = el("input", { class: "paraminput", type: "number", step: "0.01", value: params.hcp_correctie_par3_per_punt });
+  const iHcpPar4 = el("input", { class: "paraminput", type: "number", step: "0.01", value: params.hcp_correctie_par4_per_punt });
+  const iHcpPar5 = el("input", { class: "paraminput", type: "number", step: "0.01", value: params.hcp_correctie_par5_per_punt });
+  const iFlightPar3 = el("input", { class: "paraminput", type: "number", step: "0.1", value: params.flightgrootte_correctie_par3_per_speler });
+  const iFlightPar4 = el("input", { class: "paraminput", type: "number", step: "0.1", value: params.flightgrootte_correctie_par4_per_speler });
+  const iFlightPar5 = el("input", { class: "paraminput", type: "number", step: "0.1", value: params.flightgrootte_correctie_par5_per_speler });
 
   const voorbeeldtekst = el("p", { class: "help" });
   const voorbeeldrij = (label, aantalSpelers, hcp) => {
@@ -2449,8 +2484,12 @@ async function vulAdminParametersTab(inhoud) {
       par3_minuten: parseFloat(iPar3.value) || 0,
       par4_minuten: parseFloat(iPar4.value) || 0,
       par5_minuten: parseFloat(iPar5.value) || 0,
-      hcp_correctie_per_punt_boven_10: parseFloat(iHcp.value) || 0,
-      flightgrootte_correctie_per_speler_boven_2: parseFloat(iFlight.value) || 0,
+      hcp_correctie_par3_per_punt: parseFloat(iHcpPar3.value) || 0,
+      hcp_correctie_par4_per_punt: parseFloat(iHcpPar4.value) || 0,
+      hcp_correctie_par5_per_punt: parseFloat(iHcpPar5.value) || 0,
+      flightgrootte_correctie_par3_per_speler: parseFloat(iFlightPar3.value) || 0,
+      flightgrootte_correctie_par4_per_speler: parseFloat(iFlightPar4.value) || 0,
+      flightgrootte_correctie_par5_per_speler: parseFloat(iFlightPar5.value) || 0,
     };
     return `${label}: ${formatDuur(rondetijdVoor(waarden, aantalSpelers, hcp))}`;
   };
@@ -2462,7 +2501,7 @@ async function vulAdminParametersTab(inhoud) {
     ].join("  ·  ");
   };
   herbereken();
-  [iPar3, iPar4, iPar5, iHcp, iFlight].forEach((input) => input.addEventListener("input", herbereken));
+  [iPar3, iPar4, iPar5, iHcpPar3, iHcpPar4, iHcpPar5, iFlightPar3, iFlightPar4, iFlightPar5].forEach((input) => input.addEventListener("input", herbereken));
 
   const opslaan = async () => {
     adminLocal.paramFout = null;
@@ -2471,8 +2510,12 @@ async function vulAdminParametersTab(inhoud) {
       par3_minuten: parseFloat(iPar3.value),
       par4_minuten: parseFloat(iPar4.value),
       par5_minuten: parseFloat(iPar5.value),
-      hcp_correctie_per_punt_boven_10: parseFloat(iHcp.value),
-      flightgrootte_correctie_per_speler_boven_2: parseFloat(iFlight.value),
+      hcp_correctie_par3_per_punt: parseFloat(iHcpPar3.value),
+      hcp_correctie_par4_per_punt: parseFloat(iHcpPar4.value),
+      hcp_correctie_par5_per_punt: parseFloat(iHcpPar5.value),
+      flightgrootte_correctie_par3_per_speler: parseFloat(iFlightPar3.value),
+      flightgrootte_correctie_par4_per_speler: parseFloat(iFlightPar4.value),
+      flightgrootte_correctie_par5_per_speler: parseFloat(iFlightPar5.value),
     };
     if (Object.values(nieuw).some((v) => Number.isNaN(v) || v < 0)) {
       adminLocal.paramFout = "Vul voor elk veld een geldig, niet-negatief getal in.";
@@ -2504,8 +2547,12 @@ async function vulAdminParametersTab(inhoud) {
     el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Par 3 (minuten)" }), iPar3]),
     el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Par 4 (minuten)" }), iPar4]),
     el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Par 5 (minuten)" }), iPar5]),
-    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Hcp-correctie / punt boven 10" }), iHcp]),
-    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Flightgrootte-correctie / speler boven 2" }), iFlight]),
+    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Hcp-correctie Par 3 (min/punt)" }), iHcpPar3]),
+    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Hcp-correctie Par 4 (min/punt)" }), iHcpPar4]),
+    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Hcp-correctie Par 5 (min/punt)" }), iHcpPar5]),
+    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Flightgrootte-correctie Par 3 (min/speler)" }), iFlightPar3]),
+    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Flightgrootte-correctie Par 4 (min/speler)" }), iFlightPar4]),
+    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Flightgrootte-correctie Par 5 (min/speler)" }), iFlightPar5]),
     el("p", { class: "help", text: "Verwachte rondetijden:" }),
     voorbeeldtekst,
     ...(fout ? [fout] : []),
@@ -2524,23 +2571,26 @@ async function vulAdminParametersTab(inhoud) {
       const alleFlights = await sb("flights?uitgestapt=eq.false&select=*");
       const metMelding = alleFlights.filter((f) => f.gerapporteerde_hole != null && f.gerapporteerd_checkpoint != null);
       const nu = new Date();
-      let opSchema = 0, voor = 0, achter = 0, somAfwijking = 0;
+      // v0.18.0: hergebruikt conclusieVoor() zelf (i.p.v. een eigen losse drempel-check) zodat deze
+      // telling altijd exact dezelfde minuten-banden hanteert als de rest van de app.
+      let opSchema = 0, achter = 0, verAchter = 0, somAfwijkingMin = 0;
       for (const flight of metMelding) {
         const minutenPerHole = rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp, flight.ronde_type) / rondeInfo(flight.ronde_type).holesInRonde;
         const zelfPos = verwachtePositie(flight.starttijd_effectief, minutenPerHole, nu, flight.ronde_type);
         const actueleFractie = (flight.gerapporteerde_hole - 1) + checkpointFractie(flight.gerapporteerd_checkpoint);
-        const deltaHoles = actueleFractie - zelfPos.fractie;
-        somAfwijking += deltaHoles;
-        if (deltaHoles >= 0.4) voor++;
-        else if (deltaHoles <= -0.4) achter++;
-        else opSchema++;
+        const deltaMinuten = (actueleFractie - zelfPos.fractie) * minutenPerHole;
+        somAfwijkingMin += deltaMinuten;
+        const key = conclusieVoor(deltaMinuten).key;
+        if (key === "op_schema") opSchema++;
+        else if (key === "achter") achter++;
+        else verAchter++;
       }
       const totaal = metMelding.length;
       analyseResultaatNode.append(el("div", {
         class: "analyseresultaat",
         text: totaal === 0
           ? "Geen flights met een actuele melding gevonden — nog geen data om te analyseren."
-          : `${totaal} flight(s) met een melding: ${opSchema} op schema, ${voor} voor, ${achter} achter. Gemiddelde afwijking: ${(somAfwijking / totaal).toFixed(2)} hole.`,
+          : `${totaal} flight(s) met een melding: ${opSchema} op schema, ${achter} achter, ${verAchter} ver achter. Gemiddelde afwijking: ${Math.round(somAfwijkingMin / totaal)} minuten (negatief = gemiddeld achter op schema).`,
       }));
     } catch (e) {
       analyseResultaatNode.append(el("div", { class: "paramfout", text: "Analyse is niet gelukt. Probeer het nog eens." }));
