@@ -72,7 +72,6 @@
   .card.me{background:var(--accent);border:none;box-shadow:0 4px 14px rgba(0,0,0,0.1);color:#fff;padding:18px}
   .eyebrow{font-size:12px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;color:var(--ink);margin-bottom:6px}
   .card.me .eyebrow{color:rgba(255,255,255,0.7);text-align:center;margin-bottom:10px}
-  .posline{font-size:16px;line-height:1.35}
   .holebig{font-size:52px;font-weight:800;color:#fff;line-height:1;text-align:center;margin:2px 0 2px}
   .pleklabel{font-size:14px;font-weight:700;color:rgba(255,255,255,0.85);text-align:center;
     text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px}
@@ -99,32 +98,11 @@
     font-size:15px;font-weight:700;text-align:center}
   .markerbtn.big{padding:13px 6px;border-radius:14px;font-size:16px;border-width:2px}
 
-  /* Inhaal-correctie (flight-voor-jou) */
-  .correctiewarn{font-size:14px;color:var(--warn);line-height:1.45;margin-bottom:8px;padding:10px 12px;
-    border-radius:12px;background:var(--warn-bg)}
-  .uitgestaptbtn{width:100%;box-sizing:border-box;padding:9px 12px;border-radius:10px;background:#fff;
-    border:1.5px dashed rgba(168,94,28,0.4);cursor:pointer;margin-bottom:8px;font-size:14px;
-    font-weight:700;color:var(--warn);text-align:center}
-  /* Doorlaat-knop — duidelijk herkenbaar door een stevige rand + lichte tint, zonder een volle
-     blok accentkleur te zijn (dat trok te veel aandacht naast de groene middelste kaart).
-     Breedte volgt nu de tekst (ipv de volle kaartbreedte) en staat gecentreerd, met wat meer
-     ruimte boven zich t.o.v. de tekst erboven. */
-  .doorlaatbtn{display:block;width:fit-content;max-width:100%;box-sizing:border-box;padding:13px 20px;
-    border-radius:14px;cursor:pointer;text-align:center;background:var(--accent-soft);
-    border:2px solid var(--accent);transition:opacity 0.15s;margin:16px auto 0 auto}
-  .doorlaatbtn.vergrendeld{background:#F0EEE6;border-color:#C7C0AF;opacity:1;cursor:default}
-  .doorlaatbtn .tekst{font-size:15px;font-weight:800;color:var(--accent);white-space:nowrap}
-  .doorlaatbtn.vergrendeld .tekst{color:#9B9585}
-  .gewisseldline{font-size:13px;color:#8A8470;margin-top:6px;line-height:1.35;text-align:center}
-
-  /* Bevestiging voor doorlaten ("Weet je het zeker?") */
-  .bevestigblok{margin:16px auto 0 auto;width:fit-content;max-width:100%}
-  .bevestigtekst{font-size:14px;font-weight:700;color:var(--accent);text-align:center;margin-bottom:8px}
-  .bevestigrow{display:flex;gap:8px;justify-content:center}
-  .bevestigbtn{box-sizing:border-box;padding:11px 16px;border-radius:12px;cursor:pointer;
-    font-size:14px;font-weight:800;text-align:center;white-space:nowrap}
-  .bevestigbtn.ja{background:var(--accent);border:2px solid var(--accent);color:#fff}
-  .bevestigbtn.annuleren{background:#fff;border:2px solid var(--border);color:var(--muted-ink)}
+  /* (28 oktober 2026, sparsessie: .correctiewarn/.uitgestaptbtn/.doorlaatbtn(+varianten)/
+     .gewisseldline/.bevestigblok/.bevestigtekst/.bevestigrow/.bevestigbtn(+varianten) hier
+     verwijderd — hoorden bij de inhaal-correctiewaarschuwing en de doorlaat-functionaliteit, die
+     op Kay's verzoek zijn verwijderd. .stepperrow/.stepbtn/.steplabel/.stepvalue/.markerrow/
+     .markerbtn hierboven blijven: die worden nog gedeeld met de eigen-positie-kaart hieronder. */
 
   /* Ronde voltooid (eigen kaart) */
   .rondeklaartekst{font-size:14px;color:rgba(255,255,255,0.92);line-height:1.45;margin-bottom:14px}
@@ -132,6 +110,10 @@
     border:none;cursor:pointer;font-size:15px;font-weight:800;color:var(--accent);text-align:center}
 
   /* GPS-ondersteunde check-in (eigen kaart) — zie startGpsPositiebepaling()/gpsPending in index.html */
+  /* GPS-statuspil (v0.17.0, Kay's verzoek tijdens de veldtest: "ik kan nergens zien of gps wel of
+     niet actief is of werkt") — altijd zichtbaar bovenaan de eigen kaart, zie bouwGpsStatusRegel(). */
+  .gpsstatuspil{display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;
+    font-weight:700;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:8px}
   .gpssubregel{font-size:13px;font-weight:600;color:rgba(255,255,255,0.75);text-align:center;margin-bottom:10px}
   .gpsuitleg{font-size:13px;color:rgba(255,255,255,0.85);line-height:1.4;margin-bottom:10px}
   .gpsbevestigbtn{margin-top:12px;width:100%;box-sizing:border-box;padding:13px 14px;border-radius:14px;
@@ -143,6 +125,18 @@
   .gpsretrybtn{margin-bottom:12px;width:100%;box-sizing:border-box;padding:10px 14px;border-radius:14px;
     background:transparent;border:1.5px solid rgba(255,255,255,0.5);cursor:pointer;font-size:13px;
     font-weight:700;color:rgba(255,255,255,0.92);text-align:center}
+
+  /* Gat-signaal met de startbuur (v0.17.0, eigen kaart) — zie evalueerGatMetStartbuur in index.html.
+     Puur een tekstmelding met een Ja/Nee-vraag, geen blokkade van de rest van de kaart. */
+  .gatvraagblok{margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.18)}
+  .gatvraagtekst{font-size:14px;color:rgba(255,255,255,0.92);line-height:1.4;margin-bottom:10px}
+  .gatvraagrow{display:flex;gap:10px}
+  .gatvraagbtn{flex:1;box-sizing:border-box;padding:11px 6px;border-radius:12px;cursor:pointer;
+    font-size:14px;font-weight:700;text-align:center;border:1.5px solid rgba(255,255,255,0.5)}
+  .gatvraagbtn.nee{background:transparent;color:rgba(255,255,255,0.92)}
+  .gatvraagbtn.ja{background:#fff;color:var(--accent);border-color:#fff}
+  .gatresultaat{font-size:13px;color:rgba(255,255,255,0.85);line-height:1.4;margin-top:12px;
+    padding-top:12px;border-top:1px solid rgba(255,255,255,0.18)}
 
   /* Tijdlijn onder Afslag/Fairway/Green — vordert live mee met de klok, puur visueel (zie
      tijdlijnPercentage()); de knoppen erboven zijn drie gelijke kolommen, dus de balk komt exact
@@ -217,7 +211,9 @@
   .detailclose{width:26px;height:26px;border-radius:8px;background:#F3F0E6;border:none;display:flex;
     align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;padding:0;margin-top:2px}
   .spelerlijst{margin-top:14px}
-  .spelerrij{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;
+  /* v0.16.0: padding 9px → 5px (Kay's veldtest-feedback: "ik wil ze dichter op elkaar") — geldt voor
+     zowel het leden-eigen spelersoverzicht als het beheerder-spelersoverzicht, die delen deze klasse. */
+  .spelerrij{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 0;
     border-bottom:1px solid var(--border)}
   .spelerrij:last-child{border-bottom:none}
   .spelernaamrow{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
@@ -492,8 +488,85 @@
    de "<lidcode> · Club lid"-metaregel is daar verwijderd, nu alleen naam + hcp per speler. Reden
    (niet expliciet gevraagd, maar consistent met de bestaande scheiding): een ingelogde speler ziet zo
    niet langer de lidcodes van zijn medespelers.
+   v0.15.0: op Kay's verzoek (28 oktober 2026, sparsessie — zie bouwgeschiedenis) het leden-
+   trackerscherm teruggebracht naar de essentie: "waar is mijn flight op de baan", voor inzicht in
+   de EIGEN speelsnelheid. Drie samenhangende onderdelen volledig verwijderd, elk met zijn eigen UI,
+   dataveld(en) en schrijfacties:
+   (1) De kaarten "Flight voor jou"/"Flight achter jou" (voorCard/achterCard in renderTracker) met
+       de bijbehorende geschatte positie van de buurflights (voor/achter, posVanMetMelding,
+       kandidaatVoltooid) — dat scherm toonde voorheen ook waar de flights voor/achter je ongeveer
+       moesten zijn.
+   (2) De inhaal-correctiewaarschuwing (loopJeTegenVoorAan/loopAchterTegenJouAan, de bijbehorende
+       stepper + Afslag/Fairway/Green-knoppen en de "Uitgestapt"-knop, geschreven via
+       correctieVanVoorMelden/markeerVoorUitgestapt/correctieVanAchterMelden/
+       markeerAchterUitgestapt). Kay: "Als spelers (én Marshals) gewend raken om hun posities te
+       checken én te melden, dan zou dit het probleem zelf op moeten lossen. [...] Correctiewaar-
+       schuwing: Hoeft dus ook niet meer. Dat is een Marshal functie."
+   (3) De hele doorlaat-functionaliteit (toonVoorDoorlaat/toonAchterDoorlaat/doorlaatWissel), inclusief
+       de tempo-(her)berekening die daaraan gekoppeld was (het wacht_tot/wacht_hole/wacht_checkpoint-
+       mechanisme, pasWachttijdToe) — zowel op het leden-trackerscherm als in het admin-scherm
+       (berekenFlightPositie, dat exact dezelfde weergavepositie berekent). Kay was hier expliciet
+       over: "Let op: dus ook de tempo (her)berekening van een flight gekoppeld aan doorlaten moet
+       weg." De kolommen wacht_tot/wacht_hole/wacht_checkpoint in schema.sql worden niet meer
+       gebruikt door de app (zie schema.sql voor een toelichting daar).
+   Bewuste reframe (Kay's woorden): een flight die "achter op schema" loopt omdat hij een paar keer
+   heeft doorgelaten, vertelt daarmee gewoon de waarheid — dat is niets om te "corrigeren", en past
+   bij de bestaande neutrale-taal-filosofie (zie v0.12.0). De eigen-positie-berekening (zelfPos,
+   deltaHoles, conclusie) was en is PUUR gebaseerd op de eigen starttijd_effectief vs. de eigen
+   melding — nooit op de buurflights — dus deze verwijdering raakt het kernmechanisme van het
+   scherm niet. Meegenomen opruiming: de nu ongebruikte helperfuncties checkpointOrdinaal/
+   doorlaatMarge/volgendCheckpoint/duurTotVolgendCheckpoint/pasWachttijdToe, de bijbehorende
+   trackerLocal-velden (voorKnopVergrendeld/achterKnopVergrendeld/voorBevestigen/achterBevestigen/
+   voorCorrectieHole/achterCorrectieHole) en de CSS-klassen .posline/.correctiewarn/.doorlaatbtn
+   (+varianten)/.gewisseldline/.bevestigblok/.bevestigtekst/.bevestigrow/.bevestigbtn(+varianten)/
+   .uitgestaptbtn — allemaal uitsluitend gebruikt door de hierboven verwijderde code (gecontroleerd
+   per klasse/functie). Kay's gestelde toekomstwens — individuele positiemeldingen uit GoyerFlow
+   laten doorwerken in de Marshal-weergave, en Marshal-meldingen van flight-posities laten
+   doorwerken in GoyerFlow — staat los van deze opruiming genoteerd in de bouwgeschiedenis ("Op de
+   planning"); nog niet uitgewerkt of gepland.
+   v0.16.0: drie bugfixes + één stijlfix, na Kay's veldtest-ronde op de baan (28 oktober 2026, zie
+   bouwgeschiedenis voor de volledige analyse).
+   (1) "Ronde afgerond"-lockout: een flight die nog nooit een positie gemeld had, maar waarvan de
+       PURE schema-tijd al voorbij het verwachte eindtijdstip was, kwam vast te zitten op een
+       foutief "klaar"-scherm (alleen de "Ronde afgerond"-bevestiging, geen stepper) — ook als de
+       ronde in werkelijkheid nog niet voorbij was. Kay: "niet afgerond. Hoe corrigeer ik dat??",
+       bevestigd met een flight die om 15:51 al "klaar" toonde maar pas om 16:05 echt klaar was. Fix:
+       zelfRondeVoltooid vereist nu altijd een eerste eigen melding (heeftGekozen) — zonder melding
+       geen enkel bewijs dat de ronde al voorbij is, dus altijd eerst de normale stepper tonen.
+   (2) Geen status voor "nog niet gestart": vóór starttijd_effectief berekende verwachtePositie()
+       alsnog een (uit een negatieve fractie afgeleide) hole/checkpoint, in plaats van een "nog niet
+       begonnen"-status — geobserveerd vóór de start van de testronde ("fairway van hole 1" om
+       11:45, terwijl de starttijd 11:52 was). Kay's eigen suggestie ("U start om 11:52") als fix:
+       een nieuwe nogNietGestart-check toont nu "Nog niet gestart — deze flight start om [tijd]" in
+       plaats van een stepper/conclusie, zolang de starttijd nog in de toekomst ligt.
+   (3) UX-verduidelijking: de stepper/marker-knoppen tonen altijd de laatst gemelde positie
+       (vooruit geprojecteerd in de tijd), los van de schema-verwachting in de conclusietekst
+       eronder — twee bewust verschillende getallen, maar zonder duidelijk onderscheid in de UI
+       leek dat tegenstrijdig tijdens het testen ("tekst wijkt ook af van visualisatie?", bv. de
+       kaart toonde "Green" van hole 4 terwijl Kay fysiek op de fairway stond). Nu een vaste regel
+       onder de eyebrow zodra er een melding ligt: "Dit is je laatste melding — pas aan als dit niet
+       meer klopt."
+   (4) Stijl: naamrijen in het spelersoverzicht ("Jouw flight" + het beheerder-overzicht, delen
+       dezelfde CSS-klasse) stonden te los — padding van 9px naar 5px, op Kay's verzoek.
+   v0.17.0: de twee na v0.16.0 nog openstaande ontwerpvragen uit de testronde-analyse, nu gebouwd
+   op basis van Kay's antwoorden (28 oktober 2026, allemaal de aanbevolen optie):
+   (1) GPS-status-icoontje: een vaste statuspil (bouwGpsStatusRegel) bovenaan de eigen kaart, altijd
+       zichtbaar — "GPS zoekt…"/"GPS gevonden"/"GPS bevestigd"/"Geen GPS" met een passend icoontje
+       (hergebruikt checkSvg(), dat sinds de doorlaat-knoppen-verwijdering in v0.15.0 ongebruikt
+       stond, voor de "bevestigd"-staat). Plaatsing: bij de eigen kaart (Kay's keuze).
+   (2) Gat-melding met de startbuur: na elke eigen melding checkt evalueerGatMetStartbuur() of er
+       een gat van 1+ hole is ontstaan met de flight die volgens de startlijst direct voor je
+       gestart is (binnen STARTBUUR_MAX_VERSCHIL_MINUTEN, zie de toelichting bij die constante).
+       Puur een tekstmelding ("Klopt dat?" met Ja/Nee, Kay's keuze) — bij "Ja" ofwel een
+       geruststellende tekst (op schema) ofwel "Probeer aansluiting te vinden met de flight voor
+       je" (achter op schema, afgeleid van de bestaande conclusie), bij "Nee" simpelweg niets (Kay's
+       keuze, geen vervolgactie). Draait op de achtergrond — geen automatische/periodieke herbereke-
+       ning, alleen bij een eigen melding.
+   v0.17.1: STARTBUUR_MAX_VERSCHIL_MINUTEN was bij v0.17.0 nog een ongeverifieerde placeholder (12
+       minuten) — Kay bevestigde het echte vertrekinterval op De Goyer (om de 8 minuten), constante
+       aangepast naar 8. Verder geen gedragswijziging.
    ============================================================================================ */
-const APP_VERSIE = "0.14.4";
+const APP_VERSIE = "0.17.1";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -718,81 +791,6 @@ function checkpointFractieMidden(key) {
   return { afslag: 0.125, fairway: 0.5, green: 0.875 }[key] ?? 0.125;
 }
 
-// Discreet volgnummer van een checkpoint, doorlopend over de hele ronde (hole 1/afslag = 0,
-// hole 1/fairway = 1, hole 1/green = 2, hole 2/afslag = 3, enz.) — gebruikt om de AFSTAND tussen
-// twee flights uit te drukken in checkpoint-stappen, voor de doorlaat-zichtbaarheid hieronder.
-function checkpointOrdinaal(hole, checkpoint) {
-  const idx = { afslag: 0, fairway: 1, green: 2 }[checkpoint] ?? 0;
-  return (hole - 1) * 3 + idx;
-}
-
-// Marge (in checkpoint-stappen, zie checkpointOrdinaal) waarbinnen een doorlaat-knop getoond
-// wordt, bepaald door de par van de hole van de VOOROP liggende flight — zie scopedocument
-// "Doorlaat-afstand" en Kay's voorbeeld: op een par-3 hole (korte speeltijd) is 2 stappen marge al
-// realistisch (bijv. achterflight op hole N-1/green, jij al op hole N/afslag); op par-4/5 holes
-// (langere speeltijd) is de marge ruimer, 3 stappen.
-function doorlaatMarge(hole) {
-  const par = HOLE_PAR[hole - 1] ?? 4;
-  return par === 3 ? 2 : 3;
-}
-
-// Het checkpoint ONMIDDELLIJK NA het gegeven checkpoint, in de vaste Afslag → Fairway → Green →
-// volgende hole/Afslag-volgorde — gebruikt om de wachttijd bij een doorlaat te bepalen (zie
-// duurTotVolgendCheckpoint/doorlaatWissel hieronder). "hole" is hier, net als overal, RONDE-RELATIEF
-// — zie de rondetype-toelichting bij RONDE_INFO. Klemt op de laatste green van DEZE ronde (geen hole
-// na de laatste), vandaar rondeType hier nodig.
-function volgendCheckpoint(hole, checkpoint, rondeType) {
-  const { holesInRonde } = rondeInfo(rondeType);
-  const idx = { afslag: 0, fairway: 1, green: 2 }[checkpoint] ?? 0;
-  const ordinaal = (hole - 1) * 3 + idx + 1;
-  const nieuweHole = Math.floor(ordinaal / 3) + 1;
-  if (nieuweHole > holesInRonde) return { hole: holesInRonde, checkpoint: "green" };
-  return { hole: nieuweHole, checkpoint: CHECKPOINT_VOLGORDE[ordinaal % 3] };
-}
-
-// Hoe lang (in minuten, met het EIGEN tempo van de spelende flight) het duurt om van het gegeven
-// checkpoint naar het volgende te spelen — zie doorlaatWissel: de flight die doorlaat staat precies
-// zo lang stil als de doorgelaten flight nodig heeft om dat volgende stuk te spelen. Levert 0 op bij
-// een holeovergang (green → afslag van de volgende hole): die overgang kost in dit rekenmodel
-// sowieso al geen tijd (checkpointFractie(green) van hole N en checkpointFractie(afslag) van hole
-// N+1 vallen op precies dezelfde fractie) — bestaande modelkeuze, geen nieuwe aanname hier.
-function duurTotVolgendCheckpoint(hole, checkpoint, minutenPerHole, rondeType) {
-  const huidigeFractie = (hole - 1) + checkpointFractie(checkpoint);
-  const doel = volgendCheckpoint(hole, checkpoint, rondeType);
-  const doelFractie = (doel.hole - 1) + checkpointFractie(doel.checkpoint);
-  return Math.max(0, doelFractie - huidigeFractie) * minutenPerHole;
-}
-
-// Wachttijd na een doorlaat (zie doorlaatWissel in renderTracker, en de kolommen wacht_tot/
-// wacht_hole/wacht_checkpoint in schema.sql — Fase 2c): Kay's model is dat de flight die doorlaat
-// stilstaat op het checkpoint waar dat gebeurt, en pas na wacht_tot haar eigen tempo weer laat
-// doortellen. Dat is EXACT (geen middelpunt-truc nodig, zoals bij projecteerVanafMelding — dit is
-// een bewuste, precieze waarneming op het moment van doorlaten, geen mogelijk-onnauwkeurige eigen
-// melding) tot wacht_tot, en loopt daarna normaal door vanaf dat ankerpunt — zelfde projectie-vorm
-// als projecteerVanafMelding, nu met wacht_tot als ankertijdstip in plaats van gerapporteerd_tijdstip.
-// Overschrijft bewust ELKE andere positiebron (schema, eigen melding, correctie) zolang hij actief
-// is: dit is de meest recente, fysiek geobserveerde waarheid. Raakt nooit de PURE schema-positie
-// (posVan/verwachtePositie zonder dit) die voor de "op schema"-vergelijking gebruikt wordt — die
-// moet de afwijking door het wachten juist laten zien, niet verbergen.
-function pasWachttijdToe(pos, flight, minutenPerHole, nu, rondeType) {
-  if (!flight.wacht_tot) return pos;
-  const { holesInRonde } = rondeInfo(rondeType);
-  const wachtTot = new Date(flight.wacht_tot).getTime();
-  const ankerFractie = (flight.wacht_hole - 1) + checkpointFractie(flight.wacht_checkpoint);
-  if (nu.getTime() < wachtTot) {
-    return { ...pos, hole: flight.wacht_hole, checkpoint: flight.wacht_checkpoint, fractie: ankerFractie };
-  }
-  const minutenSindsWachttot = (nu.getTime() - wachtTot) / 60000;
-  const fractie = ankerFractie + minutenSindsWachttot / minutenPerHole;
-  const holeIndex = Math.floor(fractie);
-  const rest = fractie - holeIndex;
-  let checkpoint = "afslag";
-  if (rest >= 0.75) checkpoint = "green";
-  else if (rest >= 0.25) checkpoint = "fairway";
-  const hole = Math.max(1, Math.min(holesInRonde, holeIndex + 1));
-  return { ...pos, hole, checkpoint, fractie };
-}
-
 // Ronde voltooid: de ONGECLEMDE fractie (dus los van de weergegeven hole, die bij
 // verwachtePositie() al op het aantal holes van DEZE ronde wordt vastgezet) is voorbij het totaal
 // aantal holes van deze ronde — er is geen "hole na de laatste", dus vanaf hier moet de tracker een
@@ -925,6 +923,14 @@ const GPS_MAX_AFSTAND_METER = 400;
 // langzame flight te snel of voor een snelle flight te laat zou aanvoelen.
 const HERBEVESTIG_DREMPEL_HOLES = 2;
 
+// Hoeveel minuten eerder de flight vóór je op de startlijst nog mag zijn gestart en toch gelden als
+// "direct voor jou gestart" voor het gat-signaal (zie evalueerGatMetStartbuur in renderTracker,
+// Kay's verzoek 28 oktober 2026: "Dan moet de flight voor je wél op de startlijst inderdaad direct
+// voor jou zijn gestart, anders niet flaggen [...] want als hij 30 mn eerder startte is er
+// natuurlijk ruimte"). Op De Goyer starten flights om de 8 minuten (door Kay bevestigd, 28 oktober
+// 2026, v0.17.1) — exact dat interval, dus één "slot" te vroeg valt al buiten de drempel.
+const STARTBUUR_MAX_VERSCHIL_MINUTEN = 8;
+
 // Dichtstbijzijnde van alle 18×3 checkpoints t.o.v. een gemeten positie — puur een suggestie, zie
 // de toelichting hierboven. Geeft null terug als zelfs de dichtstbijzijnde match verder weg ligt dan
 // GPS_MAX_AFSTAND_METER (bijv. thuis getest) — de aanroeper behandelt dat hetzelfde als "geen GPS
@@ -1040,23 +1046,37 @@ function checkSvg(kleur) {
   return svg;
 }
 
+// GPS-locatiepin-svg (v0.17.0, Kay's verzoek tijdens de veldtest van 28 oktober 2026: "ik kan
+// nergens zien of gps wel of niet actief is of werkt") — zie bouwGpsStatusRegel() in renderTracker
+// voor de statussen die deze pin (en checkSvg hierboven, hergebruikt voor de bevestigde status)
+// weergeeft. `gevuld` = opgevulde pin (een actieve/gevonden positie) vs. alleen een omtrek (bezig/
+// niet beschikbaar).
+function gpsPinSvg(kleur, gevuld) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", "13"); svg.setAttribute("height", "13"); svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", gevuld ? kleur : "none");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z");
+  path.setAttribute("stroke", kleur);
+  path.setAttribute("stroke-width", gevuld ? "0" : "1.6");
+  svg.appendChild(path);
+  return svg;
+}
+
 /* ============================================================================================
    App-state en navigatie
    ============================================================================================ */
 const state = { scherm: "persoonscode", speler: null, flight: null, fout: null, bericht: null };
 
-// Lokale, niet-opgeslagen UI-staat voor het trackerscherm: vergrendeling na een doorlaat-klik (4
-// seconden, zelfde patroon als de mockup) en de draft-hole-waarden van de twee steppers, voordat
-// ze als melding worden bevestigd. Wordt bij uitloggen gereset.
+// Lokale, niet-opgeslagen UI-staat voor het trackerscherm: de draft-hole-waarde van de eigen
+// stepper, voordat die als melding bevestigd wordt. Wordt bij uitloggen gereset.
+// (28 oktober 2026, sparsessie: de voor/achter-zichtbaarheid, de correctiewaarschuwing en de hele
+// doorlaat-functionaliteit zijn op Kay's verzoek verwijderd — zie APP_VERSIE-changelog hieronder en
+// de bouwgeschiedenis. Dit object bevatte daarvoor ook voorKnopVergrendeld/achterKnopVergrendeld/
+// voorBevestigen/achterBevestigen/voorCorrectieHole/achterCorrectieHole.)
 function nieuweTrackerLocal() {
   return {
-    voorKnopVergrendeld: false,
-    achterKnopVergrendeld: false,
-    voorBevestigen: false,    // true = toont "Weet je het zeker?" i.p.v. de doorlaat-knop zelf
-    achterBevestigen: false,
     zelfHoleDraft: null,       // null = volg de live berekende verwachte hole
-    voorCorrectieHole: null,  // null = volg de live berekende positie van de flight voor je
-    achterCorrectieHole: null, // null = volg de live berekende positie van de flight achter je
     toontTipsPopup: false,
     bezig: false,              // voorkomt dubbele schrijfacties tijdens een lopende Supabase-call
     // GPS-ondersteunde check-in (zie startGpsPositiebepaling/renderTracker): "onbekend" = nog geen
@@ -1068,6 +1088,11 @@ function nieuweTrackerLocal() {
     gpsCheckpointDraft: null,  // checkpoint-keuze binnen de GPS-suggestie, vóór bevestiging
     gpsBevestigd: false,       // true zodra deze visit al bevestigd/aangepast is — verbergt de
                                 // suggestie-UI daarna voor de rest van dit bezoek
+    // Gat-signaal met de startbuur (v0.17.0, zie evalueerGatMetStartbuur/STARTBUUR_MAX_VERSCHIL_
+    // MINUTEN hieronder in index.html) — wordt opnieuw bepaald bij elke eigen melding, niet
+    // automatisch/periodiek herberekend.
+    gatVraagTonen: false,      // true = toont de "klopt dat?"-vraag na een net gemeld gat van 1+ hole
+    gatResultaat: null,        // null | "achter" | "opschema" — het antwoord-resultaat, tot de volgende melding
   };
 }
 let trackerLocal = nieuweTrackerLocal();
@@ -1523,6 +1548,23 @@ function bouwSpelersoverzichtBeheer(teecontrolSpelers, legeTekst) {
   return kinderen;
 }
 
+// GPS-statuspil (v0.17.0): altijd zichtbaar zodra de ronde gestart is, los van de overige
+// gpsPending/moetOpnieuwBevestigen-teksten hieronder (die zijn onderling exclusief — dit is dat
+// bewust niet, zodat de status nooit verdwijnt). "onbekend" (het zeer korte moment vóór de allereerste
+// fix, zie startGpsPositiebepaling()) wordt behandeld als "bezig" — in de praktijk wordt renderTracker
+// pas aangeroepen nadat gpsStatus al op "bezig" is gezet, zie de toelichting bij startGpsPositiebepaling.
+function bouwGpsStatusRegel() {
+  const status = trackerLocal.gpsBevestigd ? "bevestigd"
+    : trackerLocal.gpsStatus === "beschikbaar" ? "gevonden"
+    : trackerLocal.gpsStatus === "nietBeschikbaar" ? "uit"
+    : "bezig";
+  const KLEUR = { bezig: "rgba(255,255,255,0.55)", gevonden: "#fff", bevestigd: "#fff", uit: "rgba(255,255,255,0.4)" };
+  const TEKST = { bezig: "GPS zoekt…", gevonden: "GPS gevonden", bevestigd: "GPS bevestigd", uit: "Geen GPS" };
+  const kleur = KLEUR[status];
+  const icoon = status === "bevestigd" ? checkSvg(kleur) : gpsPinSvg(kleur, status === "gevonden" || status === "bevestigd");
+  return el("div", { class: "gpsstatuspil", style: "color:" + kleur }, [icoon, el("span", { text: TEKST[status] })]);
+}
+
 /* ---- Scherm 4: tracker ---- */
 async function renderTracker(app, opts = {}) {
   // "stil" = automatische achtergrondverversing (zie TRACKER_VERVERS_MS/trackerIntervalId in
@@ -1561,55 +1603,24 @@ async function renderTracker(app, opts = {}) {
     return { ...verwachtePositie(flight.starttijd_effectief, minutenPerHole, nu, flight.ronde_type), minutenPerHole };
   }
 
-  // Voor de BUUR-flights (voor/achter): als die flight zelf al een positie gemeld heeft — via hun
-  // eigen inlog, dezelfde gerapporteerde_hole/checkpoint/tijdstip-velden als bij "zelf" — is dat een
-  // veel betrouwbaardere schatting dan de pure schema-aanname, zeker als hun werkelijke tempo van
-  // het schema afwijkt. Zelfde aanpak als bij de eigen kaart (projecteerVanafMelding), nu ook
-  // toegepast op de buurflights; valt terug op posVan() zolang er nog geen melding van DIE flight
-  // is. Bewust NIET gebruikt voor zelfPos (zie hierboven).
-  //
-  // Uitzondering: als deze flight al eens HANDMATIG gecorrigeerd is (gecorrigeerd=true, via
-  // correctieVanVoorMelden/-Achter hieronder), gaat die correctie voor op een eigen melding — een
-  // correctie is een bewuste, actuele waarneming van de naaste speler; zonder deze uitzondering zou
-  // een (mogelijk verouderde) eigen melding van de buurflight een correctie onzichtbaar maken (de
-  // correctie past alleen starttijd_effectief aan, niet de meldingsvelden van de buur).
-  function posVanMetMelding(flight) {
-    const basis = posVan(flight);
-    if (flight.gecorrigeerd) return basis;
-    const gemeld = projecteerVanafMelding(flight, basis.minutenPerHole, nu, flight.ronde_type);
-    return gemeld ? { ...gemeld, minutenPerHole: basis.minutenPerHole } : basis;
-  }
-
-  // Een kandidaat-buurflight die zelf al (vrijwel zeker) klaar is overslaan bij het kiezen van
-  // "voor"/"achter" (toegevoegd 27 oktober 2026, Kay's feedback tijdens de veldtest op de baan).
-  // Reden: "voor"/"achter" kwamen tot nu toe puur uit de buren-op-starttijd in de lijst, ongeacht of
-  // die buur zelf nog speelt. Een flight die is uitgespeeld maar waarvan niemand op "Ronde afgerond"
-  // heeft gedrukt (heel gewoon — spelers loggen na afloop lang niet altijd nog even in om dat te
-  // bevestigen, zie ook de nieuwe "klaar"-knop in Admin) bleef daardoor voor onbepaalde tijd de
-  // voor/achter-plek van zijn startijd-buren innemen, terwijl de ECHTE dichtstbijzijnde nog spelende
-  // flight buiten beeld bleef — dat verklaart de verwarrende meldingen tijdens het testen ("deze
-  // flight is toch al klaar, hoe kan die dan nog een correctiemelding geven"). Gebruikt dezelfde
-  // rondeVoltooid()-berekening als voorRondeVoltooid/achterRondeVoltooid verderop, dus een kandidaat
-  // die hier wordt overgeslagen zou toch al als "waarschijnlijk afgerond" zijn getoond — dit zorgt
-  // er alleen voor dat zo'n flight niet meer de plek van een echte buur inneemt.
-  function kandidaatVoltooid(flight) {
-    const pos = posVanMetMelding(flight);
-    const metWacht = pasWachttijdToe(pos, flight, pos.minutenPerHole, nu, flight.ronde_type);
-    return rondeVoltooid(metWacht, flight.ronde_type);
-  }
-  let voorIndex = index - 1;
-  while (voorIndex >= 0 && kandidaatVoltooid(flights[voorIndex])) voorIndex--;
-  const voor = voorIndex >= 0 ? flights[voorIndex] : null;
-  let achterIndex = index >= 0 ? index + 1 : flights.length;
-  while (achterIndex < flights.length && kandidaatVoltooid(flights[achterIndex])) achterIndex++;
-  const achter = index >= 0 && achterIndex < flights.length ? flights[achterIndex] : null;
-
-  const voorPosVoorWacht = voor ? posVanMetMelding(voor) : null;
-  const voorPos = voorPosVoorWacht ? pasWachttijdToe(voorPosVoorWacht, voor, voorPosVoorWacht.minutenPerHole, nu, voor.ronde_type) : null;
-  const achterPosVoorWacht = achter ? posVanMetMelding(achter) : null;
-  const achterPos = achterPosVoorWacht ? pasWachttijdToe(achterPosVoorWacht, achter, achterPosVoorWacht.minutenPerHole, nu, achter.ronde_type) : null;
+  // (28 oktober 2026, sparsessie: dit scherm toonde hier voorheen ook de geschatte positie van de
+  // flight VOOR en ACHTER de eigen flight — posVanMetMelding/kandidaatVoltooid/voor/achter/voorPos/
+  // achterPos — als basis voor de inhaal-correctiewaarschuwing en de doorlaat-knoppen. Kay's
+  // besluit: dat kan allemaal weg. Spelers (en Marshals) die hun eigen positie checken en melden
+  // lossen het "inhalen"-probleem zelf al op; een flight die een paar keer heeft doorgelaten en
+  // daardoor flink achter schema loopt, is gewoon een waarheid, geen fout om te "corrigeren" — zie
+  // de bouwgeschiedenis voor de volledige afweging. Dit scherm toont voortaan alleen nog waar JOUW
+  // eigen flight is, voor inzicht in je eigen speeltempo.)
   const zelfPos = posVan(zelf);
   const zelfRondetijd = rondetijdVoor(params, zelf.aantal_spelers, zelf.gemiddelde_hcp, zelf.ronde_type);
+
+  // (v0.16.0, bugfix na de testronde van 28 oktober 2026): verwachtePositie() kent geen "nog niet
+  // begonnen"-status — vóór starttijd_effectief levert de formule een negatieve fractie op die
+  // alsnog wordt omgezet naar een ogenschijnlijk geldige hole/checkpoint (bv. "fairway van hole 1"
+  // ruim vóór de start). Kay liep hier tegenaan tijdens het testen ("Mijn starttijd is 11.52. Dus ik
+  // zou melding verwachten: op basis starttijd afslag hole 1. Of zelfs: U start om 11.52") — vanaf
+  // hier expliciet apart behandeld, zie het gebruik hieronder.
+  const nogNietGestart = nu.getTime() < new Date(zelf.starttijd_effectief).getTime();
 
   // Eigen gemelde positie: gedeeld per flight (zelfde rij, dus zichtbaar voor alle spelers van die
   // flight — "laatste melding wint"), opgeslagen in gerapporteerde_hole/gerapporteerd_checkpoint.
@@ -1626,15 +1637,22 @@ async function renderTracker(app, opts = {}) {
   // sprong naar een andere hole), en loopt hij daarna vanzelf door. zelfPos zelf blijft ongewijzigd
   // en wordt verderop nog los gebruikt voor de "op schema"-vergelijking (deltaHoles/conclusie),
   // want dat vergelijkt een melding bewust tegen het ORIGINELE, ongecorrigeerde rondeschema.
-  const zelfWeergavePosVoorWacht = (heeftGekozen ? projecteerVanafMelding(zelf, zelfPos.minutenPerHole, nu, zelf.ronde_type) : null) ?? zelfPos;
-  const zelfWeergavePos = pasWachttijdToe(zelfWeergavePosVoorWacht, zelf, zelfPos.minutenPerHole, nu, zelf.ronde_type);
+  const zelfWeergavePos = (heeftGekozen ? projecteerVanafMelding(zelf, zelfPos.minutenPerHole, nu, zelf.ronde_type) : null) ?? zelfPos;
 
-  // Ronde voltooid: vanaf hier toont elke kaart een eindstatus in plaats van door te blijven
-  // rekenen aan een hole die niet bestaat (zie rondeVoltooid()). Voor de eigen kaart op basis van
-  // de weergavepositie (dus inclusief een eventuele correctie), niet de ruwe schema-berekening.
-  const zelfRondeVoltooid = rondeVoltooid(zelfWeergavePos, zelf.ronde_type);
-  const voorRondeVoltooid = voor ? rondeVoltooid(voorPos, voor.ronde_type) : false;
-  const achterRondeVoltooid = achter ? rondeVoltooid(achterPos, achter.ronde_type) : false;
+  // Ronde voltooid: vanaf hier toont de kaart een eindstatus in plaats van door te blijven rekenen
+  // aan een hole die niet bestaat (zie rondeVoltooid()). Op basis van de weergavepositie (dus
+  // inclusief een eventuele melding), niet de ruwe schema-berekening.
+  //
+  // (v0.16.0, bugfix na de testronde van 28 oktober 2026): bewust ALLEEN "voltooid" als er al een
+  // eigen melding ligt (heeftGekozen). Zonder die voorwaarde viel een flight die nog nooit gemeld
+  // had, maar waarvan de PURE schema-tijd al voorbij het verwachte eindtijdstip was, terug op
+  // zelfPos en werd dan — onterecht — meteen als voltooid getoond: geen stepper, geen manier om de
+  // werkelijke (nog niet voltooide) positie alsnog te melden, alleen de "Ronde afgerond"-
+  // bevestiging. Kay liep hier tijdens het testen tegenaan ("niet afgerond. Hoe corrigeer ik dat??",
+  // bevestigd met een flight die om 15:51 al "klaar" toonde maar pas om 16:05 echt klaar was) —
+  // zonder eerste melding is er simpelweg geen enkel bewijs dat de ronde al voorbij is, dus nu
+  // altijd eerst de normale stepper tonen totdat de speler zelf meldt.
+  const zelfRondeVoltooid = heeftGekozen && rondeVoltooid(zelfWeergavePos, zelf.ronde_type);
 
   // Herbevestiging na een verouderde melding (Kay's feedback 25 oktober 2026, zie
   // HERBEVESTIG_DREMPEL_HOLES hierboven): zolang de laatste melding vers genoeg is, blijft het
@@ -1649,115 +1667,14 @@ async function renderTracker(app, opts = {}) {
   const moetOpnieuwBevestigen = heeftGekozen && !zelfRondeVoltooid && minutenSindsMelding != null
     && minutenSindsMelding / zelfPos.minutenPerHole >= HERBEVESTIG_DREMPEL_HOLES;
 
-  // Inhaal-signaal: je eigen melding bereikt of overschrijdt de geschatte positie van de flight
-  // voor je (zie scopedocument, "Inhaal-signaal"). Alleen relevant als je al een positie hebt
-  // gemeld en er een flight voor je is.
-  const loopJeTegenVoorAan = heeftGekozen && voor && !voorRondeVoltooid && actueleFractie >= voorPos.fractie;
-
-  // Spiegelbeeld van loopJeTegenVoorAan: je eigen melding ligt gelijk aan of verder TERUG dan de
-  // geschatte (live berekende) positie van de flight achter je — dus volgens de klok zou die
-  // flight je al ingehaald moeten hebben. Net als bij de voor-flight is dit geen directe melding
-  // over je eigen positie, maar een signaal dat de live-berekende positie van de ACHTER-flight
-  // vermoedelijk niet klopt (bijv. een te vroege starttijd_effectief) — vandaar de correctie-optie
-  // hieronder, die de starttijd van de achter-flight aanpast, niet jouw eigen melding.
-  const loopAchterTegenJouAan = heeftGekozen && achter && !achterRondeVoltooid && actueleFractie <= achterPos.fractie;
-
-  // Doorlaat-knoppen alleen tonen als de twee flights dicht genoeg bij elkaar zitten om een
-  // doorlaat realistisch te maken (zie scopedocument "Doorlaat-afstand") — op basis van de
-  // weergavepositie (zelfWeergavePos), in checkpoint-stappen (checkpointOrdinaal). checkpointOrdinaal
-  // blijft rekenen met het RONDE-RELATIEVE holenummer (correct en wrap-vrij: voor/zelf/achter delen
-  // altijd dezelfde lus, dus hetzelfde starthole — zie de rondetype-toelichting bij RONDE_INFO).
-  // doorlaatMarge heeft wél het FYSIEKE holenummer nodig (HOLE_PAR is fysiek geïndexeerd) — vandaar
-  // fysiekeHole() alleen op die ene plek. Een negatieve afstand (de vooropliggende flight is zelf al
-  // ingehaald) toont geen doorlaat — dat is het aparte inhaal-correctiescenario hierboven
-  // (loopJeTegenVoorAan).
-  const toonVoorDoorlaat = !!voor && !voorRondeVoltooid && !zelfRondeVoltooid && (() => {
-    const afstand = checkpointOrdinaal(voorPos.hole, voorPos.checkpoint) - checkpointOrdinaal(zelfWeergavePos.hole, zelfWeergavePos.checkpoint);
-    return afstand >= 0 && afstand <= doorlaatMarge(fysiekeHole(voor.ronde_type, voorPos.hole));
-  })();
-  const toonAchterDoorlaat = !!achter && !achterRondeVoltooid && !zelfRondeVoltooid && (() => {
-    const afstand = checkpointOrdinaal(zelfWeergavePos.hole, zelfWeergavePos.checkpoint) - checkpointOrdinaal(achterPos.hole, achterPos.checkpoint);
-    return afstand >= 0 && afstand <= doorlaatMarge(fysiekeHole(zelf.ronde_type, zelfWeergavePos.hole));
-  })();
-
-  // Draft-waarden van de steppers: volgen de weergavepositie totdat de speler er zelf aan heeft
+  // Draft-waarde van de stepper: volgt de weergavepositie totdat de speler er zelf aan heeft
   // gedraaid (zie nieuweTrackerLocal()). Alleen een druk op een knop (zelfPositieMelden) schrijft
   // iets naar de database.
   const zelfHoleWeergave = trackerLocal.zelfHoleDraft ?? zelfWeergavePos.hole;
-  const voorCorrectieHoleWeergave = voor ? (trackerLocal.voorCorrectieHole ?? voorPos.hole) : null;
-  const achterCorrectieHoleWeergave = achter ? (trackerLocal.achterCorrectieHole ?? achterPos.hole) : null;
 
   app.innerHTML = "";
 
   if (trackerLocal.fout) app.append(el("div", { class: "msg err", text: trackerLocal.fout }));
-
-  /* ---------------------------------------------------------------------------------------
-     Kaart: flight voor jou
-     --------------------------------------------------------------------------------------- */
-  const voorKinderen = [el("div", { class: "eyebrow", text: "Flight voor jou" })];
-  if (!voor) {
-    voorKinderen.push(el("div", { class: "posline", text: "Geen flight voor jou gevonden op dezelfde lus." }));
-  } else if (voorRondeVoltooid) {
-    voorKinderen.push(el("div", { class: "posline", text: "Deze flight heeft de ronde waarschijnlijk afgerond." }));
-  } else {
-    voorKinderen.push(el("div", { class: "posline" }, [
-      document.createTextNode("Moet rond de "),
-      el("b", { text: CHECKPOINT_LABEL[voorPos.checkpoint] }),
-      document.createTextNode(` van hole ${fysiekeHole(voor.ronde_type, voorPos.hole)} zijn.`),
-    ]));
-
-    if (loopJeTegenVoorAan) {
-      voorKinderen.push(el("div", { class: "correctiewarn", text: "Jouw gemelde positie is gelijk aan of verder dan die van de flight voor jou. Waar bevindt de flight voor jou zich in werkelijkheid?" }));
-
-      const stepMin = el("button", { class: "stepbtn", "aria-label": "Een hole terug", onclick: () => { trackerLocal.voorCorrectieHole = Math.max(1, voorCorrectieHoleWeergave - 1); render(); } }, [chevronSvg("links", "#8A5A1C")]);
-      const stepPlus = el("button", { class: "stepbtn", "aria-label": "Een hole verder", onclick: () => { trackerLocal.voorCorrectieHole = Math.min(rondeInfo(voor.ronde_type).holesInRonde, voorCorrectieHoleWeergave + 1); render(); } }, [chevronSvg("rechts", "#8A5A1C")]);
-      voorKinderen.push(el("div", { class: "stepperrow" }, [
-        stepMin,
-        el("div", { class: "steplabel", text: "hole" }),
-        el("div", { class: "stepvalue", text: String(fysiekeHole(voor.ronde_type, voorCorrectieHoleWeergave)) }),
-        stepPlus,
-      ]));
-
-      const markerKnoppen = CHECKPOINT_VOLGORDE.map((key) => {
-        const komtOvereen = voorCorrectieHoleWeergave === voorPos.hole && key === voorPos.checkpoint && trackerLocal.voorCorrectieHole === null;
-        return el("button", {
-          class: "markerbtn",
-          style: komtOvereen ? "background:rgba(168,94,28,0.12);border:2px solid #8A5A1C;color:#8A5A1C"
-                              : "background:#fff;border:1.5px solid rgba(168,94,28,0.4);color:#8A5A1C",
-          onclick: () => correctieVanVoorMelden(key),
-          text: CHECKPOINT_KNOPLABEL[key],
-        });
-      });
-      voorKinderen.push(el("div", { class: "markerrow" }, markerKnoppen));
-
-      voorKinderen.push(el("button", { class: "uitgestaptbtn", onclick: markeerVoorUitgestapt, text: "Uitgestapt" }));
-    }
-
-
-    const voorVergrendeld = trackerLocal.voorKnopVergrendeld;
-    if (voorVergrendeld) {
-      voorKinderen.push(el("button", { class: "doorlaatbtn vergrendeld" }, [
-        el("div", { class: "tekst", text: "Doorgelaten? Klik hier." }),
-      ]));
-      voorKinderen.push(el("div", { class: "gewisseldline", text: "Wachttijd verwerkt — de flight voor je staat even stil, jij speelt gewoon door." }));
-    } else if (trackerLocal.voorBevestigen) {
-      voorKinderen.push(el("div", { class: "bevestigblok" }, [
-        el("div", { class: "bevestigtekst", text: "Weet je het zeker?" }),
-        el("div", { class: "bevestigrow" }, [
-          el("button", { class: "bevestigbtn annuleren", onclick: () => { trackerLocal.voorBevestigen = false; render(); }, text: "Annuleren" }),
-          el("button", { class: "bevestigbtn ja", onclick: () => doorlaatWissel(voor, "voor"), text: "Ja, doorlaten" }),
-        ]),
-      ]));
-    } else if (toonVoorDoorlaat) {
-      voorKinderen.push(el("button", {
-        class: "doorlaatbtn",
-        onclick: () => { trackerLocal.voorBevestigen = true; render(); },
-      }, [
-        el("div", { class: "tekst", text: "Doorgelaten? Klik hier." }),
-      ]));
-    }
-  }
-  const voorCard = el("div", { class: "card" }, voorKinderen);
 
   /* ---------------------------------------------------------------------------------------
      Kaart: jouw flight (eigen positie melden)
@@ -1768,7 +1685,7 @@ async function renderTracker(app, opts = {}) {
   // GPS-suggestie staat "open" (nog niet bevestigd/aangepast deze visit) zolang er een gevonden
   // match is, er nog niet bevestigd is, en de ronde niet al voltooid is (geen hole 19 om naar te
   // suggereren) — zie startGpsPositiebepaling()/nieuweTrackerLocal() voor gpsStatus/gpsBevestigd.
-  const gpsPending = trackerLocal.gpsStatus === "beschikbaar" && !trackerLocal.gpsBevestigd && !zelfRondeVoltooid;
+  const gpsPending = !nogNietGestart && trackerLocal.gpsStatus === "beschikbaar" && !trackerLocal.gpsBevestigd && !zelfRondeVoltooid;
 
   const markerKnoppenZelf = CHECKPOINT_VOLGORDE.map((key) => {
     // Highlight volgt, zolang een GPS-suggestie openstaat, de checkpoint-keuze van die suggestie
@@ -1797,13 +1714,24 @@ async function renderTracker(app, opts = {}) {
     });
   });
 
+  // (v0.16.0) Vóór de starttijd krijgt de kaart een eigen, sterk vereenvoudigde inhoud — zie
+  // nogNietGestart hierboven. Geen eyebrow-tekstkeuze/subregel-logica (gpsPending/moetOpnieuwBe-
+  // vestigen) nodig in dat geval: die gaan allemaal over een lopende ronde.
   const meKinderen = [el("div", {
     class: "eyebrow",
-    text: gpsPending
-      ? `Je bent op de ${CHECKPOINT_LABEL[trackerLocal.gpsCheckpointDraft]} van hole ${fysiekeHole(zelf.ronde_type, zelfHoleWeergave)}`
-      : (heeftGekozen ? "Waar is jouw flight nu?" : "Maak een keuze: waar is jouw flight nu?"),
+    text: nogNietGestart
+      ? "Nog niet gestart"
+      : gpsPending
+        ? `Je bent op de ${CHECKPOINT_LABEL[trackerLocal.gpsCheckpointDraft]} van hole ${fysiekeHole(zelf.ronde_type, zelfHoleWeergave)}`
+        : (heeftGekozen ? "Waar is jouw flight nu?" : "Maak een keuze: waar is jouw flight nu?"),
   })];
-  if (gpsPending) {
+  if (!nogNietGestart) {
+    // (v0.17.0) Altijd als eerste, los van de hierna volgende (onderling exclusieve) subregels.
+    meKinderen.push(bouwGpsStatusRegel());
+  }
+  if (nogNietGestart) {
+    meKinderen.push(el("div", { class: "rondeklaartekst", text: `Deze flight start om ${formatTijd(zelf.starttijd_effectief)}. Kom daarna terug om je positie te melden.` }));
+  } else if (gpsPending) {
     // Losse regel i.p.v. aan de eyebrow-tekst vastgeplakt — op een klein scherm liep "...van hole 1
     // — bevestig of pas aan" lelijk af over twee regels middenin de zin.
     meKinderen.push(el("div", { class: "gpssubregel", text: "Bevestig of pas aan" }));
@@ -1811,8 +1739,18 @@ async function renderTracker(app, opts = {}) {
     // Zelfde subregel-stijl hergebruikt (puur visueel identiek aan de GPS-variant hierboven) voor
     // de herbevestig-hint — zie HERBEVESTIG_DREMPEL_HOLES hierboven.
     meKinderen.push(el("div", { class: "gpssubregel", text: "Dit is nog gebaseerd op je laatste melding. Klopt dit nog? Bevestig of pas aan." }));
+  } else if (heeftGekozen) {
+    // (v0.16.0, UX-verduidelijking na de testronde van 28 oktober 2026): de stepper/marker-knoppen
+    // hieronder tonen je LAATSTE melding, vooruit geprojecteerd in de tijd (zelfWeergavePos) — niet
+    // de schema-verwachting (die staat apart in de conclusietekst onderaan de kaart, gebaseerd op
+    // zelfPos). Zonder deze regel leken die twee tijdens het testen tegenstrijdig ("tekst wijkt ook
+    // af van visualisatie?", bv. de kaart toonde "Green" van hole 4 terwijl Kay op de fairway stond
+    // — dat was de geprojecteerde laatste melding, niet een claim over de actuele werkelijkheid).
+    meKinderen.push(el("div", { class: "gpssubregel", text: "Dit is je laatste melding — pas aan als dit niet meer klopt." }));
   }
-  if (zelfRondeVoltooid) {
+  if (nogNietGestart) {
+    // Niets verder: geen stepper, geen conclusie, geen "ronde afgerond"-knop vóór de start.
+  } else if (zelfRondeVoltooid) {
     // Ronde voltooid: er is geen hole 19 om naar te schuiven, dus geen stepper/marker-knoppen meer —
     // alleen een expliciete bevestiging (zelfRondeAfgerond) sluit de ronde daadwerkelijk af en
     // haalt de flight uit de live lijst voor andere spelers.
@@ -1856,6 +1794,37 @@ async function renderTracker(app, opts = {}) {
       // zelfPositieMelden gerapporteerd_tijdstip op nu, waarmee moetOpnieuwBevestigen vanzelf weer
       // false wordt bij de eerstvolgende render — geen aparte "bevestigd deze visit"-vlag nodig.
     } else {
+      // (v0.17.0) Gat-signaal met de startbuur (zie evalueerGatMetStartbuur) — staat los van de
+      // tijdlijn/conclusie hieronder, een losse vraag die alleen verschijnt direct na een eigen
+      // melding die een gat van 1+ hole oplevert met de flight vlak voor je. Puur een tekstmelding;
+      // "Nee" wist de vraag zonder verder gevolg, "Ja" toont een vaste vervolgtekst tot de volgende
+      // melding (zie gatResultaat hierboven).
+      if (trackerLocal.gatVraagTonen) {
+        meKinderen.push(el("div", { class: "gatvraagblok" }, [
+          el("div", { class: "gatvraagtekst", text: "Het lijkt erop dat er een gat is met de flight voor je. Klopt dat?" }),
+          el("div", { class: "gatvraagrow" }, [
+            el("button", {
+              class: "gatvraagbtn nee",
+              onclick: () => { trackerLocal.gatVraagTonen = false; trackerLocal.gatResultaat = null; render(); },
+              text: "Nee",
+            }),
+            el("button", {
+              class: "gatvraagbtn ja",
+              onclick: () => {
+                trackerLocal.gatVraagTonen = false;
+                trackerLocal.gatResultaat = (conclusie && (conclusie.key === "te_langzaam" || conclusie.key === "veel_te_langzaam")) ? "achter" : "opschema";
+                render();
+              },
+              text: "Ja",
+            }),
+          ]),
+        ]));
+      } else if (trackerLocal.gatResultaat === "achter") {
+        meKinderen.push(el("div", { class: "gatresultaat", text: "Probeer aansluiting te vinden met de flight voor je." }));
+      } else if (trackerLocal.gatResultaat === "opschema") {
+        meKinderen.push(el("div", { class: "gatresultaat", text: "Geen zorgen, jij ligt zelf op schema." }));
+      }
+
       // Tijdlijn alleen tonen ná de eerste melding (zelfde reden als bij het niet vooraf markeren
       // van een knop: vóór die eerste keuze niets suggereren) en alleen zolang de speler de live
       // positie volgt (geen handmatige stepper-afwijking — anders zou de balk een andere hole tonen
@@ -1887,73 +1856,6 @@ async function renderTracker(app, opts = {}) {
   }
   const meCard = el("div", { class: "card me", style: "background:" + kaartKleur }, meKinderen);
 
-  /* ---------------------------------------------------------------------------------------
-     Kaart: flight achter jou
-     --------------------------------------------------------------------------------------- */
-  const achterKinderen = [el("div", { class: "eyebrow", text: "Flight achter jou" })];
-  if (!achter) {
-    achterKinderen.push(el("div", { class: "posline", text: "Geen flight achter jou gevonden op dezelfde lus." }));
-  } else if (achterRondeVoltooid) {
-    achterKinderen.push(el("div", { class: "posline", text: "Deze flight heeft de ronde waarschijnlijk afgerond." }));
-  } else {
-    achterKinderen.push(el("div", { class: "posline" }, [
-      document.createTextNode("Moet rond de "),
-      el("b", { text: CHECKPOINT_LABEL[achterPos.checkpoint] }),
-      document.createTextNode(` van hole ${fysiekeHole(achter.ronde_type, achterPos.hole)} zijn.`),
-    ]));
-
-    if (loopAchterTegenJouAan) {
-      achterKinderen.push(el("div", { class: "correctiewarn", text: "Jouw gemelde positie is gelijk aan of verder terug dan die van de flight achter jou. Waar bevindt de flight achter jou zich in werkelijkheid?" }));
-
-      const stepMinAchter = el("button", { class: "stepbtn", "aria-label": "Een hole terug", onclick: () => { trackerLocal.achterCorrectieHole = Math.max(1, achterCorrectieHoleWeergave - 1); render(); } }, [chevronSvg("links", "#8A5A1C")]);
-      const stepPlusAchter = el("button", { class: "stepbtn", "aria-label": "Een hole verder", onclick: () => { trackerLocal.achterCorrectieHole = Math.min(rondeInfo(achter.ronde_type).holesInRonde, achterCorrectieHoleWeergave + 1); render(); } }, [chevronSvg("rechts", "#8A5A1C")]);
-      achterKinderen.push(el("div", { class: "stepperrow" }, [
-        stepMinAchter,
-        el("div", { class: "steplabel", text: "hole" }),
-        el("div", { class: "stepvalue", text: String(fysiekeHole(achter.ronde_type, achterCorrectieHoleWeergave)) }),
-        stepPlusAchter,
-      ]));
-
-      const markerKnoppenAchter = CHECKPOINT_VOLGORDE.map((key) => {
-        const komtOvereen = achterCorrectieHoleWeergave === achterPos.hole && key === achterPos.checkpoint && trackerLocal.achterCorrectieHole === null;
-        return el("button", {
-          class: "markerbtn",
-          style: komtOvereen ? "background:rgba(168,94,28,0.12);border:2px solid #8A5A1C;color:#8A5A1C"
-                              : "background:#fff;border:1.5px solid rgba(168,94,28,0.4);color:#8A5A1C",
-          onclick: () => correctieVanAchterMelden(key),
-          text: CHECKPOINT_KNOPLABEL[key],
-        });
-      });
-      achterKinderen.push(el("div", { class: "markerrow" }, markerKnoppenAchter));
-
-      achterKinderen.push(el("button", { class: "uitgestaptbtn", onclick: markeerAchterUitgestapt, text: "Uitgestapt" }));
-    }
-
-    const achterVergrendeld = trackerLocal.achterKnopVergrendeld;
-    if (achterVergrendeld) {
-      achterKinderen.push(el("button", { class: "doorlaatbtn vergrendeld" }, [
-        el("div", { class: "tekst", text: "Doorlaten? Klik hier." }),
-      ]));
-      achterKinderen.push(el("div", { class: "gewisseldline", text: "Wachttijd verwerkt — jij staat even stil, de flight achter je speelt gewoon door." }));
-    } else if (trackerLocal.achterBevestigen) {
-      achterKinderen.push(el("div", { class: "bevestigblok" }, [
-        el("div", { class: "bevestigtekst", text: "Weet je het zeker?" }),
-        el("div", { class: "bevestigrow" }, [
-          el("button", { class: "bevestigbtn annuleren", onclick: () => { trackerLocal.achterBevestigen = false; render(); }, text: "Annuleren" }),
-          el("button", { class: "bevestigbtn ja", onclick: () => doorlaatWissel(achter, "achter"), text: "Ja, doorlaten" }),
-        ]),
-      ]));
-    } else if (toonAchterDoorlaat) {
-      achterKinderen.push(el("button", {
-        class: "doorlaatbtn",
-        onclick: () => { trackerLocal.achterBevestigen = true; render(); },
-      }, [
-        el("div", { class: "tekst", text: "Doorlaten? Klik hier." }),
-      ]));
-    }
-  }
-  const achterCard = el("div", { class: "card" }, achterKinderen);
-
   // Spelersoverzicht van de EIGEN flight (v0.7.0), net onder de topbar — Kay's verzoek: dezelfde
   // lay-out als de Admin-popup (naam t/m "Gem. handicap flight"), nu ook zichtbaar voor leden zelf.
   const spelersKaart = el("div", { class: "card" }, [
@@ -1961,7 +1863,7 @@ async function renderTracker(app, opts = {}) {
     ...bouwSpelersoverzicht(zelf.spelers),
   ]);
 
-  app.append(spelersKaart, voorCard, meCard, achterCard);
+  app.append(spelersKaart, meCard);
 
   // Ready Golf-knop (v0.10.0, Kay's verzoek): altijd zichtbaar onderaan het trackerscherm, niet
   // afhankelijk van de conclusie (in tegenstelling tot de knop "Tips om sneller te spelen" in de
@@ -2021,6 +1923,27 @@ async function renderTracker(app, opts = {}) {
   /* ---------------------------------------------------------------------------------------
      Schrijfacties
      --------------------------------------------------------------------------------------- */
+  // (v0.17.0, Kay's verzoek 28 oktober 2026): signaleert — zuiver als tekstmelding, geen eigen
+  // actie — wanneer een VERSE eigen melding een gat van 1 hole of meer oplevert met de flight die
+  // volgens de startlijst direct voor je is gestart (binnen STARTBUUR_MAX_VERSCHIL_MINUTEN, zie
+  // hierboven). Bewust alleen bij een eigen melding, niet automatisch/periodiek herberekend — zie
+  // Kay's eigen formulering ("Melding gat 1+ hole alleen na eigen positiebepaling, niet
+  // automatisch") en de drie antwoorden op de verduidelijkende vragen (28 okt 2026): puur een
+  // tekstmelding (geen actie/bevestiging) en bij "Nee" simpelweg niets (geen vervolgactie).
+  function evalueerGatMetStartbuur(nieuweHole, nieuwCheckpoint) {
+    trackerLocal.gatVraagTonen = false;
+    trackerLocal.gatResultaat = null;
+    if (index <= 0) return; // geen flight voor je op deze lus
+    const buur = flights[index - 1];
+    const verschilMinuten = (new Date(zelf.starttijd_effectief).getTime() - new Date(buur.starttijd_effectief).getTime()) / 60000;
+    if (verschilMinuten > STARTBUUR_MAX_VERSCHIL_MINUTEN) return; // startte te veel eerder — geen aanname over een gat
+    const buurPosSchema = posVan(buur);
+    const buurPos = projecteerVanafMelding(buur, buurPosSchema.minutenPerHole, nu, buur.ronde_type) ?? buurPosSchema;
+    const eigenFractie = (nieuweHole - 1) + checkpointFractie(nieuwCheckpoint);
+    const gat = buurPos.fractie - eigenFractie;
+    if (gat >= 1.0) trackerLocal.gatVraagTonen = true;
+  }
+
   async function zelfPositieMelden(checkpoint, hole) {
     if (trackerLocal.bezig) return;
     trackerLocal.bezig = true;
@@ -2032,6 +1955,7 @@ async function renderTracker(app, opts = {}) {
       });
       trackerLocal.zelfHoleDraft = null;
       trackerLocal.fout = null;
+      evalueerGatMetStartbuur(hole, checkpoint);
     } catch (e) {
       trackerLocal.fout = "Melden is niet gelukt. Probeer het nog eens.";
       console.error(e);
@@ -2069,137 +1993,9 @@ async function renderTracker(app, opts = {}) {
     }
   }
 
-  async function correctieVanVoorMelden(checkpoint) {
-    if (trackerLocal.bezig || !voor) return;
-    trackerLocal.bezig = true;
-    try {
-      const doelFractie = (voorCorrectieHoleWeergave - 1) + checkpointFractie(checkpoint);
-      const nieuweStartTijdMs = nu.getTime() - doelFractie * voorPos.minutenPerHole * 60000;
-      await sb(`flights?id=eq.${voor.id}`, {
-        method: "PATCH",
-        prefer: "return=minimal",
-        body: JSON.stringify({ starttijd_effectief: new Date(nieuweStartTijdMs).toISOString(), gecorrigeerd: true }),
-      });
-      trackerLocal.voorCorrectieHole = null;
-      trackerLocal.fout = null;
-    } catch (e) {
-      trackerLocal.fout = "Corrigeren is niet gelukt. Probeer het nog eens.";
-      console.error(e);
-    } finally {
-      trackerLocal.bezig = false;
-      render();
-    }
-  }
-
-  async function markeerVoorUitgestapt() {
-    if (trackerLocal.bezig || !voor) return;
-    trackerLocal.bezig = true;
-    try {
-      await sb(`flights?id=eq.${voor.id}`, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ uitgestapt: true }) });
-      trackerLocal.voorCorrectieHole = null;
-      trackerLocal.fout = null;
-    } catch (e) {
-      trackerLocal.fout = "Markeren als 'uitgestapt' is niet gelukt. Probeer het nog eens.";
-      console.error(e);
-    } finally {
-      trackerLocal.bezig = false;
-      render();
-    }
-  }
-
-  // Spiegelbeeld van correctieVanVoorMelden/markeerVoorUitgestapt — zelfde mechaniek, maar dan voor
-  // de flight ACHTER je (zie loopAchterTegenJouAan hierboven).
-  async function correctieVanAchterMelden(checkpoint) {
-    if (trackerLocal.bezig || !achter) return;
-    trackerLocal.bezig = true;
-    try {
-      const doelFractie = (achterCorrectieHoleWeergave - 1) + checkpointFractie(checkpoint);
-      const nieuweStartTijdMs = nu.getTime() - doelFractie * achterPos.minutenPerHole * 60000;
-      await sb(`flights?id=eq.${achter.id}`, {
-        method: "PATCH",
-        prefer: "return=minimal",
-        body: JSON.stringify({ starttijd_effectief: new Date(nieuweStartTijdMs).toISOString(), gecorrigeerd: true }),
-      });
-      trackerLocal.achterCorrectieHole = null;
-      trackerLocal.fout = null;
-    } catch (e) {
-      trackerLocal.fout = "Corrigeren is niet gelukt. Probeer het nog eens.";
-      console.error(e);
-    } finally {
-      trackerLocal.bezig = false;
-      render();
-    }
-  }
-
-  async function markeerAchterUitgestapt() {
-    if (trackerLocal.bezig || !achter) return;
-    trackerLocal.bezig = true;
-    try {
-      await sb(`flights?id=eq.${achter.id}`, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ uitgestapt: true }) });
-      trackerLocal.achterCorrectieHole = null;
-      trackerLocal.fout = null;
-    } catch (e) {
-      trackerLocal.fout = "Markeren als 'uitgestapt' is niet gelukt. Probeer het nog eens.";
-      console.error(e);
-    } finally {
-      trackerLocal.bezig = false;
-      render();
-    }
-  }
-
-  // Generieke doorlaat-wissel (Kay's model, 24 okt 2026 — zie bouwgeschiedenis): de PASSERENDE
-  // flight (die doorgelaten wordt) past helemaal niets aan — ze speelt gewoon door op haar eigen
-  // tempo, geen kunstmatige sprong. Alle kosten van het inhaalmoment landen bij de flight die
-  // DOORLAAT: die staat stil op het checkpoint waar de doorlaat plaatsvindt, precies zo lang als de
-  // passerende flight nodig heeft (met HAAR EIGEN tempo) om het volgende checkpoint te spelen (zie
-  // duurTotVolgendCheckpoint) — bijvoorbeeld: een doorlaat op de Fairway betekent dat de doorlatende
-  // flight twee keer zo lang op de Fairway blijft staan als normaal, omdat de wachttijd ongeveer
-  // even lang is als de tijd die de doorlatende flight daar zelf al normaal zou doorbrengen.
-  //
-  // Opgeslagen als wacht_tot/wacht_hole/wacht_checkpoint op de doorlatende flight (zie
-  // pasWachttijdToe hierboven) i.p.v. een directe starttijd_effectief-aanpassing: een simpele
-  // tijdverschuiving van het hele schema zou de LIVE weergave tijdens het wachten zelf tijdelijk
-  // laten terugspringen naar een eerder checkpoint (wiskundig onvermijdelijk bij één rechte lijn
-  // door één ankerpunt) voordat hij weer bij de juiste positie uitkomt — met een los wacht_tot-
-  // ankerpunt blijft de kaart tijdens het hele wachten gewoon het juiste checkpoint tonen.
-  //
-  // kant "voor": de buurflight (voor) laat zelf door — buur wacht, zelf (de passerende partij)
-  // wordt niet aangepast. kant "achter": zelf laat de buurflight (achter) door — zelf wacht, buur
-  // (de passerende partij) wordt niet aangepast. voorPos/achterPos/zelfWeergavePos komen uit de
-  // buitenste renderTracker-scope en reflecteren dus ook een eventuele eigen melding/correctie/
-  // eerdere wachttijd.
-  async function doorlaatWissel(buur, kant) {
-    if (trackerLocal.bezig || trackerLocal[`${kant}KnopVergrendeld`]) return;
-    trackerLocal.bezig = true;
-    trackerLocal[`${kant}Bevestigen`] = false; // bevestigingsblok sluiten, ongeacht de uitkomst
-    const wachtendeFlight = kant === "voor" ? buur : zelf;
-    const wachtendePos = kant === "voor" ? voorPos : zelfWeergavePos;
-    const passerendePos = kant === "voor" ? zelfWeergavePos : achterPos;
-    // minutenPerHole apart opgevraagd (i.p.v. passerendePos.minutenPerHole): projecteerVanafMelding
-    // (gebruikt door zelfWeergavePos zodra er al een eigen melding is) geeft dat veld niet terug —
-    // zelfPos/achterPos hebben het altijd (zie posVan), en het tempo hangt sowieso alleen af van
-    // flightgrootte/hcp, nooit van de gemelde positie.
-    const passerendeMinutenPerHole = kant === "voor" ? zelfPos.minutenPerHole : achterPos.minutenPerHole;
-    const passerendeFlight = kant === "voor" ? zelf : buur;
-    const wachtMinuten = duurTotVolgendCheckpoint(passerendePos.hole, passerendePos.checkpoint, passerendeMinutenPerHole, passerendeFlight.ronde_type);
-    const wachtTot = new Date(nu.getTime() + wachtMinuten * 60000).toISOString();
-    try {
-      await sb(`flights?id=eq.${wachtendeFlight.id}`, {
-        method: "PATCH",
-        prefer: "return=minimal",
-        body: JSON.stringify({ wacht_tot: wachtTot, wacht_hole: wachtendePos.hole, wacht_checkpoint: wachtendePos.checkpoint }),
-      });
-      trackerLocal[`${kant}KnopVergrendeld`] = true;
-      trackerLocal.fout = null;
-      setTimeout(() => { trackerLocal[`${kant}KnopVergrendeld`] = false; render(); }, 4000);
-    } catch (e) {
-      trackerLocal.fout = "Doorlaten is niet gelukt. Probeer het nog eens.";
-      console.error(e);
-    } finally {
-      trackerLocal.bezig = false;
-      render();
-    }
-  }
+  // (28 oktober 2026, sparsessie: correctieVanVoorMelden/markeerVoorUitgestapt/
+  // correctieVanAchterMelden/markeerAchterUitgestapt/doorlaatWissel zijn hier verwijderd samen met
+  // de voor/achter-kaarten die ze aanstuurden — zie de bouwgeschiedenis.)
 }
 
 /* ============================================================================================
@@ -2313,8 +2109,9 @@ function berekenFlightPositie(flight, params, nu) {
   const minutenPerHole = rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp, flight.ronde_type) / rondeInfo(flight.ronde_type).holesInRonde;
   const zelfPos = verwachtePositie(flight.starttijd_effectief, minutenPerHole, nu, flight.ronde_type);
   const heeftMelding = flight.gerapporteerde_hole != null && flight.gerapporteerd_checkpoint != null;
-  const weergaveVoorWacht = (heeftMelding ? projecteerVanafMelding(flight, minutenPerHole, nu, flight.ronde_type) : null) ?? zelfPos;
-  const weergave = pasWachttijdToe(weergaveVoorWacht, flight, minutenPerHole, nu, flight.ronde_type);
+  // (28 oktober 2026: pasWachttijdToe is hier verwijderd — de doorlaat-functionaliteit (en dus het
+  // wacht_tot-mechanisme) bestaat niet meer, zie de bouwgeschiedenis.)
+  const weergave = (heeftMelding ? projecteerVanafMelding(flight, minutenPerHole, nu, flight.ronde_type) : null) ?? zelfPos;
   const voltooid = rondeVoltooid(weergave, flight.ronde_type);
   let conclusie = null;
   if (heeftMelding && !voltooid) {
