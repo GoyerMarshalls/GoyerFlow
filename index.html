@@ -226,15 +226,33 @@
   .detaileigenkaart{margin-top:16px}
 
   /* Beheerder — Parameters-tab */
-  .paramrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;
+  .paramrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 0;
     border-bottom:1px solid var(--border)}
   .paramrow:last-child{border-bottom:none}
   .paramlabel{font-size:14px;color:var(--ink);font-weight:600;text-transform:none;letter-spacing:0}
   .paraminput{width:84px;font-size:15px;font-weight:700;padding:8px 10px;margin-top:0;letter-spacing:0;
     text-align:center;border-radius:10px;border:1.5px solid var(--border);background:#fff;color:var(--ink)}
+  /* v0.19.0 (Kay's verzoek): native spinner-pijltjes weg — gewoon een cijferveld, de waarde blijft
+     met +/- toetsenbord of typen aan te passen zoals elk ander getalveld. */
+  .paraminput::-webkit-inner-spin-button, .paraminput::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+  .paraminput[type=number]{-moz-appearance:textfield;appearance:textfield}
   .analyseresultaat{font-size:14px;color:var(--ink);line-height:1.6;margin-top:12px;padding-top:12px;
     border-top:1px solid var(--border)}
   .analyseresultaat b{color:var(--accent)}
+
+  /* v0.19.0: "Verwachte rondetijden"-matrix (flightgrootte × drie voorbeeldhandicaps) i.p.v. de
+     eerdere losse tekstregel. */
+  .voorbeeldtabel{display:grid;grid-template-columns:auto repeat(3, 1fr);gap:4px 8px;margin-top:4px}
+  .voorbeeldtabel .vbkop{font-size:12px;font-weight:700;color:var(--muted-ink);text-align:center;
+    padding-bottom:4px;border-bottom:1px solid var(--border)}
+  .voorbeeldtabel .vblabel{font-size:13px;font-weight:700;color:var(--ink);align-self:center}
+  .voorbeeldtabel .vbcel{font-size:13px;font-weight:700;color:var(--ink);text-align:center;
+    background:var(--accent-soft);border-radius:8px;padding:6px 4px}
+
+  /* v0.19.0: "Verantwoording"-popup bij de Parameters-tab — zelfde modal-opzet als .tipsoverlay/
+     .tipsmodal (zie hieronder), alleen de inhoud is prose i.p.v. een tips-lijst. */
+  .verantwoordingtekst p{font-size:14px;line-height:1.5;color:#3A362C;margin:0 0 10px 0}
+  .verantwoordingtekst p:last-child{margin-bottom:0}
 
   /* Beheerder — Admin-tab: in-/uitklapbare ledenlijst + wachtwoordwijzigen */
   .ledenlijst{display:flex;flex-direction:column}
@@ -588,8 +606,21 @@
    (5) Opruiming: de losse hulpfunctie basisRondetijdVoorRonde() verviel — de per-hole par-opzoeking
        zit nu rechtstreeks in rondetijdVoor() (punt 1), en basisRondetijdVoorRonde() had daardoor
        geen call-site meer over.
+   v0.19.0: feedback op de v0.18.0 Parameters-tab-UI (Kay, 28 oktober 2026), zuiver cosmetisch/
+       informatief — geen wijziging aan de rekenformules zelf:
+   (1) Native spinner-pijltjes (op/neer) op de .paraminput-velden weg — gewoon een cijferveld.
+   (2) Regelafstand in de parameterlijst verkleind (.paramrow-padding 9px → 5px).
+   (3) "Verwachte rondetijden" is een matrix geworden: 2-/3-/4-bal × drie voorbeeldhandicaps (10, 18,
+       28 — mijn eigen voorstel voor laag/gemiddeld/hoog, geen door Kay bevestigde clubcijfers),
+       weergegeven in decimale uren (bv. "3.5 uur", formatUren()) i.p.v. de eerdere ene tekstregel
+       in "H uur M minuten".
+   (4) Nieuwe knop "Verantwoording" boven "Opslaan": een popup (zelfde opzet als de tips-popup) met
+       een korte uitleg waaróm voor deze parameteropzet gekozen is — de checkpointtijden als nullijn,
+       de hcp-/flightgrootte-correctie per hole-type, bewust geen gedragsfactor, en de minutenbuffer-
+       banden. Bewust buiten render() om geopend/gesloten, zodat niet-opgeslagen invoer in de velden
+       niet verloren gaat bij het openen van de popup.
    ============================================================================================ */
-const APP_VERSIE = "0.18.0";
+const APP_VERSIE = "0.19.0";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -878,6 +909,13 @@ function formatDuur(minuten) {
   return `${h} uur ${m} minuten`;
 }
 
+// v0.19.0: decimale-uren-weergave voor de "Verwachte rondetijden"-matrix in de admin Parameters-tab
+// (Kay's verzoek: "tijd in #.# uur, bv 3.5 uur" — bewust bondiger dan formatDuur()'s "H uur M
+// minuten" omdat deze tabel nu meerdere cellen tegelijk toont).
+function formatUren(minuten) {
+  return `${(minuten / 60).toFixed(1)} uur`;
+}
+
 // Conclusie bij een zelf-gemelde positie. Tot v0.17.1 een holes-relatieve indeling in 5 categorieën
 // (veel_te_snel/te_snel/op_schema/te_langzaam/veel_te_langzaam). Vanaf v0.18.0 (Kay's verzoek 28
 // oktober 2026, "strakke benchmark, maar wiskundig zuiver"): een ABSOLUTE minuten-buffer in 3
@@ -1027,6 +1065,18 @@ const TIPS = [
   "Loop door naar je bal terwijl je partners nog voorbereiden, in plaats van te wachten.",
   "Zoek een verloren bal maximaal 3 minuten en wenk de flight achter je door als je langer zoekt.",
   "Zet de trolley of buggy aan de kant van de volgende afslag neer, niet terug bij de green.",
+];
+
+// v0.19.0 (Kay's verzoek): uitleg bij de knop "Verantwoording" in de admin Parameters-tab — waarom
+// deze opzet, niet de huidige ingevulde getallen zelf (die kan een beheerder wijzigen; deze tekst
+// moet kloppen blijven ongeacht de actuele waarden). Zie de bouwgeschiedenis (v0.18.0) voor de
+// volledige achtergrond van Kay's keuzes hierin.
+const VERANTWOORDING_PARAMETERS = [
+  "De checkpointtijden per par (Par 3/4/5) zijn de nullijn: de tijd die een flight in Ready Golf-tempo nodig heeft als de baan verder vrij is, zonder enige correctie voor handicap of flightgrootte.",
+  "De hcp-correctie en de flightgrootte-correctie staan apart per hole-type, omdat een extra slag of een extra speler op een lange par 5 nu eenmaal meer tijd kost dan op een korte par 3 — één vlak bedrag voor de hele ronde deed die holes ten onrechte hetzelfde.",
+  "Bewust geen 'gedragsfactor' die de lat verlaagt voor langzamer spel: de correcties compenseren alleen voor de fysiek onvermijdelijke extra tijd (meer slagen, meer spelers), niet voor treuzelen. De benchmark blijft daardoor ambitieus.",
+  "De status op het trackerscherm werkt met een harde minutenbuffer t.o.v. die benchmark: groen bij minder dan 5 minuten achter, oranje bij 5–10 minuten, rood bij meer dan 10 minuten. Minuten in plaats van holes, omdat op De Goyer de holes dicht op elkaar liggen — een kleine vertraging op de green kan anders al lijken op een achterstand van een hele hole.",
+  "Vooruitlopen op schema krijgt bewust geen eigen status: te snel spelen is op zich geen probleem dat de app hoeft te signaleren.",
 ];
 
 // Kleine chevron-svg, voor de hole-steppers en de terug-knop.
@@ -2478,8 +2528,13 @@ async function vulAdminParametersTab(inhoud) {
   const iFlightPar4 = el("input", { class: "paraminput", type: "number", step: "0.1", value: params.flightgrootte_correctie_par4_per_speler });
   const iFlightPar5 = el("input", { class: "paraminput", type: "number", step: "0.1", value: params.flightgrootte_correctie_par5_per_speler });
 
-  const voorbeeldtekst = el("p", { class: "help" });
-  const voorbeeldrij = (label, aantalSpelers, hcp) => {
+  // v0.19.0 (Kay's verzoek): van één losse voorbeeldregel per flightgrootte naar een matrix —
+  // flightgrootte (2/3/4-bal) × drie voorbeeldhandicaps, in decimale uren (formatUren). De drie
+  // handicaps zijn mijn eigen voorstel (laag/gemiddeld/hoog), geen door Kay bevestigde clubcijfers —
+  // zie mijn toelichting in de chat; pas aan als een andere spreiding beter past bij De Goyer.
+  const VOORBEELD_HANDICAPS = [10, 18, 28];
+  const voorbeeldtabel = el("div", { class: "voorbeeldtabel" });
+  const rondetijdVoorInput = (aantalSpelers, hcp) => {
     const waarden = {
       par3_minuten: parseFloat(iPar3.value) || 0,
       par4_minuten: parseFloat(iPar4.value) || 0,
@@ -2491,17 +2546,44 @@ async function vulAdminParametersTab(inhoud) {
       flightgrootte_correctie_par4_per_speler: parseFloat(iFlightPar4.value) || 0,
       flightgrootte_correctie_par5_per_speler: parseFloat(iFlightPar5.value) || 0,
     };
-    return `${label}: ${formatDuur(rondetijdVoor(waarden, aantalSpelers, hcp))}`;
+    return rondetijdVoor(waarden, aantalSpelers, hcp, "18holes");
   };
   const herbereken = () => {
-    voorbeeldtekst.textContent = [
-      voorbeeldrij("Tweebal (hcp 10)", 2, 10),
-      voorbeeldrij("Driebal (hcp 15)", 3, 15),
-      voorbeeldrij("Vierbal (hcp 18)", 4, 18),
-    ].join("  ·  ");
+    voorbeeldtabel.innerHTML = "";
+    voorbeeldtabel.append(
+      el("div", { class: "vbkop" }),
+      ...VOORBEELD_HANDICAPS.map((hcp) => el("div", { class: "vbkop", text: `Hcp ${hcp}` })),
+    );
+    [["Tweebal", 2], ["Driebal", 3], ["Vierbal", 4]].forEach(([label, aantalSpelers]) => {
+      voorbeeldtabel.append(
+        el("div", { class: "vblabel", text: label }),
+        ...VOORBEELD_HANDICAPS.map((hcp) => el("div", { class: "vbcel", text: formatUren(rondetijdVoorInput(aantalSpelers, hcp)) })),
+      );
+    });
   };
   herbereken();
   [iPar3, iPar4, iPar5, iHcpPar3, iHcpPar4, iHcpPar5, iFlightPar3, iFlightPar4, iFlightPar5].forEach((input) => input.addEventListener("input", herbereken));
+
+  // v0.19.0 (Kay's verzoek): korte uitleg-popup bij de parameterkeuzes — zelfde modal-opzet als de
+  // tips-popup (.tipsoverlay/.tipsmodal), bewust NIET via render() geopend/gesloten (dat zou de
+  // Parameters-tab opnieuw ophalen en eventuele niet-opgeslagen invoer in de velden hierboven
+  // verliezen) — puur een los DOM-element toegevoegd/verwijderd.
+  const toonVerantwoording = () => {
+    const sluiten = () => overlay.remove();
+    const overlay = el("div", { class: "tipsoverlay" }, [
+      el("div", { class: "tipsmodal" }, [
+        el("div", { class: "tipsheader" }, [
+          el("div", { class: "tipstitle", text: "Verantwoording parameters" }),
+          el("button", { class: "tipsclose", "aria-label": "Sluiten", onclick: sluiten }, [
+            (() => { const s = document.createElementNS("http://www.w3.org/2000/svg", "svg"); s.setAttribute("width","13"); s.setAttribute("height","13"); s.setAttribute("viewBox","0 0 24 24"); s.setAttribute("fill","none");
+              const p = document.createElementNS("http://www.w3.org/2000/svg", "path"); p.setAttribute("d","M6 6l12 12M18 6L6 18"); p.setAttribute("stroke","#6B6558"); p.setAttribute("stroke-width","2"); p.setAttribute("stroke-linecap","round"); s.appendChild(p); return s; })(),
+          ]),
+        ]),
+        el("div", { class: "verantwoordingtekst" }, VERANTWOORDING_PARAMETERS.map((tekst) => el("p", { text: tekst }))),
+      ]),
+    ]);
+    document.body.appendChild(overlay);
+  };
 
   const opslaan = async () => {
     adminLocal.paramFout = null;
@@ -2554,9 +2636,10 @@ async function vulAdminParametersTab(inhoud) {
     el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Flightgrootte-correctie Par 4 (min/speler)" }), iFlightPar4]),
     el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Flightgrootte-correctie Par 5 (min/speler)" }), iFlightPar5]),
     el("p", { class: "help", text: "Verwachte rondetijden:" }),
-    voorbeeldtekst,
+    voorbeeldtabel,
     ...(fout ? [fout] : []),
     ...(succes ? [succes] : []),
+    el("button", { class: "btn secondary", style: "margin-top:12px", onclick: toonVerantwoording, text: "Verantwoording" }),
     el("button", { class: "btn", onclick: opslaan, text: adminLocal.paramBezig ? "Bezig…" : "Opslaan" }),
   ]);
 
