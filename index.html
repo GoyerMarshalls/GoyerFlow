@@ -476,8 +476,15 @@
    projecteerVanafMelding() rekent i.p.v. de pure schema-berekening — ligt de gemelde positie niet ook
    voorbij de laatste hole, dan vervalt "voltooid" daarmee automatisch. De tijdlijn/conclusie-tekst
    (die alleen zinvol is als conclusie niet null is) en de "Flight klaarmelden"-knop blijven ongewijzigd.
+   v0.14.3: lidcode (persoonscode) was bij de v0.14.0-herbouw van het beheerder-spelersoverzicht
+   (bouwSpelersoverzichtBeheer) onbedoeld verdwenen uit de metaregel — alleen het Teecontrol-
+   typelabel bleef over. Kay merkte dit op: "Je hebt de lidcodes weggehaald in Beheer view." Fix:
+   metaregel toont nu weer lidcode + typelabel samen ("<lidcode> · <type>") voor leden; voor gasten
+   (geen persoonscode) ongewijzigd alleen het typelabel. Puur een weergavefix — de data was altijd al
+   aanwezig in flight.teecontrol_spelers (persoonscode-veld bestond al sinds v0.14.0), alleen niet
+   getoond.
    ============================================================================================ */
-const APP_VERSIE = "0.14.2";
+const APP_VERSIE = "0.14.3";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -1471,16 +1478,27 @@ function tcKleur(kleur) {
 // i.p.v. de vaste tekst "Club lid". Bron: flight.teecontrol_spelers (schema.sql "Fase 2h"), puur
 // weergavedata, raakt de login-tabel `spelers` niet. Leeg/null (bv. oude seed-flights, of flights van
 // vóór de migratie) valt terug op dezelfde "lus · aantal-bal"-tekst als de Tracker-tab-rijen.
+// v0.14.3: de lidcode (persoonscode) viel bij de v0.14.0-herbouw onbedoeld weg uit de metaregel
+// (alleen het typelabel bleef over) — Kay merkte dit op ("je hebt de lidcodes weggehaald in Beheer
+// view"). Nu staan lidcode én typelabel weer allebei (gescheiden door " · "), met de lidcode zoals
+// voorheen vooraan; voor gasten (geen persoonscode) blijft alleen het typelabel over, ongewijzigd.
 function bouwSpelersoverzichtBeheer(teecontrolSpelers, legeTekst) {
   const lijst = teecontrolSpelers || [];
   const spelerrijen = lijst.length === 0
     ? [el("p", { class: "help", text: legeTekst || "Geen spelers gevonden voor deze flight." })]
     : lijst.map((s) => {
         const kleur = tcKleur(s.kleur);
+        // v0.14.3: lidcode (persoonscode) was hier stilletjes verdwenen t.o.v. de oude
+        // bouwSpelersoverzicht() — Kay merkte op dat beheerders die in deze weergave misten. Nu
+        // weer getoond, samen met (niet i.p.v.) het Teecontrol-typelabel: `s.persoonscode` is voor
+        // leden al aanwezig in teecontrol_spelers (zie GoyerSpeler in teecontrol-sync/index.ts), en
+        // is null voor gasten — dus voor gasten blijft alleen het typelabel over, precies zoals
+        // voorheen.
+        const metaDelen = [s.persoonscode, s.type].filter(Boolean);
         return el("div", { class: "spelerrij" }, [
           el("div", { class: "spelernaamrow" }, [
             el("span", { class: "spelernaampil", style: `background:${kleur.bg};color:${kleur.fg}`, text: s.naam }),
-            s.type ? el("span", { class: "spelermeta", text: s.type }) : null,
+            metaDelen.length ? el("span", { class: "spelermeta", text: metaDelen.join(" · ") }) : null,
           ].filter(Boolean)),
           el("div", { class: "spelerhcp", text: s.hcp != null ? `hcp ${s.hcp}` : "hcp —" }),
         ]);
