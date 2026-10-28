@@ -483,8 +483,17 @@
    (geen persoonscode) ongewijzigd alleen het typelabel. Puur een weergavefix — de data was altijd al
    aanwezig in flight.teecontrol_spelers (persoonscode-veld bestond al sinds v0.14.0), alleen niet
    getoond.
+   v0.14.4: tegenovergestelde wijziging, maar bewust op een ANDER scherm (geen tegenspraak met
+   v0.14.3 hierboven — zie bouwSpelersoverzicht's toelichting). Kay: "In individuele inlog aanpassen:
+   Alleen naam en handicap (haal lidcode en lid type weg)." Dit betreft het leden-eigen
+   trackerscherm ("Jouw flight"-kaart, renderTracker/bouwSpelersoverzicht) — niet de beheerderskant
+   (bouwSpelersoverzichtBeheer, ongewijzigd, lidcode blijft daar zichtbaar voor de beheerder). Sinds
+   v0.14.0 zijn dit al twee gescheiden functies, dus deze wijziging raakt alleen bouwSpelersoverzicht:
+   de "<lidcode> · Club lid"-metaregel is daar verwijderd, nu alleen naam + hcp per speler. Reden
+   (niet expliciet gevraagd, maar consistent met de bestaande scheiding): een ingelogde speler ziet zo
+   niet langer de lidcodes van zijn medespelers.
    ============================================================================================ */
-const APP_VERSIE = "0.14.3";
+const APP_VERSIE = "0.14.4";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -1417,14 +1426,14 @@ function renderNieuwePincode(app) {
   i1.focus();
 }
 
-// Herbruikbare opbouw van het spelersoverzicht van een flight: per speler naam + lidcode + lidtype
-// op ÉÉN regel (v0.7.0 — stond tot dan op twee regels, Kay's feedback: "lidcode en lidtype achter
-// de naam op dezelfde regel") + hcp rechts, gevolgd door de "Gem. handicap flight"-regel. Gebruikt
-// door zowel het leden-trackerscherm (de eigen flight, zie renderTracker hieronder) als het admin-
-// flight-detailscherm (bouwFlightDetailModal, v0.6.0) — zodat beide exact dezelfde lay-out en hcp-
-// gemiddelde tonen, zoals Kay vroeg ("dezelfde lay-out als in de Admin tracker pop-up"). Alle hier
-// getoonde spelers zijn per definitie Goyer-leden ("Club lid" is daarom een vaste tekst) — zie
-// bouwFlightDetailModal's toelichting hierboven (v0.6.0) voor waarom.
+// Herbruikbare opbouw van het spelersoverzicht van een flight, voor het LEDEN-EIGEN trackerscherm
+// ("Jouw flight", renderTracker hieronder) — sinds v0.14.0 niet meer gedeeld met de beheerderskant
+// (die heeft z'n eigen bouwSpelersoverzichtBeheer hieronder, incl. lidcode/typelabel, want een
+// beheerder mag dat wél zien). Oorspronkelijk (v0.7.0) stond hier ook lidcode + "Club lid" naast
+// elke naam ("dezelfde lay-out als in de Admin tracker pop-up") — v0.14.4: Kay vroeg dit voor de
+// leden-eigen weergave weer weg te halen ("Alleen naam en handicap"), zodat een ingelogde speler
+// niet de lidcodes van zijn medespelers te zien krijgt. Toont nu alleen naam + hcp, gevolgd door de
+// "Gem. handicap flight"-regel.
 function bouwSpelersoverzicht(spelers) {
   const lijst = spelers || [];
   const spelerrijen = lijst.length === 0
@@ -1432,7 +1441,6 @@ function bouwSpelersoverzicht(spelers) {
     : lijst.map((s) => el("div", { class: "spelerrij" }, [
         el("div", { class: "spelernaamrow" }, [
           el("span", { class: "spelernaampil", text: s.naam }),
-          el("span", { class: "spelermeta", text: `${s.persoonscode} · Club lid` }),
         ]),
         el("div", { class: "spelerhcp", text: s.hcp != null ? `hcp ${s.hcp}` : "hcp —" }),
       ]));
