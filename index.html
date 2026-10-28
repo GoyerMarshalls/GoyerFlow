@@ -221,7 +221,7 @@
     background:var(--accent-soft);color:var(--accent);white-space:nowrap}
   .spelermeta{font-size:12px;color:var(--muted-ink)}
   .spelerhcp{font-size:15px;font-weight:800;color:var(--ink);flex-shrink:0;white-space:nowrap}
-  .gemhcprow{display:flex;justify-content:space-between;align-items:center;font-size:14px;
+  .streeftijdrow{display:flex;justify-content:space-between;align-items:center;font-size:14px;
     font-weight:700;color:var(--ink);padding-top:11px;margin-top:3px;border-top:1.5px solid var(--border)}
   .detaileigenkaart{margin-top:16px}
 
@@ -232,6 +232,13 @@
   .paramlabel{font-size:14px;color:var(--ink);font-weight:600;text-transform:none;letter-spacing:0}
   .paraminput{width:84px;font-size:15px;font-weight:700;padding:8px 10px;margin-top:0;letter-spacing:0;
     text-align:center;border-radius:10px;border:1.5px solid var(--border);background:#fff;color:var(--ink)}
+  /* v0.20.1 (Kay's verzoek, screenshot): min en max per flight-grootte op één regel naast elkaar
+     i.p.v. twee losse .paramrow's onder elkaar. */
+  .paramminmax{display:flex;align-items:center;gap:8px;flex-shrink:0}
+  .paramminmaxgroup{display:flex;align-items:center;gap:6px}
+  .paramminmaxlabel{font-size:12px;font-weight:700;color:var(--muted-ink);text-transform:uppercase;
+    letter-spacing:0.03em}
+  .paramminmax .paraminput{width:66px;padding:8px 6px}
   /* v0.19.0 (Kay's verzoek): native spinner-pijltjes weg — gewoon een cijferveld, de waarde blijft
      met +/- toetsenbord of typen aan te passen zoals elk ander getalveld. */
   .paraminput::-webkit-inner-spin-button, .paraminput::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
@@ -240,14 +247,16 @@
     border-top:1px solid var(--border)}
   .analyseresultaat b{color:var(--accent)}
 
-  /* v0.19.0: "Verwachte rondetijden"-matrix (flightgrootte × drie voorbeeldhandicaps) i.p.v. de
-     eerdere losse tekstregel. */
-  .voorbeeldtabel{display:grid;grid-template-columns:auto repeat(3, 1fr);gap:4px 8px;margin-top:4px}
+  /* v0.19.0-v0.19.5: "Verwachte rondetijden"-tabel met een invulbaar hcp-veld plus de berekende
+     rondetijd voor 2-/3-/4-bal (zie de bouwgeschiedenis voor die geschiedenis). v0.20.0: geen
+     hcp-veld/berekening meer — drie gelijke kolommen, elk een kale mirror van de ingevulde
+     min/max-velden. */
+  .voorbeeldtabel{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:4px 8px;margin-top:4px}
   .voorbeeldtabel .vbkop{font-size:12px;font-weight:700;color:var(--muted-ink);text-align:center;
     padding-bottom:4px;border-bottom:1px solid var(--border)}
-  .voorbeeldtabel .vblabel{font-size:13px;font-weight:700;color:var(--ink);align-self:center}
   .voorbeeldtabel .vbcel{font-size:13px;font-weight:700;color:var(--ink);text-align:center;
-    background:var(--accent-soft);border-radius:8px;padding:6px 4px}
+    background:var(--accent-soft);border-radius:8px;padding:6px 4px;align-self:center}
+  .voorbeeldtabel .vbcelbereik{white-space:nowrap}
 
   /* v0.19.0: "Verantwoording"-popup bij de Parameters-tab — zelfde modal-opzet als .tipsoverlay/
      .tipsmodal (zie hieronder), alleen de inhoud is prose i.p.v. een tips-lijst. */
@@ -619,8 +628,93 @@
        de hcp-/flightgrootte-correctie per hole-type, bewust geen gedragsfactor, en de minutenbuffer-
        banden. Bewust buiten render() om geopend/gesloten, zodat niet-opgeslagen invoer in de velden
        niet verloren gaat bij het openen van de popup.
+   v0.19.1: tweede feedbackronde van Kay op dezelfde Parameters-tab-UI, puur cosmetisch/informatief:
+   (1) "Verwachte rondetijden"-kopje krijgt nu dezelfde opmaak (.eyebrow) als "Checkpointtijden".
+   (2) De matrix met drie VASTE voorbeeldhandicaps (10/18/28) is vervangen door één zelf invulbaar
+       hcp-veld + de rondetijd voor 2-/3-/4-bal op basis daarvan — geen giswerk meer over welke drie
+       handicaps representatief zijn, Kay kan nu elke hcp zelf intikken.
+   v0.19.2: derde feedbackronde van Kay op dezelfde tabel (28 oktober 2026), inclusief zijn antwoord
+       op de open min/max-vraag uit v0.19.1 — puur weergave, geen wijziging aan rondetijdVoor() zelf:
+   (1) Hcp-kolom veel smaller, de drie uitkomst-kolommen (2-/3-/4-Bal) breder.
+   (2) Elke cel toont nu een bereik ("3.5 - 3.6") i.p.v. één exact getal, met "uur" op een eigen regel
+       eronder (nieuwe formatUrenBereik(), zie aldaar) — Kay's antwoord op de min/max-vraag: de
+       rekenkern blijft één exacte waarde berekenen (ongewijzigd), alleen de PRESENTATIE wordt een
+       vriendelijke bandbreedte. Kay's eigen voorbeeld gebruikte stappen van 5 minuten; hier vertaald
+       naar stappen van 6 minuten (1 decimaal, de bestaande weergaveprecisie van deze tabel) om
+       degeneratie te voorkomen waarbij twee aangrenzende 5-minutenstappen op hetzelfde afgeronde
+       cijfer zouden uitkomen — mijn eigen aanpassing op het voorbeeld, in de bouwgeschiedenis
+       teruggekoppeld aan Kay. Kay noemde ook een mogelijke koppeling tussen de bovengrens van deze
+       marge en de live rood/oranje/groen-statuskleur op het Tracker-scherm — dat is een apart,
+       NIET uitgevoerd voorstel voor later; de bestaande conclusieVoor()-drempels (5/10 minuten, zie
+       v0.18.0 hierboven) zijn in deze build ongewijzigd gebleven.
+   v0.19.3: bugfix (Kay, 28 oktober 2026) — het Hcp-veld in de voorbeeldtabel bleef na v0.19.2 nog
+       steeds even breed als voorheen. Oorzaak: (1) een kale "1fr"-grid-track krimpt in CSS Grid nooit
+       kleiner dan de intrinsieke min-content-breedte van zijn inhoud — moest minmax(0, 1fr) zijn;
+       (2) .paraminput had al een vaste basisbreedte (84px) en de voorbeeldtabel-override zette die op
+       "width:auto", wat voor een <input> terugvalt op de browser-standaardbreedte (vergelijkbaar met
+       size="20", ruim 170px) i.p.v. "vul de grid-cel" — moest width:100% zijn. Beide gecorrigeerd.
+   v0.19.4: drie UI-verzoeken van Kay op de Parameters-tab (28 oktober 2026), geen wijziging aan de
+       rekenkern:
+   (1) "Verwachte rondetijden"-bereik nu in "#u##"-notatie (bv. "3u05 - 3u10") i.p.v. decimale uren —
+       nieuwe formatRondetijdBereik()/formatUurMin(), weer in stappen van 5 minuten (kon weer terug
+       naar Kay's oorspronkelijke voorbeeld nu de weergave zelf in minuten is, zie de code-comment
+       aldaar). De losse "uur"-regel onder elke cel is vervallen (de notatie draagt de eenheid nu al
+       per getal, een aparte regel zou dubbelop zijn).
+   (2) De tekst "Opgeslagen." bij de Parameters-tab is vervallen.
+   (3) "Opslaan"-knop is nu disabled (grijs, via de al bestaande .btn:disabled-stijl) zodra de
+       velden overeenkomen met wat net geladen/opgeslagen is, en wordt weer actief zodra een van de
+       9 parametervelden wijzigt — nieuwe markeerGewijzigd(), op dezelfde input-listeners als
+       herbereken(). Neveneffect: de knop was voorheen ook tijdens "Bezig…" nog technisch klikbaar
+       (een tweede, overlappende opslaan()-aanroep was mogelijk); dat is nu ook dicht, omdat de knop
+       bij elke render() (ook de render() die de "Bezig…"-tekst toont) default disabled begint.
+   v0.19.5: Kay wees er terecht op dat het v0.19.4-bereik altijd precies 5 minuten breed was — geen
+       realistische bandbreedte, ongeacht flightgrootte of werkelijke speelvariatie. formatRondetijd-
+       Bereik() rekent nu ±10 minuten rond de exacte berekening, naar buiten afgerond op een
+       5-minutengrid (komt opvallend dicht bij de onderzoeksgebaseerde "Acceptabele bandbreedte" van
+       eerder deze sessie — zie de code-comment aldaar). Nieuwe optionele `vloerMinuten`-parameter,
+       gebruikt voor de 4-bal-cel (vloer 240 min = 4 uur) zodat die nooit onder de 4 uur toont, ook al
+       zou de bredere band dat anders wél laten zien (Kay's expliciete eis uit v0.19.3). Geen wijziging
+       aan rondetijdVoor() of de rekenkern zelf.
+   v0.20.0 (Kay's verzoek 28 oktober 2026, "misschien maak ik het zelf te ingewikkeld" — zie de
+       bouwgeschiedenis voor het volledige gesprek): het per-hole-type-model uit v0.18.0-v0.19.5
+       (checkpointtijd + aparte hcp-/flightgrootte-correctie per par-type) bleek te indirect om te
+       tunen. Vervangen door drie rechtstreeks ingevulde bereiken (minimaal/maximaal in minuten) per
+       flight-grootte — geen formule meer.
+   (1) Nieuwe rondetijdBereikVoor(params, aantalSpelers, rondeType) vervangt rondetijdVoor(). Klemt
+       flight-groottes buiten 2/3/4 op de 2-bal- resp. 4-bal-band (1-bal/5-bal, zelden); halveert het
+       bereik voor een 9-holes ronde. `minutenPerHole` is overal de BOVENgrens (.max) van het bereik
+       gedeeld door het aantal holes — exact dezelfde rol als het vroegere enkele benchmarkgetal, dus
+       verwachtePositie()/projecteerVanafMelding()/de GPS-pil/evalueerGatMetStartbuur() zijn
+       ONGEWIJZIGD. conclusieVoor() krijgt er een resultaatTekst bij (het resultaat zonder "Dus "),
+       voor de vetgedrukte infotekst in punt 3; de 5/10-minutengrenzen zelf zijn ongewijzigd.
+   (2) schema.sql "Fase 2k": bal2/3/4_min/max_minuten (6 nieuwe kolommen, defaults = Kay's eigen
+       genoemde bereiken 2u50-3u20/3u30-4u00/3u50-4u20). De 9 oude kolommen (par3_minuten t/m
+       flightgrootte_correctie_par5_per_speler) blijven ongebruikt in de tabel staan, zelfde
+       niet-destructieve conventie als Fase 2i/2j.
+   (3) Admin Parameters-tab: 9 velden → 6 (min+max per flight-grootte), "Verwachte rondetijden" is nu
+       een kale mirror zonder hcp-veld/berekening, nieuwe max>min-validatie, VERANTWOORDING_PARAMETERS
+       herschreven. Ledenscherm + beheerder-flightdetail-popup: infotekst na een positie-melding toont
+       nu "streeftijd tussen minimaal X en maximaal Y" i.p.v. "een gemiddelde rondetijd van X", met het
+       resultaat ("Dus ...") nu ook zelf vet. Dit rondt tevens Kay's eerdere, nog openstaande verzoek
+       (28 oktober 2026) af om de "Gem. handicap flight"-regel te vervangen door een
+       "Streeftijd ... maximaal ..."-regel (handicap is immers geen factor meer) — en de statische
+       tekst onder "GoyerFlow" op het inlogscherm toont nu versie-informatie i.p.v. een vaste
+       omschrijving.
+   v0.20.1 (Kay's verzoek, screenshot van v0.20.0): de Streeftijden-sectie toonde minimaal en
+       maximaal nog als twee losse rijen onder elkaar per flight-grootte. Nu één rij per
+       flight-grootte, met het min- en max-veld naast elkaar (nieuwe .paramminmax/.paramminmaxgroup-
+       opmaak) i.p.v. twee aparte .paramrow's. Geen wijziging aan de rekenkern, validatie of
+       opslaanlogica — uitsluitend de rangschikking van dezelfde 6 velden.
+   v0.20.2 (Kay's verzoek): "Verwachte rondetijden" toonde tot nu toe maar één tabel — de rauwe
+       ingevulde (18-holes-)waarden, ook als die ooit voor een 9-holes-ronde gelezen zouden worden.
+       Nu twee aparte tabellen: "Verwachte rondetijden — 9 holes" (de ingevulde waarden gehalveerd,
+       exact zoals rondetijdBereikVoor() dat ook op de Tracker zelf doet voor een 9holes_voor/
+       9holes_achter-ronde) en "Verwachte rondetijden — 18 holes" (ongewijzigd, de rauwe waarden).
+       Bijvangst: formatUurMin() rondde voorheen niet af — bij een oneven aantal minuten gaf een
+       halvering een halve minuut (bv. "1u45.5"); rondt nu af op de hele minuut vóór het opsplitsen
+       in uren/minuten. Geen wijziging aan de rekenkern, validatie of opslaanlogica.
    ============================================================================================ */
-const APP_VERSIE = "0.19.0";
+const APP_VERSIE = "0.20.2";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -783,36 +877,29 @@ function loggen(persoonscode, type, succes) {
 /* ============================================================================================
    Rondetijd-berekening
    ============================================================================================ */
-// v0.8.0: was een vlak gemiddelde (PAR_VERDELING: 4x par3 + 10x par4 + 4x par5, ongeacht welke
-// holes daadwerkelijk gespeeld worden) — werd toen een exacte som over de FYSIEKE holes van déze
-// ronde, met het al bevestigde HOLE_PAR (voor een volle 18-holes-ronde identiek aan de oude
-// berekening — PAR_VERDELING is precies de par-verdeling die in HOLE_PAR zit, zie de toelichting
-// bovenaan dit bestand). Sinds v0.18.0 zit die per-hole par-opzoeking rechtstreeks in
-// rondetijdVoor() hieronder (de eerdere losse hulpfunctie basisRondetijdVoorRonde() verviel, omdat
-// hij na het splitsen van de hcp-/flightgrootte-correctie per hole-type geen eigen call-site meer
-// had — zie de bouwgeschiedenis, v0.18.0).
-
-// v0.18.0 (Kay's verzoek 28 oktober 2026): de hcp-/flightgrootte-correctie was tot nu toe één vlak
-// bedrag per hole, ongeacht of die hole een par 3, 4 of 5 is — terwijl een extra speler of extra
-// slag op een par 5 nu eenmaal meer tijd kost dan op een korte par 3. Corrigeert nu PER HOLE, met
-// een eigen hcp-/flightgrootte-toeslag per par-type (hcp_correctie_par3/4/5_per_punt,
-// flightgrootte_correctie_par3/4/5_per_speler — zie schema.sql "Fase 2j"), opgeteld in dezelfde lus
-// als de par-basistijd i.p.v. achteraf als één vlakke `* holesInRonde`-vermenigvuldiging. Voor een
-// vlakke parameterset (alle drie par-correcties gelijk) is de uitkomst identiek aan de oude
-// berekening — dit is dus een precisering, geen principiële gedragsverandering.
-function rondetijdVoor(params, aantalSpelers, gemiddeldeHcp, rondeType) {
+// v0.8.0 → v0.19.5: dit was een berekening (checkpointtijd per par-type, met een aparte hcp- en
+// flightgrootte-correctie per hole-type sinds v0.18.0 — zie de bouwgeschiedenis voor die
+// geschiedenis). v0.20.0 (Kay's verzoek 28 oktober 2026): dat model bleek te indirect om te tunen
+// — Kay's feedback op de checkpointtijden maakte duidelijk dat hij eigenlijk alleen de UITKOMST
+// (de rondetijd-range per flight-grootte) wilde sturen. Vervangen door drie rechtstreeks
+// ingevulde bereiken (bal2/3/4_min/max_minuten, schema.sql "Fase 2k") — geen formule meer, Kay
+// vult zelf het minimaal/maximaal in. `rondetijdVoor()`/`formatRondetijdBereik()` (de ±10-min/
+// vloer-bucketlogica die daarbij hoorde) zijn hiermee vervallen; `HOLE_PAR` blijft bestaan, nog
+// gebruikt voor GPS-matching/`fysiekeHole()`.
+//
+// Klem-gedrag voor flight-groottes buiten 2/3/4 (1-bal, 5-bal — zelden, zie de "5-bal-hypothese"
+// in de bouwgeschiedenis): een 1-bal valt op de 2-bal-band, een 5-bal (of groter) op de
+// 4-bal-band. Geen eigen categorie — aangeven als dat in de praktijk niet klopt.
+//
+// Voor een 9-holes ronde (rondeType 9holes_voor/9holes_achter) wordt het 18-holes-bereik
+// gehalveerd — er zijn geen apart ingevulde 9-holes-parameters.
+function rondetijdBereikVoor(params, aantalSpelers, rondeType) {
+  const n = aantalSpelers <= 2 ? 2 : aantalSpelers === 3 ? 3 : 4;
+  const min = params[`bal${n}_min_minuten`];
+  const max = params[`bal${n}_max_minuten`];
   const { holesInRonde } = rondeInfo(rondeType);
-  const hcpBovenTien = Math.max(0, gemiddeldeHcp - 10);
-  const extraSpelers = Math.max(0, aantalSpelers - 2);
-  let totaal = 0;
-  for (let i = 1; i <= holesInRonde; i++) {
-    const par = HOLE_PAR[fysiekeHole(rondeType, i) - 1] ?? 4;
-    const basis = par === 3 ? params.par3_minuten : par === 5 ? params.par5_minuten : params.par4_minuten;
-    const hcpCorrectie = hcpBovenTien * (par === 3 ? params.hcp_correctie_par3_per_punt : par === 5 ? params.hcp_correctie_par5_per_punt : params.hcp_correctie_par4_per_punt);
-    const flightCorrectie = extraSpelers * (par === 3 ? params.flightgrootte_correctie_par3_per_speler : par === 5 ? params.flightgrootte_correctie_par5_per_speler : params.flightgrootte_correctie_par4_per_speler);
-    totaal += basis + hcpCorrectie + flightCorrectie;
-  }
-  return totaal;
+  const factor = holesInRonde / AANTAL_HOLES; // 1 voor 18 holes, 0.5 voor 9 holes
+  return { min: min * factor, max: max * factor };
 }
 
 // "hole" hierin (en in pasWachttijdToe/projecteerVanafMelding) blijft RONDE-RELATIEF (1 = eerste
@@ -916,6 +1003,34 @@ function formatUren(minuten) {
   return `${(minuten / 60).toFixed(1)} uur`;
 }
 
+// v0.19.2: bereik-weergave ("3.5 - 3.6") voor diezelfde tabel — Kay wilde niet langer de exacte
+// verwachte tijd tonen maar een vriendelijke bandbreedte (28 oktober 2026). Kay's eigen voorbeeld
+// werkte in stappen van 5 minuten (3u44 -> "3u40-3u45"); hier vertaald naar de bestaande
+// weergaveprecisie van 1 decimaal (= stappen van 6 minuten) — bij letterlijke 5-minutenstappen zouden
+// aangrenzende stappen soms op hetzelfde afgeronde cijfer uitkomen (bv. 3u45 én 3u50 ronden beide af
+// op "3,8 uur"), wat een nep-bereik ("3.8 - 3.8") zou opleveren. Dit is mijn eigen aanpassing op het
+// voorbeeld, aan Kay teruggekoppeld. rondetijdVoor() zelf blijft intern exact rekenen; dit is puur
+// weergave, geen wijziging aan de rekenkern of aan de live rode/oranje/groene statuslogica.
+function formatUrenBereik(minuten) {
+  const exacteUren = minuten / 60;
+  const onder = Math.floor(exacteUren * 10) / 10;
+  const boven = Math.round((onder + 0.1) * 10) / 10;
+  return `${onder.toFixed(1)} - ${boven.toFixed(1)}`;
+}
+
+// v0.19.4: Kay wilde de "Verwachte rondetijden"-tabel liever in "#u##"-notatie (bv. "3u05 - 3u10")
+// dan in decimale uren. formatUrenBereik() hierboven is sindsdien ongebruikt maar laten staan als
+// referentie.
+function formatUurMin(minuten) {
+  // v0.20.2: rondt nu af op de hele minuut (was voorheen een kale deling) — nodig zodra dit ook
+  // gehalveerde waarden krijgt (9-holes-voorbeeldtabel), die bij een oneven minutenaantal anders op
+  // een halve minuut zouden uitkomen (bv. "1u45.5").
+  const totaal = Math.round(minuten);
+  const h = Math.floor(totaal / 60);
+  const m = totaal - h * 60;
+  return `${h}u${String(m).padStart(2, "0")}`;
+}
+
 // Conclusie bij een zelf-gemelde positie. Tot v0.17.1 een holes-relatieve indeling in 5 categorieën
 // (veel_te_snel/te_snel/op_schema/te_langzaam/veel_te_langzaam). Vanaf v0.18.0 (Kay's verzoek 28
 // oktober 2026, "strakke benchmark, maar wiskundig zuiver"): een ABSOLUTE minuten-buffer in 3
@@ -924,13 +1039,17 @@ function formatUren(minuten) {
 // consistent met de v0.12.0-keuze dat voorlopen op zich geen probleem is. Toon BEWUST neutraal
 // gehouden (Kay's expliciete keuze, 28 oktober 2026): wel de nieuwe minutenbuffer/kleurbanden, geen
 // directieve/sturende taal ("Let op: pak de bal op...") — zelfde feitelijke stijl als de bestaande
-// "X holes achter op schema"-tekst uit v0.12.0, nu in minuten i.p.v. holes.
+// "X holes achter op schema"-tekst uit v0.12.0, nu in minuten i.p.v. holes. deltaMinuten is sinds
+// v0.20.0 t.o.v. de BOVENgrens van het ingevulde bereik (rondetijdBereikVoor(...).max) i.p.v. een
+// enkel berekend benchmarkgetal — de 5/10-minutengrenzen zelf zijn ongewijzigd.
+// v0.20.0: resultaatTekst toegevoegd (zin zonder "Dus "-voorvoegsel), nodig op het ledenscherm/de
+// beheerder-popup om alleen het resultaat zelf vet te zetten ("Dus **resultaat**.").
 function conclusieVoor(deltaMinuten) {
   const minutenAchter = Math.round(Math.max(0, -deltaMinuten));
   const achterText = `${minutenAchter} minuten achter op schema`;
-  if (deltaMinuten > -5) return { key: "op_schema", label: "Op schema", kleur: "var(--accent)", zin: "Dus je loopt op schema." };
-  if (deltaMinuten > -10) return { key: "achter", label: achterText, kleur: "var(--warn)", zin: `Dus je loopt ${achterText}.` };
-  return { key: "ver_achter", label: achterText, kleur: "var(--err)", zin: `Dus je loopt ${achterText}.` };
+  if (deltaMinuten > -5) return { key: "op_schema", label: "Op schema", kleur: "var(--accent)", resultaatTekst: "je loopt op schema", zin: "Dus je loopt op schema." };
+  if (deltaMinuten > -10) return { key: "achter", label: achterText, kleur: "var(--warn)", resultaatTekst: `je loopt ${achterText}`, zin: `Dus je loopt ${achterText}.` };
+  return { key: "ver_achter", label: achterText, kleur: "var(--err)", resultaatTekst: `je loopt ${achterText}`, zin: `Dus je loopt ${achterText}.` };
 }
 
 /* ============================================================================================
@@ -1069,13 +1188,15 @@ const TIPS = [
 
 // v0.19.0 (Kay's verzoek): uitleg bij de knop "Verantwoording" in de admin Parameters-tab — waarom
 // deze opzet, niet de huidige ingevulde getallen zelf (die kan een beheerder wijzigen; deze tekst
-// moet kloppen blijven ongeacht de actuele waarden). Zie de bouwgeschiedenis (v0.18.0) voor de
-// volledige achtergrond van Kay's keuzes hierin.
+// moet kloppen blijven ongeacht de actuele waarden). Zie de bouwgeschiedenis voor de volledige
+// achtergrond van Kay's keuzes hierin.
+// v0.20.0: herschreven — niet langer "checkpointtijd + hcp-correctie + flightgrootte-correctie per
+// hole-type" (v0.18.0-v0.19.5), maar een rechtstreeks ingesteld bereik per flight-grootte.
 const VERANTWOORDING_PARAMETERS = [
-  "De checkpointtijden per par (Par 3/4/5) zijn de nullijn: de tijd die een flight in Ready Golf-tempo nodig heeft als de baan verder vrij is, zonder enige correctie voor handicap of flightgrootte.",
-  "De hcp-correctie en de flightgrootte-correctie staan apart per hole-type, omdat een extra slag of een extra speler op een lange par 5 nu eenmaal meer tijd kost dan op een korte par 3 — één vlak bedrag voor de hele ronde deed die holes ten onrechte hetzelfde.",
-  "Bewust geen 'gedragsfactor' die de lat verlaagt voor langzamer spel: de correcties compenseren alleen voor de fysiek onvermijdelijke extra tijd (meer slagen, meer spelers), niet voor treuzelen. De benchmark blijft daardoor ambitieus.",
-  "De status op het trackerscherm werkt met een harde minutenbuffer t.o.v. die benchmark: groen bij minder dan 5 minuten achter, oranje bij 5–10 minuten, rood bij meer dan 10 minuten. Minuten in plaats van holes, omdat op De Goyer de holes dicht op elkaar liggen — een kleine vertraging op de green kan anders al lijken op een achterstand van een hele hole.",
+  "Per flight-grootte (2-/3-/4-bal) staat een minimale en maximale streeftijd, rechtstreeks ingesteld — geen formule meer op basis van losse par-tijden en correctiegetallen.",
+  "Handicap is bewust geen factor: pace-of-play-onderzoek (zie de bouwgeschiedenis) vond geen aantoonbaar effect van handicap op speeltempo. Flightgrootte heeft wél een gemeten effect, en dat zit al verwerkt in het verschil tussen de drie bereiken.",
+  "Bewust geen 'gedragsfactor' die de lat verlaagt voor langzamer spel — de drie bereiken zijn een ambitieuze, realistische streeftijd, niet een gemiddelde van hoe traag er nu daadwerkelijk gespeeld wordt.",
+  "De status op het trackerscherm werkt met een harde minutenbuffer t.o.v. de maximale streeftijd: groen bij minder dan 5 minuten erboven, oranje bij 5–10 minuten, rood bij meer dan 10 minuten. Minuten in plaats van holes, omdat op De Goyer de holes dicht op elkaar liggen — een kleine vertraging op de green kan anders al lijken op een achterstand van een hele hole.",
   "Vooruitlopen op schema krijgt bewust geen eigen status: te snel spelen is op zich geen probleem dat de app hoeft te signaleren.",
 ];
 
@@ -1185,7 +1306,7 @@ function nieuwAdminLocal() {
     resetSucces: null,           // id van het lid waarvoor een pincode-reset net gelukt is
     wachtwoordOud: "", wachtwoordNieuw: "", wachtwoordHerhaal: "",
     wachtwoordFout: null, wachtwoordSucces: false, wachtwoordBezig: false,
-    paramFout: null, paramSucces: false, paramBezig: false,
+    paramFout: null, paramBezig: false,
     analyseResultaat: null,      // gevuld na klik op "Analyseer huidige flights"
     // Flight-detailscherm (v0.6.0): id van de flight waarvan de popup openstaat (null = dicht),
     // plus de draft-hole-waarde van de stepper daarin en bezig/fout-status voor de meldactie —
@@ -1267,7 +1388,10 @@ function render() {
       }, TRACKER_VERVERS_MS);
     }
   } else {
-    sub.textContent = "Speeltempo-tracker voor leden";
+    // v0.20.0 (Kay's verzoek 28 oktober 2026): de statische tekst direct onder "GoyerFlow" toont nu
+    // versie-informatie i.p.v. een vaste omschrijving — de kleine versiebadge rechtsboven
+    // (#versiebadge) blijft daarnaast ook gewoon staan, zie de bouwgeschiedenis.
+    sub.textContent = `GoyerFlow versie ${APP_VERSIE}`;
     if (trackerIntervalId) { clearInterval(trackerIntervalId); trackerIntervalId = null; }
     if (tijdlijnIntervalId) { clearInterval(tijdlijnIntervalId); tijdlijnIntervalId = null; }
     if (adminIntervalId) { clearInterval(adminIntervalId); adminIntervalId = null; }
@@ -1532,9 +1656,14 @@ function renderNieuwePincode(app) {
 // beheerder mag dat wél zien). Oorspronkelijk (v0.7.0) stond hier ook lidcode + "Club lid" naast
 // elke naam ("dezelfde lay-out als in de Admin tracker pop-up") — v0.14.4: Kay vroeg dit voor de
 // leden-eigen weergave weer weg te halen ("Alleen naam en handicap"), zodat een ingelogde speler
-// niet de lidcodes van zijn medespelers te zien krijgt. Toont nu alleen naam + hcp, gevolgd door de
-// "Gem. handicap flight"-regel.
-function bouwSpelersoverzicht(spelers) {
+// niet de lidcodes van zijn medespelers te zien krijgt. Toont nu alleen naam + hcp.
+// v0.20.0 (Kay's verzoek 28 oktober 2026): de "Gem. handicap flight"-regel is vervangen door een
+// "Streeftijd"-regel ("Streeftijd {holesInRonde} holes maximaal {Xu YY}") — handicap is sinds
+// v0.19.x geen factor meer in de rondetijd-berekening, dus een gemiddelde handicap tonen had geen
+// functie meer. `bereik`/`holesInRonde` komen nu van de aanroeper (renderTracker), i.p.v. hier zelf
+// uit de spelerslijst afgeleid (dat kon ook niet: hcp van medespelers zegt niets meer over de
+// streeftijd).
+function bouwSpelersoverzicht(spelers, bereik, holesInRonde) {
   const lijst = spelers || [];
   const spelerrijen = lijst.length === 0
     ? [el("p", { class: "help", text: "Geen spelers gevonden voor deze flight." })]
@@ -1544,19 +1673,16 @@ function bouwSpelersoverzicht(spelers) {
         ]),
         el("div", { class: "spelerhcp", text: s.hcp != null ? `hcp ${s.hcp}` : "hcp —" }),
       ]));
-  const hcps = lijst.map((s) => s.hcp).filter((h) => h !== null && h !== undefined);
-  const gemHcp = hcps.length ? Math.round((hcps.reduce((a, b) => a + Number(b), 0) / hcps.length) * 10) / 10 : null;
   const kinderen = [el("div", { class: "spelerlijst" }, spelerrijen)];
-  if (gemHcp != null) {
+  if (bereik != null) {
     // Bugfix (27 oktober 2026, Kay akkoord): twee kale document.createTextNode's naast elkaar werden
-    // door de flexbox-layout (.gemhcprow heeft justify-content:space-between) als ÉÉN enkel anoniem
-    // flex-item behandeld — vandaar "Gem. handicap flight15.9" aan elkaar geplakt, zonder spatie én
-    // zonder de bedoelde rechts-uitgelijnde getalwaarde. Elk stuk tekst in een eigen <span> zet ze om
-    // in twee echte flex-items, zodat space-between weer werkt zoals bedoeld (label links, getal
-    // rechts) — niet alleen een losse spatie toevoegen.
-    kinderen.push(el("div", { class: "gemhcprow" }, [
-      el("span", { text: "Gem. handicap flight" }),
-      el("span", { text: String(gemHcp) }),
+    // door de flexbox-layout (.streeftijdrow heeft justify-content:space-between) als ÉÉN enkel
+    // anoniem flex-item behandeld — vandaar aan elkaar geplakte tekst zonder spatie. Elk stuk tekst
+    // in een eigen <span> zet ze om in twee echte flex-items, zodat space-between weer werkt zoals
+    // bedoeld (label links, getal rechts) — niet alleen een losse spatie toevoegen.
+    kinderen.push(el("div", { class: "streeftijdrow" }, [
+      el("span", { text: `Streeftijd ${holesInRonde} holes` }),
+      el("span", { text: `maximaal ${formatUurMin(bereik.max)}` }),
     ]));
   }
   return kinderen;
@@ -1590,7 +1716,10 @@ function tcKleur(kleur) {
 // (alleen het typelabel bleef over) — Kay merkte dit op ("je hebt de lidcodes weggehaald in Beheer
 // view"). Nu staan lidcode én typelabel weer allebei (gescheiden door " · "), met de lidcode zoals
 // voorheen vooraan; voor gasten (geen persoonscode) blijft alleen het typelabel over, ongewijzigd.
-function bouwSpelersoverzichtBeheer(teecontrolSpelers, legeTekst) {
+// v0.20.0: "Gem. handicap flight" vervangen door dezelfde "Streeftijd"-regel als bouwSpelersoverzicht
+// hierboven (handicap is geen factor meer in de rondetijd-berekening) — `bereik`/`holesInRonde` komen
+// nu van de aanroeper (bouwFlightDetailModal).
+function bouwSpelersoverzichtBeheer(teecontrolSpelers, legeTekst, bereik, holesInRonde) {
   const lijst = teecontrolSpelers || [];
   const spelerrijen = lijst.length === 0
     ? [el("p", { class: "help", text: legeTekst || "Geen spelers gevonden voor deze flight." })]
@@ -1611,13 +1740,11 @@ function bouwSpelersoverzichtBeheer(teecontrolSpelers, legeTekst) {
           el("div", { class: "spelerhcp", text: s.hcp != null ? `hcp ${s.hcp}` : "hcp —" }),
         ]);
       });
-  const hcps = lijst.map((s) => s.hcp).filter((h) => h !== null && h !== undefined);
-  const gemHcp = hcps.length ? Math.round((hcps.reduce((a, b) => a + Number(b), 0) / hcps.length) * 10) / 10 : null;
   const kinderen = [el("div", { class: "spelerlijst" }, spelerrijen)];
-  if (gemHcp != null) {
-    kinderen.push(el("div", { class: "gemhcprow" }, [
-      el("span", { text: "Gem. handicap flight" }),
-      el("span", { text: String(gemHcp) }),
+  if (bereik != null) {
+    kinderen.push(el("div", { class: "streeftijdrow" }, [
+      el("span", { text: `Streeftijd ${holesInRonde} holes` }),
+      el("span", { text: `maximaal ${formatUurMin(bereik.max)}` }),
     ]));
   }
   return kinderen;
@@ -1674,7 +1801,7 @@ async function renderTracker(app, opts = {}) {
   // hieronder, die bewust tegen het ORIGINELE rondeschema vergelijkt (zie de "op schema"-conclusie
   // verderop), niet tegen een al gemelde/geprojecteerde positie.
   function posVan(flight) {
-    const minutenPerHole = rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp, flight.ronde_type) / rondeInfo(flight.ronde_type).holesInRonde;
+    const minutenPerHole = rondetijdBereikVoor(params, flight.aantal_spelers, flight.ronde_type).max / rondeInfo(flight.ronde_type).holesInRonde;
     return { ...verwachtePositie(flight.starttijd_effectief, minutenPerHole, nu, flight.ronde_type), minutenPerHole };
   }
 
@@ -1687,7 +1814,7 @@ async function renderTracker(app, opts = {}) {
   // de bouwgeschiedenis voor de volledige afweging. Dit scherm toont voortaan alleen nog waar JOUW
   // eigen flight is, voor inzicht in je eigen speeltempo.)
   const zelfPos = posVan(zelf);
-  const zelfRondetijd = rondetijdVoor(params, zelf.aantal_spelers, zelf.gemiddelde_hcp, zelf.ronde_type);
+  const zelfBereik = rondetijdBereikVoor(params, zelf.aantal_spelers, zelf.ronde_type);
 
   // (v0.16.0, bugfix na de testronde van 28 oktober 2026): verwachtePositie() kent geen "nog niet
   // begonnen"-status — vóór starttijd_effectief levert de formule een negatieve fractie op die
@@ -1915,15 +2042,23 @@ async function renderTracker(app, opts = {}) {
           ]),
         ]));
       }
+      // v0.20.0 (Kay's verzoek 28 oktober 2026): "een gemiddelde rondetijd van X" vervangen door
+      // "een streeftijd tussen minimaal X en maximaal Y" — past bij het nieuwe min/max-bereikmodel
+      // (rondetijdBereikVoor(), zie de bouwgeschiedenis) i.p.v. één berekend gemiddelde. Het
+      // resultaat ("Dus ...") staat nu zelf ook vet, via conclusie.resultaatTekst.
       if (heeftGekozen) {
         meKinderen.push(el("div", { class: "conclusieline" }, [
           document.createTextNode("Op basis van een start om "),
           el("b", { text: formatTijd(zelf.starttijd_effectief) }),
-          document.createTextNode(" en een gemiddelde rondetijd van "),
-          el("b", { text: formatDuur(zelfRondetijd) }),
-          document.createTextNode(` voor een ${zelf.aantal_spelers}-bal over ${rondeInfo(zelf.ronde_type).holesInRonde} holes zou je nu ongeveer op de `),
+          document.createTextNode(" en een streeftijd tussen minimaal "),
+          el("b", { text: formatUurMin(zelfBereik.min) }),
+          document.createTextNode(" en maximaal "),
+          el("b", { text: formatUurMin(zelfBereik.max) }),
+          document.createTextNode(" zou je nu ongeveer op de "),
           el("b", { text: `${CHECKPOINT_LABEL[zelfPos.checkpoint]} van hole ${fysiekeHole(zelf.ronde_type, zelfPos.hole)}` }),
-          document.createTextNode(` moeten zijn. ${conclusie.zin}`),
+          document.createTextNode(" moeten zijn. Dus "),
+          el("b", { text: conclusie.resultaatTekst }),
+          document.createTextNode("."),
         ]));
       }
       if (toonTipsKnop) {
@@ -1934,10 +2069,10 @@ async function renderTracker(app, opts = {}) {
   const meCard = el("div", { class: "card me", style: "background:" + kaartKleur }, meKinderen);
 
   // Spelersoverzicht van de EIGEN flight (v0.7.0), net onder de topbar — Kay's verzoek: dezelfde
-  // lay-out als de Admin-popup (naam t/m "Gem. handicap flight"), nu ook zichtbaar voor leden zelf.
+  // lay-out als de Admin-popup (naam t/m de Streeftijd-regel), nu ook zichtbaar voor leden zelf.
   const spelersKaart = el("div", { class: "card" }, [
     el("div", { class: "eyebrow", text: "Jouw flight" }),
-    ...bouwSpelersoverzicht(zelf.spelers),
+    ...bouwSpelersoverzicht(zelf.spelers, zelfBereik, rondeInfo(zelf.ronde_type).holesInRonde),
   ]);
 
   app.append(spelersKaart, meCard);
@@ -2183,7 +2318,7 @@ async function renderAdmin(app) {
 // WILLEKEURIGE flight (niet per se de ingelogde speler) — hergebruikt door zowel de Tracker-tab-
 // rijen als het flight-detailscherm, zodat beide altijd exact dezelfde cijfers tonen.
 function berekenFlightPositie(flight, params, nu) {
-  const minutenPerHole = rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp, flight.ronde_type) / rondeInfo(flight.ronde_type).holesInRonde;
+  const minutenPerHole = rondetijdBereikVoor(params, flight.aantal_spelers, flight.ronde_type).max / rondeInfo(flight.ronde_type).holesInRonde;
   const zelfPos = verwachtePositie(flight.starttijd_effectief, minutenPerHole, nu, flight.ronde_type);
   const heeftMelding = flight.gerapporteerde_hole != null && flight.gerapporteerd_checkpoint != null;
   // (28 oktober 2026: pasWachttijdToe is hier verwijderd — de doorlaat-functionaliteit (en dus het
@@ -2217,8 +2352,9 @@ function flightTitel(spelers) {
 // "Marshal App.html") i.p.v. te gokken — dit is een 1-op-1 vertaling van die logica naar GoyerFlow's
 // eigen datamodel:
 // - ACTIEF: de flight is gestart, en nog niet meer dan ACTIEF_GRACE_MIN minuten voorbij de
-//   verwachte rondetijd (rondetijdVoor()) — zo blijft een net afgeronde flight nog even zichtbaar,
-//   in plaats van voor altijd in de lijst te blijven staan tot iemand 'm handmatig op "Uitgestapt" zet.
+//   maximale streeftijd (rondetijdBereikVoor().max) — zo blijft een net afgeronde flight nog even
+//   zichtbaar, in plaats van voor altijd in de lijst te blijven staan tot iemand 'm handmatig op
+//   "Uitgestapt" zet.
 // - AANKOMEND: de flight start over hoogstens AANKOMEND_VENSTER_MIN minuten (en is nog niet gestart).
 // Een flight die in geen van beide vensters valt (te ver in de toekomst, of allang voorbij de
 // grace-periode) wordt niet getoond — dit is de kernwijziging t.o.v. voorheen, toen ELKE
@@ -2229,8 +2365,8 @@ const ACTIEF_GRACE_MIN = 30; // zelfde grace-periode als de Marshal App
 function trackerIsActief(positie, params, nu) {
   if (positie.gestartNog) return false;
   const verstrekenMin = (nu.getTime() - new Date(positie.flight.starttijd_effectief).getTime()) / 60000;
-  const rondetijdMin = rondetijdVoor(params, positie.flight.aantal_spelers, positie.flight.gemiddelde_hcp, positie.flight.ronde_type);
-  return verstrekenMin < rondetijdMin + ACTIEF_GRACE_MIN;
+  const rondetijdMax = rondetijdBereikVoor(params, positie.flight.aantal_spelers, positie.flight.ronde_type).max;
+  return verstrekenMin < rondetijdMax + ACTIEF_GRACE_MIN;
 }
 function trackerIsAankomend(flight, nu) {
   const resterendMin = (new Date(flight.starttijd_effectief).getTime() - nu.getTime()) / 60000;
@@ -2376,10 +2512,14 @@ function bouwFlightDetailModal(positie, params, nu) {
 
   const sluiten = () => { adminLocal.flightDetailId = null; adminLocal.flightDetailFout = null; render(); };
 
-  // Spelersoverzicht + "Gem. handicap flight" (v0.14.0): zie bouwSpelersoverzichtBeheer hierboven —
-  // ALLE Teecontrol-spelers van deze flight, niet (meer) de gedeelde bouwSpelersoverzicht() die het
-  // leden-eigen trackerscherm nog wel gebruikt.
-  const spelersoverzicht = bouwSpelersoverzichtBeheer(spelers, `${flight.lus} · ${flight.aantal_spelers}-bal`);
+  // v0.20.0: eenmalig berekend, hergebruikt door zowel de Streeftijd-regel in het spelersoverzicht
+  // hieronder als de infotekst-na-positie-melding verderop in deze functie.
+  const bereikFlight = rondetijdBereikVoor(params, flight.aantal_spelers, flight.ronde_type);
+
+  // Spelersoverzicht + "Streeftijd" (v0.14.0, tekst herschreven in v0.20.0): zie
+  // bouwSpelersoverzichtBeheer hierboven — ALLE Teecontrol-spelers van deze flight, niet (meer) de
+  // gedeelde bouwSpelersoverzicht() die het leden-eigen trackerscherm nog wel gebruikt.
+  const spelersoverzicht = bouwSpelersoverzichtBeheer(spelers, `${flight.lus} · ${flight.aantal_spelers}-bal`, bereikFlight, rondeInfo(flight.ronde_type).holesInRonde);
 
   // Eigen flight-kaart (v0.6.0): zelfde opbouw/schrijflogica als renderTracker's "zelf"-kaart,
   // hier hergebruikt voor een door de beheerder gekozen flight i.p.v. de ingelogde speler. Draft-
@@ -2468,14 +2608,21 @@ function bouwFlightDetailModal(positie, params, nu) {
         el("div", { class: "tijdlijnvoortgang", style: `width:${tijdlijnPercentage(restFractieNu)}%` }),
       ]),
     ]));
+    // v0.20.0: zelfde "minimaal/maximaal"-herschrijving als de ledenkaart (renderTracker) — zie de
+    // bouwgeschiedenis. conclusie kan hier null zijn (nog geen melding/berekenbare conclusie), dus
+    // het laatste stuk ("Dus ...") blijft dan weg, net als voorheen. bereikFlight is al hierboven
+    // (bij het spelersoverzicht) berekend.
     eigenKinderen.push(el("div", { class: "conclusieline" }, [
       document.createTextNode("Op basis van een start om "),
       el("b", { text: formatTijd(flight.starttijd_effectief) }),
-      document.createTextNode(" en een gemiddelde rondetijd van "),
-      el("b", { text: formatDuur(rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp, flight.ronde_type)) }),
-      document.createTextNode(` voor een ${flight.aantal_spelers}-bal over ${rondeInfo(flight.ronde_type).holesInRonde} holes zou deze flight nu ongeveer op de `),
+      document.createTextNode(" en een streeftijd tussen minimaal "),
+      el("b", { text: formatUurMin(bereikFlight.min) }),
+      document.createTextNode(" en maximaal "),
+      el("b", { text: formatUurMin(bereikFlight.max) }),
+      document.createTextNode(" zou deze flight nu ongeveer op de "),
       el("b", { text: `${CHECKPOINT_LABEL[positie.zelfPos.checkpoint]} van hole ${fysiekeHole(flight.ronde_type, positie.zelfPos.hole)}` }),
-      document.createTextNode(` moeten zijn. ${conclusie ? conclusie.zin : ""}`),
+      document.createTextNode(" moeten zijn."),
+      ...(conclusie ? [document.createTextNode(" Dus "), el("b", { text: conclusie.resultaatTekst }), document.createTextNode(".")] : []),
     ]));
   }
   if (adminLocal.flightDetailFout) eigenKinderen.push(el("div", { class: "msg err", text: adminLocal.flightDetailFout }));
@@ -2515,54 +2662,63 @@ async function vulAdminParametersTab(inhoud) {
   const [params] = await sb("parameters?select=*&limit=1");
   inhoud.innerHTML = "";
 
-  const iPar3 = el("input", { class: "paraminput", type: "number", step: "0.1", value: params.par3_minuten });
-  const iPar4 = el("input", { class: "paraminput", type: "number", step: "0.1", value: params.par4_minuten });
-  const iPar5 = el("input", { class: "paraminput", type: "number", step: "0.1", value: params.par5_minuten });
-  // v0.18.0 (Kay's verzoek 28 oktober 2026): hcp-/flightgrootte-correctie nu per hole-type i.p.v. één
-  // vlakke correctie voor de hele ronde — een extra speler/slag kost op een par 5 nu eenmaal meer
-  // tijd dan op een par 3. Zie schema.sql "Fase 2j" en rondetijdVoor() hierboven.
-  const iHcpPar3 = el("input", { class: "paraminput", type: "number", step: "0.01", value: params.hcp_correctie_par3_per_punt });
-  const iHcpPar4 = el("input", { class: "paraminput", type: "number", step: "0.01", value: params.hcp_correctie_par4_per_punt });
-  const iHcpPar5 = el("input", { class: "paraminput", type: "number", step: "0.01", value: params.hcp_correctie_par5_per_punt });
-  const iFlightPar3 = el("input", { class: "paraminput", type: "number", step: "0.1", value: params.flightgrootte_correctie_par3_per_speler });
-  const iFlightPar4 = el("input", { class: "paraminput", type: "number", step: "0.1", value: params.flightgrootte_correctie_par4_per_speler });
-  const iFlightPar5 = el("input", { class: "paraminput", type: "number", step: "0.1", value: params.flightgrootte_correctie_par5_per_speler });
+  // v0.20.0 (Kay's verzoek 28 oktober 2026): het per-hole-type-model (checkpointtijd + hcp-/
+  // flightgrootte-correctie per par-type, v0.18.0-v0.19.5) bleek te indirect — Kay wilde alleen de
+  // UITKOMST sturen, niet de per-hole bouwstenen. Vervangen door drie rechtstreeks ingevulde
+  // bereiken (min + max, in minuten) per flight-grootte. Zie rondetijdBereikVoor() en schema.sql
+  // "Fase 2k".
+  const iBal2Min = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal2_min_minuten });
+  const iBal2Max = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal2_max_minuten });
+  const iBal3Min = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal3_min_minuten });
+  const iBal3Max = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal3_max_minuten });
+  const iBal4Min = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal4_min_minuten });
+  const iBal4Max = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal4_max_minuten });
+  const alleVelden = [iBal2Min, iBal2Max, iBal3Min, iBal3Max, iBal4Min, iBal4Max];
 
-  // v0.19.0 (Kay's verzoek): van één losse voorbeeldregel per flightgrootte naar een matrix —
-  // flightgrootte (2/3/4-bal) × drie voorbeeldhandicaps, in decimale uren (formatUren). De drie
-  // handicaps zijn mijn eigen voorstel (laag/gemiddeld/hoog), geen door Kay bevestigde clubcijfers —
-  // zie mijn toelichting in de chat; pas aan als een andere spreiding beter past bij De Goyer.
-  const VOORBEELD_HANDICAPS = [10, 18, 28];
-  const voorbeeldtabel = el("div", { class: "voorbeeldtabel" });
-  const rondetijdVoorInput = (aantalSpelers, hcp) => {
-    const waarden = {
-      par3_minuten: parseFloat(iPar3.value) || 0,
-      par4_minuten: parseFloat(iPar4.value) || 0,
-      par5_minuten: parseFloat(iPar5.value) || 0,
-      hcp_correctie_par3_per_punt: parseFloat(iHcpPar3.value) || 0,
-      hcp_correctie_par4_per_punt: parseFloat(iHcpPar4.value) || 0,
-      hcp_correctie_par5_per_punt: parseFloat(iHcpPar5.value) || 0,
-      flightgrootte_correctie_par3_per_speler: parseFloat(iFlightPar3.value) || 0,
-      flightgrootte_correctie_par4_per_speler: parseFloat(iFlightPar4.value) || 0,
-      flightgrootte_correctie_par5_per_speler: parseFloat(iFlightPar5.value) || 0,
-    };
-    return rondetijdVoor(waarden, aantalSpelers, hcp, "18holes");
-  };
+  // "Verwachte rondetijden" is een kale weergave-mirror van de zes velden hiernaast (geen hcp-veld,
+  // geen berekening meer nodig) — puur een directe "#u## - #u##"-leesbaarheidscontrole op wat net is
+  // ingetypt. v0.20.2 (Kay's verzoek): apart getoond voor 9 en 18 holes — de ingevulde velden zijn
+  // altijd de 18-holes-waarden (zie rondetijdBereikVoor()), de 9-holes-tabel toont dezelfde waarden
+  // gehalveerd, exact dezelfde halvering die rondetijdBereikVoor() op de Tracker zelf toepast voor een
+  // 9holes_voor/9holes_achter-ronde — dus deze preview klopt met wat een lid op zo'n ronde te zien
+  // krijgt, i.p.v. alleen de 18-holes-waarde te tonen alsof die ook voor 9 holes zou gelden.
+  const vbBereik9_2 = el("div", { class: "vbcelbereik" });
+  const vbBereik9_3 = el("div", { class: "vbcelbereik" });
+  const vbBereik9_4 = el("div", { class: "vbcelbereik" });
+  const vbBereik18_2 = el("div", { class: "vbcelbereik" });
+  const vbBereik18_3 = el("div", { class: "vbcelbereik" });
+  const vbBereik18_4 = el("div", { class: "vbcelbereik" });
+  const maakVoorbeeldtabel = (b2, b3, b4) => el("div", { class: "voorbeeldtabel" }, [
+    el("div", { class: "vbkop", text: "2-Bal" }),
+    el("div", { class: "vbkop", text: "3-Bal" }),
+    el("div", { class: "vbkop", text: "4-Bal" }),
+    el("div", { class: "vbcel" }, [b2]),
+    el("div", { class: "vbcel" }, [b3]),
+    el("div", { class: "vbcel" }, [b4]),
+  ]);
+  const voorbeeldtabel9 = maakVoorbeeldtabel(vbBereik9_2, vbBereik9_3, vbBereik9_4);
+  const voorbeeldtabel18 = maakVoorbeeldtabel(vbBereik18_2, vbBereik18_3, vbBereik18_4);
+  const minutenGetal = (input) => parseFloat(input.value) || 0;
   const herbereken = () => {
-    voorbeeldtabel.innerHTML = "";
-    voorbeeldtabel.append(
-      el("div", { class: "vbkop" }),
-      ...VOORBEELD_HANDICAPS.map((hcp) => el("div", { class: "vbkop", text: `Hcp ${hcp}` })),
-    );
-    [["Tweebal", 2], ["Driebal", 3], ["Vierbal", 4]].forEach(([label, aantalSpelers]) => {
-      voorbeeldtabel.append(
-        el("div", { class: "vblabel", text: label }),
-        ...VOORBEELD_HANDICAPS.map((hcp) => el("div", { class: "vbcel", text: formatUren(rondetijdVoorInput(aantalSpelers, hcp)) })),
-      );
-    });
+    const paar = (min, max) => `${formatUurMin(minutenGetal(min))} - ${formatUurMin(minutenGetal(max))}`;
+    const paarGehalveerd = (min, max) => `${formatUurMin(minutenGetal(min) / 2)} - ${formatUurMin(minutenGetal(max) / 2)}`;
+    vbBereik18_2.textContent = paar(iBal2Min, iBal2Max);
+    vbBereik18_3.textContent = paar(iBal3Min, iBal3Max);
+    vbBereik18_4.textContent = paar(iBal4Min, iBal4Max);
+    vbBereik9_2.textContent = paarGehalveerd(iBal2Min, iBal2Max);
+    vbBereik9_3.textContent = paarGehalveerd(iBal3Min, iBal3Max);
+    vbBereik9_4.textContent = paarGehalveerd(iBal4Min, iBal4Max);
   };
   herbereken();
-  [iPar3, iPar4, iPar5, iHcpPar3, iHcpPar4, iHcpPar5, iFlightPar3, iFlightPar4, iFlightPar5].forEach((input) => input.addEventListener("input", herbereken));
+  // v0.19.4 (Kay's verzoek): de "Opslaan"-knop grijs/niet-klikbaar zodra de waarden overeenkomen met
+  // wat net geladen/opgeslagen is, en weer actief zodra een van de parametervelden wijzigt (nu 6
+  // i.p.v. 9). Omdat vulAdminParametersTab() sowieso opnieuw draait (via render()) ná elke
+  // opslagpoging — mét een verse fetch van de huidige database-waarden — hoeft dit geen apart "is
+  // dit gewijzigd t.o.v. wat is opgeslagen"-vergelijking te zijn: elke keer dat deze functie
+  // opnieuw draait staan de velden per definitie gelijk aan wat net geladen is, dus de knop mag dan
+  // simpelweg disabled starten.
+  const markeerGewijzigd = () => { opslaanBtn.disabled = false; };
+  alleVelden.forEach((input) => input.addEventListener("input", () => { herbereken(); markeerGewijzigd(); }));
 
   // v0.19.0 (Kay's verzoek): korte uitleg-popup bij de parameterkeuzes — zelfde modal-opzet als de
   // tips-popup (.tipsoverlay/.tipsmodal), bewust NIET via render() geopend/gesloten (dat zou de
@@ -2587,20 +2743,23 @@ async function vulAdminParametersTab(inhoud) {
 
   const opslaan = async () => {
     adminLocal.paramFout = null;
-    adminLocal.paramSucces = false;
     const nieuw = {
-      par3_minuten: parseFloat(iPar3.value),
-      par4_minuten: parseFloat(iPar4.value),
-      par5_minuten: parseFloat(iPar5.value),
-      hcp_correctie_par3_per_punt: parseFloat(iHcpPar3.value),
-      hcp_correctie_par4_per_punt: parseFloat(iHcpPar4.value),
-      hcp_correctie_par5_per_punt: parseFloat(iHcpPar5.value),
-      flightgrootte_correctie_par3_per_speler: parseFloat(iFlightPar3.value),
-      flightgrootte_correctie_par4_per_speler: parseFloat(iFlightPar4.value),
-      flightgrootte_correctie_par5_per_speler: parseFloat(iFlightPar5.value),
+      bal2_min_minuten: parseFloat(iBal2Min.value),
+      bal2_max_minuten: parseFloat(iBal2Max.value),
+      bal3_min_minuten: parseFloat(iBal3Min.value),
+      bal3_max_minuten: parseFloat(iBal3Max.value),
+      bal4_min_minuten: parseFloat(iBal4Min.value),
+      bal4_max_minuten: parseFloat(iBal4Max.value),
     };
     if (Object.values(nieuw).some((v) => Number.isNaN(v) || v < 0)) {
       adminLocal.paramFout = "Vul voor elk veld een geldig, niet-negatief getal in.";
+      render();
+      return;
+    }
+    // v0.20.0: nieuwe check zonder directe tegenhanger in het oude model — bij een vast min/max-
+    // bereik moet maximaal nu eenmaal groter zijn dan minimaal, anders is het geen bereik.
+    if (nieuw.bal2_max_minuten <= nieuw.bal2_min_minuten || nieuw.bal3_max_minuten <= nieuw.bal3_min_minuten || nieuw.bal4_max_minuten <= nieuw.bal4_min_minuten) {
+      adminLocal.paramFout = "Maximaal moet groter zijn dan minimaal, voor elke flight-grootte.";
       render();
       return;
     }
@@ -2611,7 +2770,10 @@ async function vulAdminParametersTab(inhoud) {
         method: "PATCH", prefer: "return=minimal",
         body: JSON.stringify({ ...nieuw, updated_at: new Date().toISOString() }),
       });
-      adminLocal.paramSucces = true;
+      // v0.19.4: expliciet disablen i.p.v. uitsluitend op de her-render (via render(), die de hele
+      // tab opnieuw opbouwt) vertrouwen — zo klopt de knopstatus ook los van render()-timing. Bij een
+      // fout blijft de knop bewust actief, zodat Kay kan herproberen zonder opnieuw te hoeven typen.
+      opslaanBtn.disabled = true;
     } catch (e) {
       adminLocal.paramFout = "Opslaan is niet gelukt. Probeer het nog eens.";
       console.error(e);
@@ -2622,25 +2784,42 @@ async function vulAdminParametersTab(inhoud) {
   };
 
   const fout = adminLocal.paramFout ? el("div", { class: "paramfout", text: adminLocal.paramFout }) : null;
-  const succes = adminLocal.paramSucces ? el("div", { class: "okmsg", text: "Opgeslagen." }) : null;
+
+  // v0.19.4 (Kay's verzoek): geen "Opgeslagen."-tekst meer — de knop zelf (grijs/niet-klikbaar na
+  // opslaan, zie markeerGewijzigd hierboven) laat nu zien dat de huidige waarden al opgeslagen zijn.
+  const opslaanBtn = el("button", { class: "btn", onclick: opslaan, text: adminLocal.paramBezig ? "Bezig…" : "Opslaan" });
+  opslaanBtn.disabled = true;
 
   const paramKaart = el("div", { class: "card" }, [
-    el("div", { class: "eyebrow", text: "Checkpointtijden" }),
-    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Par 3 (minuten)" }), iPar3]),
-    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Par 4 (minuten)" }), iPar4]),
-    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Par 5 (minuten)" }), iPar5]),
-    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Hcp-correctie Par 3 (min/punt)" }), iHcpPar3]),
-    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Hcp-correctie Par 4 (min/punt)" }), iHcpPar4]),
-    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Hcp-correctie Par 5 (min/punt)" }), iHcpPar5]),
-    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Flightgrootte-correctie Par 3 (min/speler)" }), iFlightPar3]),
-    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Flightgrootte-correctie Par 4 (min/speler)" }), iFlightPar4]),
-    el("div", { class: "paramrow" }, [el("div", { class: "paramlabel", text: "Flightgrootte-correctie Par 5 (min/speler)" }), iFlightPar5]),
-    el("p", { class: "help", text: "Verwachte rondetijden:" }),
-    voorbeeldtabel,
+    el("div", { class: "eyebrow", text: "Streeftijden" }),
+    el("div", { class: "paramrow" }, [
+      el("div", { class: "paramlabel", text: "2-bal (minuten)" }),
+      el("div", { class: "paramminmax" }, [
+        el("div", { class: "paramminmaxgroup" }, [el("span", { class: "paramminmaxlabel", text: "min" }), iBal2Min]),
+        el("div", { class: "paramminmaxgroup" }, [el("span", { class: "paramminmaxlabel", text: "max" }), iBal2Max]),
+      ]),
+    ]),
+    el("div", { class: "paramrow" }, [
+      el("div", { class: "paramlabel", text: "3-bal (minuten)" }),
+      el("div", { class: "paramminmax" }, [
+        el("div", { class: "paramminmaxgroup" }, [el("span", { class: "paramminmaxlabel", text: "min" }), iBal3Min]),
+        el("div", { class: "paramminmaxgroup" }, [el("span", { class: "paramminmaxlabel", text: "max" }), iBal3Max]),
+      ]),
+    ]),
+    el("div", { class: "paramrow" }, [
+      el("div", { class: "paramlabel", text: "4-bal (minuten)" }),
+      el("div", { class: "paramminmax" }, [
+        el("div", { class: "paramminmaxgroup" }, [el("span", { class: "paramminmaxlabel", text: "min" }), iBal4Min]),
+        el("div", { class: "paramminmaxgroup" }, [el("span", { class: "paramminmaxlabel", text: "max" }), iBal4Max]),
+      ]),
+    ]),
+    el("div", { class: "eyebrow", style: "margin-top:14px", text: "Verwachte rondetijden — 9 holes" }),
+    voorbeeldtabel9,
+    el("div", { class: "eyebrow", style: "margin-top:14px", text: "Verwachte rondetijden — 18 holes" }),
+    voorbeeldtabel18,
     ...(fout ? [fout] : []),
-    ...(succes ? [succes] : []),
     el("button", { class: "btn secondary", style: "margin-top:12px", onclick: toonVerantwoording, text: "Verantwoording" }),
-    el("button", { class: "btn", onclick: opslaan, text: adminLocal.paramBezig ? "Bezig…" : "Opslaan" }),
+    opslaanBtn,
   ]);
 
   const analyseBtn = el("button", { class: "btn secondary", text: "📊 Analyseer huidige flights" });
@@ -2658,7 +2837,7 @@ async function vulAdminParametersTab(inhoud) {
       // telling altijd exact dezelfde minuten-banden hanteert als de rest van de app.
       let opSchema = 0, achter = 0, verAchter = 0, somAfwijkingMin = 0;
       for (const flight of metMelding) {
-        const minutenPerHole = rondetijdVoor(params, flight.aantal_spelers, flight.gemiddelde_hcp, flight.ronde_type) / rondeInfo(flight.ronde_type).holesInRonde;
+        const minutenPerHole = rondetijdBereikVoor(params, flight.aantal_spelers, flight.ronde_type).max / rondeInfo(flight.ronde_type).holesInRonde;
         const zelfPos = verwachtePositie(flight.starttijd_effectief, minutenPerHole, nu, flight.ronde_type);
         const actueleFractie = (flight.gerapporteerde_hole - 1) + checkpointFractie(flight.gerapporteerd_checkpoint);
         const deltaMinuten = (actueleFractie - zelfPos.fractie) * minutenPerHole;
