@@ -39,7 +39,6 @@
   .brandwrap{flex:1;min-width:0}
   .brand{font-size:15px;font-weight:800;color:var(--accent);letter-spacing:0.2px}
   .sub{font-size:13px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .versiebadge{font-size:11px;font-weight:600;color:var(--muted);flex-shrink:0;align-self:flex-start;margin-top:2px}
   /* flex-start (ipv eerder: center) zodat het invoerveld bij een opkomend toetsenbord niet
      onder de rand van het scherm verdwijnt — de inhoud begint nu gewoon bovenaan */
   .screen{flex:1;display:flex;flex-direction:column;justify-content:flex-start;padding:24px 0 40px 0;gap:16px}
@@ -110,21 +109,15 @@
     border:none;cursor:pointer;font-size:15px;font-weight:800;color:var(--accent);text-align:center}
 
   /* GPS-ondersteunde check-in (eigen kaart) — zie startGpsPositiebepaling()/gpsPending in index.html */
-  /* GPS-statuspil (v0.17.0, Kay's verzoek tijdens de veldtest: "ik kan nergens zien of gps wel of
-     niet actief is of werkt") — altijd zichtbaar bovenaan de eigen kaart, zie bouwGpsStatusRegel(). */
-  .gpsstatuspil{display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;
-    font-weight:700;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:8px}
+  /* v0.20.5 (Kay's verzoek, screenshot: "veel te veel informatie... ik wil alleen GPS icoontje"):
+     de vroegere statuspil + uitlegtekst + mislukt-tekst + retry-knop (v0.17.0/27 okt 2026) zijn
+     vervangen door alleen een klein icoontje rechts naast de kaarttitel — zie .eyebrowrow/.gpsicoon
+     en bouwGpsIcoon() hieronder. */
+  .eyebrowrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+  .gpsicoon{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:22px;height:22px}
   .gpssubregel{font-size:13px;font-weight:600;color:rgba(255,255,255,0.75);text-align:center;margin-bottom:10px}
-  .gpsuitleg{font-size:13px;color:rgba(255,255,255,0.85);line-height:1.4;margin-bottom:10px}
   .gpsbevestigbtn{margin-top:12px;width:100%;box-sizing:border-box;padding:13px 14px;border-radius:14px;
     background:#fff;border:none;cursor:pointer;font-size:15px;font-weight:800;text-align:center}
-  /* GPS mislukt (toegevoegd 27 oktober 2026, Kay's feedback tijdens veldtest): voorheen faalde een
-     GPS-poging volledig stil — geen melding, geen manier om het opnieuw te proberen, de speler kon
-     niet zien of de functie er überhaupt was. Zie gpsStatus === "nietBeschikbaar" in renderTracker. */
-  .gpsmisluktregel{font-size:13px;color:rgba(255,255,255,0.75);line-height:1.4;margin-bottom:8px;text-align:center}
-  .gpsretrybtn{margin-bottom:12px;width:100%;box-sizing:border-box;padding:10px 14px;border-radius:14px;
-    background:transparent;border:1.5px solid rgba(255,255,255,0.5);cursor:pointer;font-size:13px;
-    font-weight:700;color:rgba(255,255,255,0.92);text-align:center}
 
   /* Gat-signaal met de startbuur (v0.17.0, eigen kaart) — zie evalueerGatMetStartbuur in index.html.
      Puur een tekstmelding met een Ja/Nee-vraag, geen blokkade van de rest van de kaart. */
@@ -287,7 +280,6 @@
       <div class="brand">GoyerFlow</div>
       <div class="sub" id="subline">Speeltempo-tracker voor leden</div>
     </div>
-    <div class="versiebadge" id="versiebadge"></div>
   </div>
   <div id="app" class="screen"></div>
 </div>
@@ -713,8 +705,54 @@
        Bijvangst: formatUurMin() rondde voorheen niet af — bij een oneven aantal minuten gaf een
        halvering een halve minuut (bv. "1u45.5"); rondt nu af op de hele minuut vóór het opsplitsen
        in uren/minuten. Geen wijziging aan de rekenkern, validatie of opslaanlogica.
+   v0.20.3 (Kay's verzoek, ledenscherm): drie van de vier gevraagde punten (topbar-subline
+       "#-bal · gestart ##:##", versie-informatie onder "GoyerFlow", en de "Streeftijd"-regel/
+       infotekst-structuur zelf) stonden al sinds v0.20.0 precies zo gebouwd — alleen de tijdnotatie
+       in de Streeftijd-regel en de infotekst-na-melding gebruikte nog de compacte "#u##"-vorm i.p.v.
+       Kay's "# uur ## minuten". Nieuwe functie formatUurMinWoorden(), gebruikt op het LEDENSCHERM
+       (bouwSpelersoverzicht + renderTracker's eigen conclusieline) i.p.v. formatUurMin() — de
+       beheerder-popup (bouwSpelersoverzichtBeheer, bouwFlightDetailModal) en de Parameters-tab
+       blijven bewust de compacte notatie houden, niet gevraagd voor die schermen (zie chat voor
+       navraag of dit ook daar gewenst is).
+   v0.20.4 (correctie op v0.20.3, Kay's screenshot): de "JOUW FLIGHT"-kop boven het spelersoverzicht
+       bleek in werkelijkheid NOOIT vervangen te zijn — een eerdere bouwgeschiedenis-notitie
+       beweerde ten onrechte dat dit al bij v0.14.x was gebeurd, zonder dat tegen de broncode te
+       verifiëren; de eyebrow-tekst "Jouw flight" stond er nog steeds, en de .eyebrow-CSS
+       (text-transform:uppercase) toonde dat als "JOUW FLIGHT". Nu daadwerkelijk vervangen door
+       dezelfde "#-bal · gestart ##:##"-tekst en -opmaak (.sub-class) als de topbar-subline erboven.
+   v0.20.5 (Kay's verzoek, screenshot van v0.20.4): twee punten.
+   (1) De v0.20.4-fix liet "3-bal · gestart ##:##" nu TWEE keer zien (topbar-subline én de nieuwe
+       kop boven het spelersoverzicht). Kay's oorspronkelijke verzoek was altijd dat de topbar-
+       subline versie-informatie zou tonen — dat stond tot nu toe alleen op het inlogscherm (de
+       tracker-/beheerderstak overschreven het met resp. "#-bal · gestart ##:##"/"Beheerder").
+       render() zet sub.textContent nu één keer, vooraan, ongeacht scherm — geen per-scherm
+       overschrijving meer.
+   (2) GPS-blok op de eigen kaart herbouwd: de statuspil met tekst ("GPS zoekt…"/"GPS gevonden"/
+       "GPS bevestigd"/"Geen GPS"), de uitlegregel ("We gebruiken je locatie...") en de mislukt-
+       tekst+"Probeer locatie opnieuw"-knop zijn vervallen — "veel te veel informatie". Nieuwe
+       bouwGpsIcoon(): alleen een klein pin-icoontje, rechts op dezelfde regel als de (nu links
+       uitgelijnde) korttitel — nieuwe .eyebrowrow. Wit = GPS actief/gezocht/bevestigd, rood =
+       gpsStatus "nietBeschikbaar". Het icoontje is in de rode stand klikbaar en start dan opnieuw
+       een GPS-poging — dezelfde functie als de weggehaalde retry-knop, nu zonder zichtbare tekst.
+   v0.20.6 (Kay's verzoek, screenshot van v0.20.5): de subline onder "GoyerFlow" toonde nog
+       "GoyerFlow versie 0.20.5" (het woord "GoyerFlow" staat al als titel erboven) — nu kortweg
+       "v0.20.5". De losse versiebadge rechtsboven naast "Uitloggen" (#versiebadge) is vervallen —
+       dat was de tweede, ongewenste plek met versie-info (zie v0.20.0-aanname 3: "zeg het als je
+       liever één van de twee weghaalt" — dit is dat antwoord). Eén versie-indicator, op één plek,
+       op elk scherm.
+   v0.21.0 (Kay's verzoek 28 oktober 2026): een 9-holes ronde las tot nu toe de 18-holes-
+       streeftijden gehalveerd (rondetijdBereikVoor(), factor 0,5, sinds v0.20.0). Kay wil dat apart
+       kunnen instellen — een 9-holes ronde is niet per definitie exact de helft van een 18-holes
+       ronde. Zes nieuwe parameters (bal{2,3,4}_min/max_minuten_9h, schema.sql "Fase 2l", defaults =
+       de helft van de Fase 2k-defaults, dus ongewijzigd gedrag totdat Kay ze zelf aanpast).
+       rondetijdBereikVoor() leest nu per rondelengte rechtstreeks haar eigen kolommenpaar, geen
+       factor/AANTAL_HOLES-rekenwerk meer. Admin Parameters-tab: nieuwe sectie "Streeftijden — 9
+       holes" (6 velden) vóór de bestaande, nu zo gelabelde "Streeftijden — 18 holes"-sectie (12
+       velden totaal) — de max>min-validatie en de "Verwachte rondetijden"-previews gelden nu voor
+       beide sets onafhankelijk (de 9-holes-preview is niet langer een afgeleide van de 18-holes-
+       velden).
    ============================================================================================ */
-const APP_VERSIE = "0.20.2";
+const APP_VERSIE = "0.21.0";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -893,13 +931,17 @@ function loggen(persoonscode, type, succes) {
 //
 // Voor een 9-holes ronde (rondeType 9holes_voor/9holes_achter) wordt het 18-holes-bereik
 // gehalveerd — er zijn geen apart ingevulde 9-holes-parameters.
+// v0.21.0 (Kay's verzoek 28 oktober 2026): een 9-holes ronde gebruikte tot nu toe de 18-holes-
+// parameters gehalveerd (factor 0,5) — Kay wil dat apart kunnen instellen, want een 9-holes ronde is
+// niet per definitie exact de helft van een 18-holes ronde (bv. een vaste "inkomtijd" op de eerste
+// hole weegt relatief zwaarder mee over minder holes). Zes nieuwe kolommen (bal{n}_min/max_minuten_9h,
+// schema.sql "Fase 2l") i.p.v. een berekende halvering; geen `factor`/`AANTAL_HOLES`-rekenwerk meer
+// nodig, elke rondelengte leest nu rechtstreeks zijn eigen ingevulde paar.
 function rondetijdBereikVoor(params, aantalSpelers, rondeType) {
   const n = aantalSpelers <= 2 ? 2 : aantalSpelers === 3 ? 3 : 4;
-  const min = params[`bal${n}_min_minuten`];
-  const max = params[`bal${n}_max_minuten`];
   const { holesInRonde } = rondeInfo(rondeType);
-  const factor = holesInRonde / AANTAL_HOLES; // 1 voor 18 holes, 0.5 voor 9 holes
-  return { min: min * factor, max: max * factor };
+  const suffix = holesInRonde === 9 ? "_9h" : "";
+  return { min: params[`bal${n}_min_minuten${suffix}`], max: params[`bal${n}_max_minuten${suffix}`] };
 }
 
 // "hole" hierin (en in pasWachttijdToe/projecteerVanafMelding) blijft RONDE-RELATIEF (1 = eerste
@@ -1029,6 +1071,19 @@ function formatUurMin(minuten) {
   const h = Math.floor(totaal / 60);
   const m = totaal - h * 60;
   return `${h}u${String(m).padStart(2, "0")}`;
+}
+
+// v0.20.3 (Kay's verzoek, ledenscherm): voluit-geschreven variant van formatUurMin() hierboven
+// ("3 uur 05 minuten" i.p.v. "3u05"), voor de Streeftijd-regel en de infotekst-na-melding op het
+// LEDENSCHERM (renderTracker/bouwSpelersoverzicht). Bewust een aparte functie i.p.v. formatUurMin()
+// zelf aan te passen: de beheerder-kant (bouwSpelersoverzichtBeheer, bouwFlightDetailModal) en de
+// Parameters-tab-voorbeeldtabellen blijven de compacte "#u##"-notatie gebruiken — alleen voor het
+// ledenscherm was dit expliciet gevraagd.
+function formatUurMinWoorden(minuten) {
+  const totaal = Math.round(minuten);
+  const h = Math.floor(totaal / 60);
+  const m = totaal - h * 60;
+  return `${h} uur ${String(m).padStart(2, "0")} minuten`;
 }
 
 // Conclusie bij een zelf-gemelde positie. Tot v0.17.1 een holes-relatieve indeling in 5 categorieën
@@ -1359,10 +1414,19 @@ function render() {
   // en een contextregel in plaats van de generieke ondertitel.
   const bestaandeLogoutbtn = document.getElementById("logoutbtn");
   if (bestaandeLogoutbtn) bestaandeLogoutbtn.remove();
+  // v0.20.5 (Kay's verzoek, screenshot): de topbar-subline (direct onder "GoyerFlow") toont nu
+  // ALTIJD versie-informatie, ongeacht scherm — voorheen toonde de tracker-/beheerderstak hier nog
+  // "#-bal · gestart ##:##" resp. "Beheerder", wat sinds v0.20.4 (de nieuwe kop boven het
+  // spelersoverzicht) een onbedoelde dubbeling gaf op het trackerscherm. Eén plek, één soort
+  // informatie, verderop in deze functie niet meer per scherm overschreven.
+  // v0.20.6 (Kay's verzoek, screenshot van v0.20.5): kortere "v0.20.5"-vorm i.p.v. "GoyerFlow versie
+  // 0.20.5" (het woord "GoyerFlow" staat al als titel erboven) — en de losse versiebadge rechtsboven
+  // (naast "Uitloggen") is vervallen, dat was de tweede, ongewenste plek met versie-info (zie
+  // aanname 3 bij v0.20.0: "zeg het als je liever één van de twee weghaalt" — dit is dat antwoord).
+  sub.textContent = `v${APP_VERSIE}`;
   if (state.scherm === "tracker" && state.flight) {
     const logoutBtn = el("button", { class: "logoutbtn", id: "logoutbtn", "aria-label": "Uitloggen", onclick: logout, text: "Uitloggen" });
     topbar.appendChild(logoutBtn);
-    sub.textContent = `${state.flight.aantal_spelers}-bal · gestart ${formatTijd(state.flight.starttijd_effectief)}`;
     if (!trackerIntervalId) {
       trackerIntervalId = setInterval(() => {
         if (state.scherm === "tracker") renderTracker(document.getElementById("app"), { stil: true });
@@ -1376,7 +1440,6 @@ function render() {
   } else if (state.scherm === "admin") {
     const logoutBtn = el("button", { class: "logoutbtn", id: "logoutbtn", "aria-label": "Uitloggen", onclick: adminUitloggen, text: "Uitloggen" });
     topbar.appendChild(logoutBtn);
-    sub.textContent = "Beheerder";
     if (trackerIntervalId) { clearInterval(trackerIntervalId); trackerIntervalId = null; }
     if (tijdlijnIntervalId) { clearInterval(tijdlijnIntervalId); tijdlijnIntervalId = null; }
     if (!adminIntervalId) {
@@ -1388,10 +1451,6 @@ function render() {
       }, TRACKER_VERVERS_MS);
     }
   } else {
-    // v0.20.0 (Kay's verzoek 28 oktober 2026): de statische tekst direct onder "GoyerFlow" toont nu
-    // versie-informatie i.p.v. een vaste omschrijving — de kleine versiebadge rechtsboven
-    // (#versiebadge) blijft daarnaast ook gewoon staan, zie de bouwgeschiedenis.
-    sub.textContent = `GoyerFlow versie ${APP_VERSIE}`;
     if (trackerIntervalId) { clearInterval(trackerIntervalId); trackerIntervalId = null; }
     if (tijdlijnIntervalId) { clearInterval(tijdlijnIntervalId); tijdlijnIntervalId = null; }
     if (adminIntervalId) { clearInterval(adminIntervalId); adminIntervalId = null; }
@@ -1682,7 +1741,7 @@ function bouwSpelersoverzicht(spelers, bereik, holesInRonde) {
     // bedoeld (label links, getal rechts) — niet alleen een losse spatie toevoegen.
     kinderen.push(el("div", { class: "streeftijdrow" }, [
       el("span", { text: `Streeftijd ${holesInRonde} holes` }),
-      el("span", { text: `maximaal ${formatUurMin(bereik.max)}` }),
+      el("span", { text: `maximaal ${formatUurMinWoorden(bereik.max)}` }),
     ]));
   }
   return kinderen;
@@ -1750,21 +1809,25 @@ function bouwSpelersoverzichtBeheer(teecontrolSpelers, legeTekst, bereik, holesI
   return kinderen;
 }
 
-// GPS-statuspil (v0.17.0): altijd zichtbaar zodra de ronde gestart is, los van de overige
-// gpsPending/moetOpnieuwBevestigen-teksten hieronder (die zijn onderling exclusief — dit is dat
-// bewust niet, zodat de status nooit verdwijnt). "onbekend" (het zeer korte moment vóór de allereerste
-// fix, zie startGpsPositiebepaling()) wordt behandeld als "bezig" — in de praktijk wordt renderTracker
-// pas aangeroepen nadat gpsStatus al op "bezig" is gezet, zie de toelichting bij startGpsPositiebepaling.
-function bouwGpsStatusRegel() {
-  const status = trackerLocal.gpsBevestigd ? "bevestigd"
-    : trackerLocal.gpsStatus === "beschikbaar" ? "gevonden"
-    : trackerLocal.gpsStatus === "nietBeschikbaar" ? "uit"
-    : "bezig";
-  const KLEUR = { bezig: "rgba(255,255,255,0.55)", gevonden: "#fff", bevestigd: "#fff", uit: "rgba(255,255,255,0.4)" };
-  const TEKST = { bezig: "GPS zoekt…", gevonden: "GPS gevonden", bevestigd: "GPS bevestigd", uit: "Geen GPS" };
-  const kleur = KLEUR[status];
-  const icoon = status === "bevestigd" ? checkSvg(kleur) : gpsPinSvg(kleur, status === "gevonden" || status === "bevestigd");
-  return el("div", { class: "gpsstatuspil", style: "color:" + kleur }, [icoon, el("span", { text: TEKST[status] })]);
+// GPS-icoontje (v0.17.0, herbouwd v0.20.5): altijd zichtbaar zodra de ronde gestart is, los van de
+// overige gpsPending/moetOpnieuwBevestigen-teksten hieronder. v0.20.5 (Kay's verzoek: "ik wil alleen
+// GPS icoontje" i.p.v. de vroegere statuspil met tekst): nog maar twee zichtbare toestanden — "aan"
+// (wit, zodra er een fix is/wordt gezocht of al bevestigd — kortom, GPS is niet mislukt) en "uit"
+// (rood, gpsStatus === "nietBeschikbaar"). "onbekend" (het zeer korte moment vóór de allereerste fix,
+// zie startGpsPositiebepaling()) telt mee als "aan" — in de praktijk wordt renderTracker pas
+// aangeroepen nadat gpsStatus al op "bezig" is gezet. Klikbaar in de "uit"-stand om opnieuw te
+// proberen — dezelfde functionaliteit als de weggehaalde "Probeer locatie opnieuw"-knop, nu zonder
+// zichtbare tekst.
+function bouwGpsIcoon() {
+  const uit = trackerLocal.gpsStatus === "nietBeschikbaar";
+  const kleur = uit ? "#D9483C" : "#fff";
+  const icoon = el("div", {
+    class: "gpsicoon",
+    style: uit ? "cursor:pointer" : "",
+    "aria-label": uit ? "GPS niet beschikbaar — tik om opnieuw te proberen" : "GPS actief",
+  }, [gpsPinSvg(kleur, true)]);
+  if (uit) icoon.addEventListener("click", () => { startGpsPositiebepaling(); render(); });
+  return icoon;
 }
 
 /* ---- Scherm 4: tracker ---- */
@@ -1921,18 +1984,17 @@ async function renderTracker(app, opts = {}) {
   // (v0.16.0) Vóór de starttijd krijgt de kaart een eigen, sterk vereenvoudigde inhoud — zie
   // nogNietGestart hierboven. Geen eyebrow-tekstkeuze/subregel-logica (gpsPending/moetOpnieuwBe-
   // vestigen) nodig in dat geval: die gaan allemaal over een lopende ronde.
-  const meKinderen = [el("div", {
-    class: "eyebrow",
-    text: nogNietGestart
-      ? "Nog niet gestart"
-      : gpsPending
-        ? `Je bent op de ${CHECKPOINT_LABEL[trackerLocal.gpsCheckpointDraft]} van hole ${fysiekeHole(zelf.ronde_type, zelfHoleWeergave)}`
-        : (heeftGekozen ? "Waar is jouw flight nu?" : "Maak een keuze: waar is jouw flight nu?"),
-  })];
-  if (!nogNietGestart) {
-    // (v0.17.0) Altijd als eerste, los van de hierna volgende (onderling exclusieve) subregels.
-    meKinderen.push(bouwGpsStatusRegel());
-  }
+  // v0.20.5 (Kay's verzoek, screenshot): titel links uitgelijnd (was gecentreerd, zie .card.me
+  // .eyebrow), GPS-icoontje ernaast rechts op dezelfde regel i.p.v. een losse statuspil eronder.
+  const eyebrowTekst = nogNietGestart
+    ? "Nog niet gestart"
+    : gpsPending
+      ? `Je bent op de ${CHECKPOINT_LABEL[trackerLocal.gpsCheckpointDraft]} van hole ${fysiekeHole(zelf.ronde_type, zelfHoleWeergave)}`
+      : (heeftGekozen ? "Waar is jouw flight nu?" : "Maak een keuze: waar is jouw flight nu?");
+  const meKinderen = [el("div", { class: "eyebrowrow" }, [
+    el("div", { class: "eyebrow", style: "margin-bottom:0;text-align:left", text: eyebrowTekst }),
+    ...(!nogNietGestart ? [bouwGpsIcoon()] : []),
+  ])];
   if (nogNietGestart) {
     meKinderen.push(el("div", { class: "rondeklaartekst", text: `Deze flight start om ${formatTijd(zelf.starttijd_effectief)}. Kom daarna terug om je positie te melden.` }));
   } else if (gpsPending) {
@@ -1961,23 +2023,10 @@ async function renderTracker(app, opts = {}) {
     meKinderen.push(el("div", { class: "rondeklaartekst", text: `Op basis van jullie starttijd zouden jullie alle ${rondeInfo(zelf.ronde_type).holesInRonde} holes nu gespeeld moeten hebben.` }));
     meKinderen.push(el("button", { class: "rondeafgerondbtn", onclick: zelfRondeAfgerond, text: "Ronde afgerond" }));
   } else {
-    // Terwijl de GPS-fix nog loopt: een korte, vaste uitleg waarom de locatie gevraagd wordt (zie
-    // het permissie-schot van de browser zelf) — exacte tekst door Kay bevestigd.
-    if (trackerLocal.gpsStatus === "bezig") {
-      meKinderen.push(el("div", { class: "gpsuitleg", text: "We gebruiken je locatie alleen om je ruwe positie te bepalen, jij bevestigt altijd zelf." }));
-    } else if (trackerLocal.gpsStatus === "nietBeschikbaar") {
-      // Vroeger hier stil niets — de speler zag geen verschil tussen "geen GPS geprobeerd" en "GPS
-      // geprobeerd maar mislukt/geweigerd/geen match binnen bereik". Niet-blokkerend (de kaart werkt
-      // gewoon door met de gewone stepper/marker-knoppen eronder), maar wel zichtbaar + een manier om
-      // het zonder het scherm te verlaten opnieuw te proberen (bijv. na een nieuwe locatietoestemming
-      // of een beter GPS-signaal verderop op de baan).
-      meKinderen.push(el("div", { class: "gpsmisluktregel", text: "Locatie ophalen lukte niet — je kunt hieronder gewoon zelf je positie melden." }));
-      meKinderen.push(el("button", {
-        class: "gpsretrybtn",
-        onclick: () => { startGpsPositiebepaling(); render(); },
-        text: "Probeer locatie opnieuw",
-      }));
-    }
+    // v0.20.5: de vroegere "We gebruiken je locatie..."-uitleg (gpsStatus "bezig") en de
+    // "Locatie ophalen lukte niet..."-tekst + "Probeer locatie opnieuw"-knop (gpsStatus
+    // "nietBeschikbaar") zijn vervallen — die status is nu puur zichtbaar via het icoontje
+    // hierboven (bouwGpsIcoon), dat in de "uit"-stand ook meteen de retry-functie overneemt.
     meKinderen.push(
       el("div", { class: "stepperrow big" }, [stepMinZelf, el("div", { class: "stepvalue big", text: String(fysiekeHole(zelf.ronde_type, zelfHoleWeergave)) }), stepPlusZelf]),
       el("div", { class: "markerrow big" }, markerKnoppenZelf)
@@ -2051,9 +2100,9 @@ async function renderTracker(app, opts = {}) {
           document.createTextNode("Op basis van een start om "),
           el("b", { text: formatTijd(zelf.starttijd_effectief) }),
           document.createTextNode(" en een streeftijd tussen minimaal "),
-          el("b", { text: formatUurMin(zelfBereik.min) }),
+          el("b", { text: formatUurMinWoorden(zelfBereik.min) }),
           document.createTextNode(" en maximaal "),
-          el("b", { text: formatUurMin(zelfBereik.max) }),
+          el("b", { text: formatUurMinWoorden(zelfBereik.max) }),
           document.createTextNode(" zou je nu ongeveer op de "),
           el("b", { text: `${CHECKPOINT_LABEL[zelfPos.checkpoint]} van hole ${fysiekeHole(zelf.ronde_type, zelfPos.hole)}` }),
           document.createTextNode(" moeten zijn. Dus "),
@@ -2071,7 +2120,12 @@ async function renderTracker(app, opts = {}) {
   // Spelersoverzicht van de EIGEN flight (v0.7.0), net onder de topbar — Kay's verzoek: dezelfde
   // lay-out als de Admin-popup (naam t/m de Streeftijd-regel), nu ook zichtbaar voor leden zelf.
   const spelersKaart = el("div", { class: "card" }, [
-    el("div", { class: "eyebrow", text: "Jouw flight" }),
+    // v0.20.4 (Kay's verzoek, screenshot): de eyebrow-tekst "Jouw flight" werd door de .eyebrow-CSS
+    // (text-transform:uppercase) als "JOUW FLIGHT" getoond — bleek bij navraag abusievelijk nooit
+    // vervangen te zijn (een eerdere bouwgeschiedenis-notitie zei ten onrechte dat dit al gebeurd
+    // was, zonder dat tegen de broncode te verifiëren). Nu dezelfde "#-bal · gestart ##:##"-tekst en
+    // -stijl (.sub, zelfde class als de topbar-subline) als boven in de topbar staat.
+    el("div", { class: "sub", style: "margin-bottom:8px", text: `${zelf.aantal_spelers}-bal · gestart ${formatTijd(zelf.starttijd_effectief)}` }),
     ...bouwSpelersoverzicht(zelf.spelers, zelfBereik, rondeInfo(zelf.ronde_type).holesInRonde),
   ]);
 
@@ -2673,15 +2727,22 @@ async function vulAdminParametersTab(inhoud) {
   const iBal3Max = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal3_max_minuten });
   const iBal4Min = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal4_min_minuten });
   const iBal4Max = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal4_max_minuten });
-  const alleVelden = [iBal2Min, iBal2Max, iBal3Min, iBal3Max, iBal4Min, iBal4Max];
+  // v0.21.0 (Kay's verzoek 28 oktober 2026): een 9-holes ronde las tot nu toe de 18-holes-velden
+  // hierboven, gehalveerd (zie de oude rondetijdBereikVoor()). Nu zes eigen velden, apart in te
+  // stellen — zie schema.sql "Fase 2l" en de herschreven rondetijdBereikVoor().
+  const iBal2Min9 = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal2_min_minuten_9h });
+  const iBal2Max9 = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal2_max_minuten_9h });
+  const iBal3Min9 = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal3_min_minuten_9h });
+  const iBal3Max9 = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal3_max_minuten_9h });
+  const iBal4Min9 = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal4_min_minuten_9h });
+  const iBal4Max9 = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal4_max_minuten_9h });
+  const alleVelden = [iBal2Min, iBal2Max, iBal3Min, iBal3Max, iBal4Min, iBal4Max,
+    iBal2Min9, iBal2Max9, iBal3Min9, iBal3Max9, iBal4Min9, iBal4Max9];
 
-  // "Verwachte rondetijden" is een kale weergave-mirror van de zes velden hiernaast (geen hcp-veld,
-  // geen berekening meer nodig) — puur een directe "#u## - #u##"-leesbaarheidscontrole op wat net is
-  // ingetypt. v0.20.2 (Kay's verzoek): apart getoond voor 9 en 18 holes — de ingevulde velden zijn
-  // altijd de 18-holes-waarden (zie rondetijdBereikVoor()), de 9-holes-tabel toont dezelfde waarden
-  // gehalveerd, exact dezelfde halvering die rondetijdBereikVoor() op de Tracker zelf toepast voor een
-  // 9holes_voor/9holes_achter-ronde — dus deze preview klopt met wat een lid op zo'n ronde te zien
-  // krijgt, i.p.v. alleen de 18-holes-waarde te tonen alsof die ook voor 9 holes zou gelden.
+  // "Verwachte rondetijden" is een kale weergave-mirror van de velden hiernaast — puur een directe
+  // "#u## - #u##"-leesbaarheidscontrole op wat net is ingetypt. v0.21.0: de 9-holes-tabel is nu ook
+  // een kale mirror van haar EIGEN zes velden (iBal*Min9/Max9) i.p.v. de 18-holes-waarden gehalveerd
+  // — zie de herschreven rondetijdBereikVoor(), die nu hetzelfde doet op de Tracker zelf.
   const vbBereik9_2 = el("div", { class: "vbcelbereik" });
   const vbBereik9_3 = el("div", { class: "vbcelbereik" });
   const vbBereik9_4 = el("div", { class: "vbcelbereik" });
@@ -2701,13 +2762,12 @@ async function vulAdminParametersTab(inhoud) {
   const minutenGetal = (input) => parseFloat(input.value) || 0;
   const herbereken = () => {
     const paar = (min, max) => `${formatUurMin(minutenGetal(min))} - ${formatUurMin(minutenGetal(max))}`;
-    const paarGehalveerd = (min, max) => `${formatUurMin(minutenGetal(min) / 2)} - ${formatUurMin(minutenGetal(max) / 2)}`;
     vbBereik18_2.textContent = paar(iBal2Min, iBal2Max);
     vbBereik18_3.textContent = paar(iBal3Min, iBal3Max);
     vbBereik18_4.textContent = paar(iBal4Min, iBal4Max);
-    vbBereik9_2.textContent = paarGehalveerd(iBal2Min, iBal2Max);
-    vbBereik9_3.textContent = paarGehalveerd(iBal3Min, iBal3Max);
-    vbBereik9_4.textContent = paarGehalveerd(iBal4Min, iBal4Max);
+    vbBereik9_2.textContent = paar(iBal2Min9, iBal2Max9);
+    vbBereik9_3.textContent = paar(iBal3Min9, iBal3Max9);
+    vbBereik9_4.textContent = paar(iBal4Min9, iBal4Max9);
   };
   herbereken();
   // v0.19.4 (Kay's verzoek): de "Opslaan"-knop grijs/niet-klikbaar zodra de waarden overeenkomen met
@@ -2750,6 +2810,14 @@ async function vulAdminParametersTab(inhoud) {
       bal3_max_minuten: parseFloat(iBal3Max.value),
       bal4_min_minuten: parseFloat(iBal4Min.value),
       bal4_max_minuten: parseFloat(iBal4Max.value),
+      // v0.21.0: de zes 9-holes-velden, los van de 18-holes-velden hierboven — zie schema.sql
+      // "Fase 2l".
+      bal2_min_minuten_9h: parseFloat(iBal2Min9.value),
+      bal2_max_minuten_9h: parseFloat(iBal2Max9.value),
+      bal3_min_minuten_9h: parseFloat(iBal3Min9.value),
+      bal3_max_minuten_9h: parseFloat(iBal3Max9.value),
+      bal4_min_minuten_9h: parseFloat(iBal4Min9.value),
+      bal4_max_minuten_9h: parseFloat(iBal4Max9.value),
     };
     if (Object.values(nieuw).some((v) => Number.isNaN(v) || v < 0)) {
       adminLocal.paramFout = "Vul voor elk veld een geldig, niet-negatief getal in.";
@@ -2758,8 +2826,10 @@ async function vulAdminParametersTab(inhoud) {
     }
     // v0.20.0: nieuwe check zonder directe tegenhanger in het oude model — bij een vast min/max-
     // bereik moet maximaal nu eenmaal groter zijn dan minimaal, anders is het geen bereik.
-    if (nieuw.bal2_max_minuten <= nieuw.bal2_min_minuten || nieuw.bal3_max_minuten <= nieuw.bal3_min_minuten || nieuw.bal4_max_minuten <= nieuw.bal4_min_minuten) {
-      adminLocal.paramFout = "Maximaal moet groter zijn dan minimaal, voor elke flight-grootte.";
+    // v0.21.0: nu voor alle zes paren (18 holes + 9 holes), niet meer alleen de 18-holes-drie.
+    if (nieuw.bal2_max_minuten <= nieuw.bal2_min_minuten || nieuw.bal3_max_minuten <= nieuw.bal3_min_minuten || nieuw.bal4_max_minuten <= nieuw.bal4_min_minuten
+      || nieuw.bal2_max_minuten_9h <= nieuw.bal2_min_minuten_9h || nieuw.bal3_max_minuten_9h <= nieuw.bal3_min_minuten_9h || nieuw.bal4_max_minuten_9h <= nieuw.bal4_min_minuten_9h) {
+      adminLocal.paramFout = "Maximaal moet groter zijn dan minimaal, voor elke flight-grootte (9 en 18 holes).";
       render();
       return;
     }
@@ -2790,29 +2860,38 @@ async function vulAdminParametersTab(inhoud) {
   const opslaanBtn = el("button", { class: "btn", onclick: opslaan, text: adminLocal.paramBezig ? "Bezig…" : "Opslaan" });
   opslaanBtn.disabled = true;
 
-  const paramKaart = el("div", { class: "card" }, [
-    el("div", { class: "eyebrow", text: "Streeftijden" }),
+  // v0.21.0 (Kay's verzoek, "STREEFTIJDEN 9 HOLES en vervolgens wat er nu al staat"): een los
+  // bouwblokje voor een rij-paar (eyebrow + drie paramrows), hergebruikt voor zowel de nieuwe
+  // 9-holes-sectie (eerst) als de bestaande 18-holes-sectie (nu expliciet zo gelabeld, was
+  // "Streeftijden").
+  const maakStreeftijdenSectie = (titel, min2, max2, min3, max3, min4, max4, eersteSectie) => [
+    el("div", { class: "eyebrow", style: eersteSectie ? "" : "margin-top:14px", text: titel }),
     el("div", { class: "paramrow" }, [
       el("div", { class: "paramlabel", text: "2-bal (minuten)" }),
       el("div", { class: "paramminmax" }, [
-        el("div", { class: "paramminmaxgroup" }, [el("span", { class: "paramminmaxlabel", text: "min" }), iBal2Min]),
-        el("div", { class: "paramminmaxgroup" }, [el("span", { class: "paramminmaxlabel", text: "max" }), iBal2Max]),
+        el("div", { class: "paramminmaxgroup" }, [el("span", { class: "paramminmaxlabel", text: "min" }), min2]),
+        el("div", { class: "paramminmaxgroup" }, [el("span", { class: "paramminmaxlabel", text: "max" }), max2]),
       ]),
     ]),
     el("div", { class: "paramrow" }, [
       el("div", { class: "paramlabel", text: "3-bal (minuten)" }),
       el("div", { class: "paramminmax" }, [
-        el("div", { class: "paramminmaxgroup" }, [el("span", { class: "paramminmaxlabel", text: "min" }), iBal3Min]),
-        el("div", { class: "paramminmaxgroup" }, [el("span", { class: "paramminmaxlabel", text: "max" }), iBal3Max]),
+        el("div", { class: "paramminmaxgroup" }, [el("span", { class: "paramminmaxlabel", text: "min" }), min3]),
+        el("div", { class: "paramminmaxgroup" }, [el("span", { class: "paramminmaxlabel", text: "max" }), max3]),
       ]),
     ]),
     el("div", { class: "paramrow" }, [
       el("div", { class: "paramlabel", text: "4-bal (minuten)" }),
       el("div", { class: "paramminmax" }, [
-        el("div", { class: "paramminmaxgroup" }, [el("span", { class: "paramminmaxlabel", text: "min" }), iBal4Min]),
-        el("div", { class: "paramminmaxgroup" }, [el("span", { class: "paramminmaxlabel", text: "max" }), iBal4Max]),
+        el("div", { class: "paramminmaxgroup" }, [el("span", { class: "paramminmaxlabel", text: "min" }), min4]),
+        el("div", { class: "paramminmaxgroup" }, [el("span", { class: "paramminmaxlabel", text: "max" }), max4]),
       ]),
     ]),
+  ];
+
+  const paramKaart = el("div", { class: "card" }, [
+    ...maakStreeftijdenSectie("Streeftijden — 9 holes", iBal2Min9, iBal2Max9, iBal3Min9, iBal3Max9, iBal4Min9, iBal4Max9, true),
+    ...maakStreeftijdenSectie("Streeftijden — 18 holes", iBal2Min, iBal2Max, iBal3Min, iBal3Max, iBal4Min, iBal4Max, false),
     el("div", { class: "eyebrow", style: "margin-top:14px", text: "Verwachte rondetijden — 9 holes" }),
     voorbeeldtabel9,
     el("div", { class: "eyebrow", style: "margin-top:14px", text: "Verwachte rondetijden — 18 holes" }),
@@ -2991,7 +3070,6 @@ function logout() {
   render();
 }
 
-document.getElementById("versiebadge").textContent = `v${APP_VERSIE}`;
 render();
 </script>
 </body>
