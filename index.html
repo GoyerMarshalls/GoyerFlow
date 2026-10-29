@@ -789,8 +789,26 @@
        beheerder-flightdetail-popup (bouwFlightDetailModal) — niet apart gevraagd voor de
        beheerderskant, maar consistent met elke eerdere tekstwijziging aan deze regel (die twee
        schermen delen al sinds v0.20.0 dezelfde formulering).
+   v0.21.4 (Kay's verzoek, screenshot): drie punten.
+   (1) "App houdt nu geen rekening met als je snel speelt?" — klopte: vooruitlopen viel tot nu toe
+       altijd onder groen/"op_schema", ongeacht hoeveel. Nieuwe blauwe band in conclusieVoor():
+       "voor_schema", vanaf 5 minuten vóór schema (zelfde drempelafstand als de bestaande
+       "achter"-grens — Kay noemde geen eigen getal, dus symmetrisch gekozen; aangeven als een ander
+       getal beter past), tekst "X minuten voor op schema". Hergebruikt de bestaande `--blue`-
+       kleurvariabele (al in gebruik voor toernooi-labels/voortgangsbalk), geen nieuwe kleur nodig.
+       Twee plekken die op "conclusie.key !== 'op_schema'" filterden, zijn meegefixt zodat de nieuwe
+       band daar niet per ongeluk in de verkeerde categorie viel: `toonTipsKnop` (zou anders ook bij
+       vooruitlopen "Tips om sneller te spelen" tonen) en de gat-vraag "Ja"-afhandeling (zou anders
+       bij vooruitlopen "Probeer aansluiting..." tonen i.p.v. "Geen zorgen, jij ligt zelf op
+       schema."). De admin-analyse ("Analyseer huidige flights") kreeg een vierde teller
+       (voorSchema) — zonder die fix zou een vooruitlopende flight daar zijn meegeteld als "ver
+       achter" (de oude catch-all else-tak).
+   (2) Gat-meldingstekst opnieuw aangepast (na v0.21.3): "Het lijkt dat er een gat is met de flight
+       voor je. Klopt dat?"
+   (3) De "Ja"-vervolgtekst ("Probeer aansluiting te vinden met de flight voor je.") is nu
+       vetgedrukt.
    ============================================================================================ */
-const APP_VERSIE = "0.21.3";
+const APP_VERSIE = "0.21.4";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -1134,7 +1152,7 @@ function formatUurMinWoorden(minuten) {
 // (veel_te_snel/te_snel/op_schema/te_langzaam/veel_te_langzaam). Vanaf v0.18.0 (Kay's verzoek 28
 // oktober 2026, "strakke benchmark, maar wiskundig zuiver"): een ABSOLUTE minuten-buffer in 3
 // banden — groen (minder dan 5 min achter), oranje (5-10 min achter), rood (meer dan 10 min achter).
-// Vooruitlopen op schema krijgt bewust geen eigen band meer (valt onder groen/"op_schema") —
+// Vooruitlopen op schema kreeg tot v0.21.3 bewust geen eigen band (viel onder groen/"op_schema") —
 // consistent met de v0.12.0-keuze dat voorlopen op zich geen probleem is. Toon BEWUST neutraal
 // gehouden (Kay's expliciete keuze, 28 oktober 2026): wel de nieuwe minutenbuffer/kleurbanden, geen
 // directieve/sturende taal ("Let op: pak de bal op...") — zelfde feitelijke stijl als de bestaande
@@ -1143,9 +1161,18 @@ function formatUurMinWoorden(minuten) {
 // enkel berekend benchmarkgetal — de 5/10-minutengrenzen zelf zijn ongewijzigd.
 // v0.20.0: resultaatTekst toegevoegd (zin zonder "Dus "-voorvoegsel), nodig op het ledenscherm/de
 // beheerder-popup om alleen het resultaat zelf vet te zetten ("Dus **resultaat**.").
+// v0.21.4 (Kay's verzoek): "App houdt nu geen rekening met als je snel speelt?" — vooruitlopen
+// krijgt nu wél een eigen band: blauw ("voor_schema"), vanaf 5 minuten vóór schema — zelfde
+// drempelafstand als de bestaande "achter"-grens, symmetrisch gekozen omdat Kay geen eigen getal
+// noemde; aangeven als een andere drempel beter past. `--blue` bestond al (gebruikt voor
+// .flighttoernooi/.flightprogressvoortgang/de ongemelde-kaart-kleur) — hergebruikt, geen nieuwe
+// kleurvariabele nodig.
 function conclusieVoor(deltaMinuten) {
   const minutenAchter = Math.round(Math.max(0, -deltaMinuten));
   const achterText = `${minutenAchter} minuten achter op schema`;
+  const minutenVoor = Math.round(Math.max(0, deltaMinuten));
+  const voorText = `${minutenVoor} minuten voor op schema`;
+  if (deltaMinuten >= 5) return { key: "voor_schema", label: voorText, kleur: "var(--blue)", resultaatTekst: `je loopt ${voorText}`, zin: `Dus je loopt ${voorText}.` };
   if (deltaMinuten > -5) return { key: "op_schema", label: "Op schema", kleur: "var(--accent)", resultaatTekst: "je loopt op schema", zin: "Dus je loopt op schema." };
   if (deltaMinuten > -10) return { key: "achter", label: achterText, kleur: "var(--warn)", resultaatTekst: `je loopt ${achterText}`, zin: `Dus je loopt ${achterText}.` };
   return { key: "ver_achter", label: achterText, kleur: "var(--err)", resultaatTekst: `je loopt ${achterText}`, zin: `Dus je loopt ${achterText}.` };
@@ -1940,7 +1967,9 @@ async function renderTracker(app, opts = {}) {
   const deltaMinuten = heeftGekozen ? (actueleFractie - zelfPos.fractie) * zelfPos.minutenPerHole : null;
   const conclusie = heeftGekozen ? conclusieVoor(deltaMinuten) : null;
   const kaartKleur = conclusie ? conclusie.kleur : "var(--accent)";
-  const toonTipsKnop = conclusie && conclusie.key !== "op_schema";
+  // v0.21.4: de nieuwe "voor_schema"-band (zie conclusieVoor()) mag de "Tips om sneller te
+  // spelen"-knop niet laten verschijnen — alleen nog bij echt achterlopen.
+  const toonTipsKnop = conclusie && (conclusie.key === "achter" || conclusie.key === "ver_achter");
 
   // Weergavepositie: zonder melding de pure live berekening (zelfPos, vanaf starttijd_effectief).
   // Mét melding: diezelfde melding vooruit geprojecteerd in de tijd (zie projecteerVanafMelding) —
@@ -2094,9 +2123,9 @@ async function renderTracker(app, opts = {}) {
       // melding (zie gatResultaat hierboven).
       if (trackerLocal.gatVraagTonen) {
         meKinderen.push(el("div", { class: "gatvraagblok" }, [
-          // v0.21.3 (Kay's verzoek): tekst verkort van "Het lijkt erop dat er een gat is met de
-          // flight voor je." naar Kay's eigen, kortere formulering.
-          el("div", { class: "gatvraagtekst", text: "Lijkt dat er gat is met flight voor je. Klopt dat?" }),
+          // v0.21.3: verkort naar "Lijkt dat er gat is met flight voor je. Klopt dat?"
+          // v0.21.4 (Kay's verzoek, screenshot): opnieuw aangepast naar Kay's eigen formulering.
+          el("div", { class: "gatvraagtekst", text: "Het lijkt dat er een gat is met de flight voor je. Klopt dat?" }),
           el("div", { class: "gatvraagrow" }, [
             el("button", {
               class: "gatvraagbtn nee",
@@ -2107,7 +2136,10 @@ async function renderTracker(app, opts = {}) {
               class: "gatvraagbtn ja",
               onclick: () => {
                 trackerLocal.gatVraagTonen = false;
-                trackerLocal.gatResultaat = (conclusie && conclusie.key !== "op_schema") ? "achter" : "opschema";
+                // v0.21.4: expliciet op "achter"/"ver_achter" controleren i.p.v. "alles wat niet
+                // op_schema is" — anders zou de nieuwe "voor_schema"-band (vooruitlopen) hier
+                // onterecht ook "Probeer aansluiting..." tonen.
+                trackerLocal.gatResultaat = (conclusie && (conclusie.key === "achter" || conclusie.key === "ver_achter")) ? "achter" : "opschema";
                 render();
               },
               text: "Ja",
@@ -2115,7 +2147,8 @@ async function renderTracker(app, opts = {}) {
           ]),
         ]));
       } else if (trackerLocal.gatResultaat === "achter") {
-        meKinderen.push(el("div", { class: "gatresultaat", text: "Probeer aansluiting te vinden met de flight voor je." }));
+        // v0.21.4 (Kay's verzoek): deze vervolgtekst nu vetgedrukt.
+        meKinderen.push(el("div", { class: "gatresultaat" }, [el("b", { text: "Probeer aansluiting te vinden met de flight voor je." })]));
       } else if (trackerLocal.gatResultaat === "opschema") {
         meKinderen.push(el("div", { class: "gatresultaat", text: "Geen zorgen, jij ligt zelf op schema." }));
       }
@@ -2951,7 +2984,10 @@ async function vulAdminParametersTab(inhoud) {
       const nu = new Date();
       // v0.18.0: hergebruikt conclusieVoor() zelf (i.p.v. een eigen losse drempel-check) zodat deze
       // telling altijd exact dezelfde minuten-banden hanteert als de rest van de app.
-      let opSchema = 0, achter = 0, verAchter = 0, somAfwijkingMin = 0;
+      // v0.21.4: vierde teller (voorSchema) toegevoegd voor de nieuwe "voor_schema"-band — zonder
+      // deze zou een vooruitlopende flight hier onterecht als "ver achter" meetellen (de oude
+      // else-tak ving alles op wat niet "op_schema"/"achter" was).
+      let opSchema = 0, voorSchema = 0, achter = 0, verAchter = 0, somAfwijkingMin = 0;
       for (const flight of metMelding) {
         const minutenPerHole = rondetijdBereikVoor(params, flight.aantal_spelers, flight.ronde_type).max / rondeInfo(flight.ronde_type).holesInRonde;
         const zelfPos = verwachtePositie(flight.starttijd_effectief, minutenPerHole, nu, flight.ronde_type);
@@ -2960,6 +2996,7 @@ async function vulAdminParametersTab(inhoud) {
         somAfwijkingMin += deltaMinuten;
         const key = conclusieVoor(deltaMinuten).key;
         if (key === "op_schema") opSchema++;
+        else if (key === "voor_schema") voorSchema++;
         else if (key === "achter") achter++;
         else verAchter++;
       }
@@ -2968,7 +3005,7 @@ async function vulAdminParametersTab(inhoud) {
         class: "analyseresultaat",
         text: totaal === 0
           ? "Geen flights met een actuele melding gevonden — nog geen data om te analyseren."
-          : `${totaal} flight(s) met een melding: ${opSchema} op schema, ${achter} achter, ${verAchter} ver achter. Gemiddelde afwijking: ${Math.round(somAfwijkingMin / totaal)} minuten (negatief = gemiddeld achter op schema).`,
+          : `${totaal} flight(s) met een melding: ${opSchema} op schema, ${voorSchema} voor op schema, ${achter} achter, ${verAchter} ver achter. Gemiddelde afwijking: ${Math.round(somAfwijkingMin / totaal)} minuten (negatief = gemiddeld achter op schema).`,
       }));
     } catch (e) {
       analyseResultaatNode.append(el("div", { class: "paramfout", text: "Analyse is niet gelukt. Probeer het nog eens." }));
