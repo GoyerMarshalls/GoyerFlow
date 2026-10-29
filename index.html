@@ -767,8 +767,30 @@
        sinds v0.21.0 al niet meer gelezen voor 9 holes, nu ook niet meer voor 18 holes, en niet
        meer beschrijfbaar vanuit de UI) — blijven ongebruikt in de tabel staan, zelfde
        niet-destructieve conventie.
+   v0.21.2 (Kay's verzoek, screenshot): de max>min-validatie op de Parameters-tab wees "min 120 / max
+       120" af ("Maximaal moet groter zijn dan minimaal"). Kay wil juist een vaste streeftijd (geen
+       bandbreedte) kunnen instellen door min en max gelijk te zetten — een geldige, bedoelde keuze.
+       Validatie versoepeld van `max <= min` (sloot gelijke waarden onterecht uit) naar `max < min`
+       (sluit alleen een ECHT ongeldig bereik uit, max en min gelijk mag nu). Geen wijziging aan
+       rondetijdBereikVoor() of enige plek die met het bereik rekent — `.min` wordt uitsluitend
+       gebruikt voor weergave (nooit als deler of in een aftrekking), dus een gelijke min/max geeft
+       nergens een deling-door-nul of ander randgeval.
+   v0.21.3 (Kay's verzoek, screenshot van het ledenscherm): drie tekstaanpassingen.
+   (1) De vaste hint "Dit is je laatste melding — pas aan als dit niet meer klopt." (v0.16.0) is
+       weggehaald. De losse, inhoudelijk andere "verouderde melding"-hint ("Dit is nog gebaseerd op
+       je laatste melding. Klopt dit nog?") blijft gewoon staan — dat is een waarschuwing, geen vaste
+       voetnoot.
+   (2) Gat-meldingstekst verkort: "Het lijkt erop dat er een gat is met de flight voor je. Klopt
+       dat?" → "Lijkt dat er gat is met flight voor je. Klopt dat?" (Kay's eigen, kortere
+       formulering).
+   (3) De infotekst na een positie-melding noemt niet langer het minimale getal: "...en een
+       streeftijd tussen minimaal X en maximaal Y zou je..." → "...en een streeftijd van maximaal Y
+       zou je...", verder ongewijzigd. Toegepast op zowel het ledenscherm (renderTracker) als de
+       beheerder-flightdetail-popup (bouwFlightDetailModal) — niet apart gevraagd voor de
+       beheerderskant, maar consistent met elke eerdere tekstwijziging aan deze regel (die twee
+       schermen delen al sinds v0.20.0 dezelfde formulering).
    ============================================================================================ */
-const APP_VERSIE = "0.21.1";
+const APP_VERSIE = "0.21.3";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -2027,15 +2049,11 @@ async function renderTracker(app, opts = {}) {
     // Zelfde subregel-stijl hergebruikt (puur visueel identiek aan de GPS-variant hierboven) voor
     // de herbevestig-hint — zie HERBEVESTIG_DREMPEL_HOLES hierboven.
     meKinderen.push(el("div", { class: "gpssubregel", text: "Dit is nog gebaseerd op je laatste melding. Klopt dit nog? Bevestig of pas aan." }));
-  } else if (heeftGekozen) {
-    // (v0.16.0, UX-verduidelijking na de testronde van 28 oktober 2026): de stepper/marker-knoppen
-    // hieronder tonen je LAATSTE melding, vooruit geprojecteerd in de tijd (zelfWeergavePos) — niet
-    // de schema-verwachting (die staat apart in de conclusietekst onderaan de kaart, gebaseerd op
-    // zelfPos). Zonder deze regel leken die twee tijdens het testen tegenstrijdig ("tekst wijkt ook
-    // af van visualisatie?", bv. de kaart toonde "Green" van hole 4 terwijl Kay op de fairway stond
-    // — dat was de geprojecteerde laatste melding, niet een claim over de actuele werkelijkheid).
-    meKinderen.push(el("div", { class: "gpssubregel", text: "Dit is je laatste melding — pas aan als dit niet meer klopt." }));
   }
+  // v0.21.3 (Kay's verzoek, screenshot): de vaste hint "Dit is je laatste melding — pas aan als dit
+  // niet meer klopt." (v0.16.0, hierboven tot nu toe de `heeftGekozen`-tak) is weggehaald — Kay wil
+  // die tekst niet meer zien. De `moetOpnieuwBevestigen`-hint hierboven (een ANDERE, inhoudelijk
+  // afwijkende hint — alleen zichtbaar als de melding verouderd is) blijft gewoon staan.
   if (nogNietGestart) {
     // Niets verder: geen stepper, geen conclusie, geen "ronde afgerond"-knop vóór de start.
   } else if (zelfRondeVoltooid) {
@@ -2076,7 +2094,9 @@ async function renderTracker(app, opts = {}) {
       // melding (zie gatResultaat hierboven).
       if (trackerLocal.gatVraagTonen) {
         meKinderen.push(el("div", { class: "gatvraagblok" }, [
-          el("div", { class: "gatvraagtekst", text: "Het lijkt erop dat er een gat is met de flight voor je. Klopt dat?" }),
+          // v0.21.3 (Kay's verzoek): tekst verkort van "Het lijkt erop dat er een gat is met de
+          // flight voor je." naar Kay's eigen, kortere formulering.
+          el("div", { class: "gatvraagtekst", text: "Lijkt dat er gat is met flight voor je. Klopt dat?" }),
           el("div", { class: "gatvraagrow" }, [
             el("button", {
               class: "gatvraagbtn nee",
@@ -2115,15 +2135,16 @@ async function renderTracker(app, opts = {}) {
       }
       // v0.20.0 (Kay's verzoek 28 oktober 2026): "een gemiddelde rondetijd van X" vervangen door
       // "een streeftijd tussen minimaal X en maximaal Y" — past bij het nieuwe min/max-bereikmodel
-      // (rondetijdBereikVoor(), zie de bouwgeschiedenis) i.p.v. één berekend gemiddelde. Het
-      // resultaat ("Dus ...") staat nu zelf ook vet, via conclusie.resultaatTekst.
+      // (rondetijdBereikVoor(), zie de bouwgeschiedenis) i.p.v. één berekend gemiddelde.
+      // v0.21.3 (Kay's verzoek, screenshot): verder verkort naar "...en een streeftijd van maximaal
+      // Y zou je..." — het minimale getal wordt niet meer apart genoemd (het staat nog wel in de
+      // param-/preview-schermen, alleen niet meer in deze lopende zin). Het resultaat ("Dus ...")
+      // staat nog steeds zelf ook vet, via conclusie.resultaatTekst.
       if (heeftGekozen) {
         meKinderen.push(el("div", { class: "conclusieline" }, [
           document.createTextNode("Op basis van een start om "),
           el("b", { text: formatTijd(zelf.starttijd_effectief) }),
-          document.createTextNode(" en een streeftijd tussen minimaal "),
-          el("b", { text: formatUurMinWoorden(zelfBereik.min) }),
-          document.createTextNode(" en maximaal "),
+          document.createTextNode(" en een streeftijd van maximaal "),
           el("b", { text: formatUurMinWoorden(zelfBereik.max) }),
           document.createTextNode(" zou je nu ongeveer op de "),
           el("b", { text: `${CHECKPOINT_LABEL[zelfPos.checkpoint]} van hole ${fysiekeHole(zelf.ronde_type, zelfPos.hole)}` }),
@@ -2688,12 +2709,14 @@ function bouwFlightDetailModal(positie, params, nu) {
     // bouwgeschiedenis. conclusie kan hier null zijn (nog geen melding/berekenbare conclusie), dus
     // het laatste stuk ("Dus ...") blijft dan weg, net als voorheen. bereikFlight is al hierboven
     // (bij het spelersoverzicht) berekend.
+    // v0.21.3: zelfde verkorting als de ledenkaart ("een streeftijd van maximaal Y" i.p.v. "tussen
+    // minimaal X en maximaal Y") — niet apart door Kay gevraagd voor dit scherm, maar toegepast voor
+    // consistentie met de ledenkaart, net als bij elke eerdere tekstwijziging aan deze regel (zie de
+    // bouwgeschiedenis bij v0.20.0/v0.20.3). Zeg het als je dit scherm liever ongemoeid had gelaten.
     eigenKinderen.push(el("div", { class: "conclusieline" }, [
       document.createTextNode("Op basis van een start om "),
       el("b", { text: formatTijd(flight.starttijd_effectief) }),
-      document.createTextNode(" en een streeftijd tussen minimaal "),
-      el("b", { text: formatUurMin(bereikFlight.min) }),
-      document.createTextNode(" en maximaal "),
+      document.createTextNode(" en een streeftijd van maximaal "),
       el("b", { text: formatUurMin(bereikFlight.max) }),
       document.createTextNode(" zou deze flight nu ongeveer op de "),
       el("b", { text: `${CHECKPOINT_LABEL[positie.zelfPos.checkpoint]} van hole ${fysiekeHole(flight.ronde_type, positie.zelfPos.hole)}` }),
@@ -2835,12 +2858,15 @@ async function vulAdminParametersTab(inhoud) {
       render();
       return;
     }
-    // v0.20.0: nieuwe check zonder directe tegenhanger in het oude model — bij een vast min/max-
-    // bereik moet maximaal nu eenmaal groter zijn dan minimaal, anders is het geen bereik.
+    // v0.20.0: nieuwe check zonder directe tegenhanger in het oude model — maximaal mag niet KLEINER
+    // zijn dan minimaal, anders is het geen geldig bereik.
     // v0.21.1: nu alleen nog de drie 9-holes-paren (18 holes is afgeleid, dus automatisch ook
     // geldig zodra 9 holes het is).
-    if (nieuw.bal2_max_minuten_9h <= nieuw.bal2_min_minuten_9h || nieuw.bal3_max_minuten_9h <= nieuw.bal3_min_minuten_9h || nieuw.bal4_max_minuten_9h <= nieuw.bal4_min_minuten_9h) {
-      adminLocal.paramFout = "Maximaal moet groter zijn dan minimaal, voor elke flight-grootte.";
+    // v0.21.2 (Kay's verzoek, screenshot): max === min moet wél kunnen — een vaste streeftijd (geen
+    // bandbreedte) is een legitieme keuze, bv. min 120/max 120. Was `<=` (sloot gelijke waarden ten
+    // onrechte uit), nu `<`.
+    if (nieuw.bal2_max_minuten_9h < nieuw.bal2_min_minuten_9h || nieuw.bal3_max_minuten_9h < nieuw.bal3_min_minuten_9h || nieuw.bal4_max_minuten_9h < nieuw.bal4_min_minuten_9h) {
+      adminLocal.paramFout = "Maximaal mag niet kleiner zijn dan minimaal, voor elke flight-grootte.";
       render();
       return;
     }
