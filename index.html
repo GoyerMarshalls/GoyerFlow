@@ -751,8 +751,24 @@
        velden totaal) — de max>min-validatie en de "Verwachte rondetijden"-previews gelden nu voor
        beide sets onafhankelijk (de 9-holes-preview is niet langer een afgeleide van de 18-holes-
        velden).
+   v0.21.1 (Kay's verzoek, screenshot van v0.21.0): "Alleen de drie rijen streeftijd 9 holes zijn
+       noodzakelijk. De streeftijden 18 holes zijn het dubbele daarvan, dus dat kun je zelf
+       uitrekenen om de verwachte rondetijden 9 en 18 holes daaronder te berekenen. Haal dus
+       streeftijden 18 holes rijen weg." Draait v0.21.0 deels terug, maar omgekeerd: vóór v0.21.0
+       was 18 holes de bron en 9 holes de afgeleide (halvering); nu is 9 holes de bron en 18 holes
+       de afgeleide (verdubbeling). rondetijdBereikVoor() leest alleen nog bal{n}_min/
+       max_minuten_9h en vermenigvuldigt met 1 (9 holes) of 2 (18 holes) — geen apart ingevulde
+       18-holes-kolommen meer. Admin Parameters-tab: de "Streeftijden — 18 holes"-sectie (6 velden)
+       is verwijderd, alleen "Streeftijden — 9 holes" blijft staan; opslaan() en de max>min-
+       validatie schrijven/controleren nu alleen nog de 9-holes-velden. De "Verwachte rondetijden —
+       9 holes"/"— 18 holes"-previewtabellen blijven beide staan (ongewijzigd) — die rekenden al
+       vanaf de 9-holes-velden (×1/×2), dus die bleven kloppen. De oude bal{n}_min/max_minuten-
+       kolommen (Fase 2k, zonder "_9h") zijn nu voor de TWEEDE keer van bron gewisseld (eerst
+       sinds v0.21.0 al niet meer gelezen voor 9 holes, nu ook niet meer voor 18 holes, en niet
+       meer beschrijfbaar vanuit de UI) — blijven ongebruikt in de tabel staan, zelfde
+       niet-destructieve conventie.
    ============================================================================================ */
-const APP_VERSIE = "0.21.0";
+const APP_VERSIE = "0.21.1";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -929,19 +945,25 @@ function loggen(persoonscode, type, succes) {
 // in de bouwgeschiedenis): een 1-bal valt op de 2-bal-band, een 5-bal (of groter) op de
 // 4-bal-band. Geen eigen categorie — aangeven als dat in de praktijk niet klopt.
 //
-// Voor een 9-holes ronde (rondeType 9holes_voor/9holes_achter) wordt het 18-holes-bereik
-// gehalveerd — er zijn geen apart ingevulde 9-holes-parameters.
-// v0.21.0 (Kay's verzoek 28 oktober 2026): een 9-holes ronde gebruikte tot nu toe de 18-holes-
-// parameters gehalveerd (factor 0,5) — Kay wil dat apart kunnen instellen, want een 9-holes ronde is
+// v0.21.0 (Kay's verzoek 28 oktober 2026): een 9-holes ronde gebruikte tot nu toe het 18-holes-
+// bereik gehalveerd (factor 0,5) — Kay wil dat apart kunnen instellen, want een 9-holes ronde is
 // niet per definitie exact de helft van een 18-holes ronde (bv. een vaste "inkomtijd" op de eerste
 // hole weegt relatief zwaarder mee over minder holes). Zes nieuwe kolommen (bal{n}_min/max_minuten_9h,
-// schema.sql "Fase 2l") i.p.v. een berekende halvering; geen `factor`/`AANTAL_HOLES`-rekenwerk meer
-// nodig, elke rondelengte leest nu rechtstreeks zijn eigen ingevulde paar.
+// schema.sql "Fase 2l") i.p.v. een berekende halvering; elke rondelengte las toen rechtstreeks zijn
+// eigen ingevulde paar.
+// v0.21.1 (Kay's verzoek, screenshot van v0.21.0): "Alleen de drie rijen streeftijd 9 holes zijn
+// noodzakelijk. De streeftijden 18 holes zijn het dubbele daarvan, dus dat kun je zelf uitrekenen."
+// Terug naar één bron van waarheid — nu de 9-holes-kolommen (bal{n}_min/max_minuten_9h) in plaats
+// van de 18-holes-kolommen zoals vóór v0.21.0. 18 holes = 9-holes-waarde × 2, altijd, geen eigen
+// kolommen meer nodig/gelezen voor 18 holes (de oude bal{n}_min/max_minuten-kolommen uit Fase 2k
+// blijven ongebruikt in de tabel staan, zelfde niet-destructieve conventie als eerder).
 function rondetijdBereikVoor(params, aantalSpelers, rondeType) {
   const n = aantalSpelers <= 2 ? 2 : aantalSpelers === 3 ? 3 : 4;
+  const min9 = params[`bal${n}_min_minuten_9h`];
+  const max9 = params[`bal${n}_max_minuten_9h`];
   const { holesInRonde } = rondeInfo(rondeType);
-  const suffix = holesInRonde === 9 ? "_9h" : "";
-  return { min: params[`bal${n}_min_minuten${suffix}`], max: params[`bal${n}_max_minuten${suffix}`] };
+  const factor = holesInRonde / 9; // 1 voor 9 holes, 2 voor 18 holes
+  return { min: min9 * factor, max: max9 * factor };
 }
 
 // "hole" hierin (en in pasWachttijdToe/projecteerVanafMelding) blijft RONDE-RELATIEF (1 = eerste
@@ -1248,7 +1270,7 @@ const TIPS = [
 // v0.20.0: herschreven — niet langer "checkpointtijd + hcp-correctie + flightgrootte-correctie per
 // hole-type" (v0.18.0-v0.19.5), maar een rechtstreeks ingesteld bereik per flight-grootte.
 const VERANTWOORDING_PARAMETERS = [
-  "Per flight-grootte (2-/3-/4-bal) staat een minimale en maximale streeftijd, rechtstreeks ingesteld — geen formule meer op basis van losse par-tijden en correctiegetallen.",
+  "Per flight-grootte (2-/3-/4-bal) staat een minimale en maximale streeftijd voor 9 holes, rechtstreeks ingesteld — geen formule meer op basis van losse par-tijden en correctiegetallen. 18 holes is steeds het dubbele van de 9-holes-streeftijd.",
   "Handicap is bewust geen factor: pace-of-play-onderzoek (zie de bouwgeschiedenis) vond geen aantoonbaar effect van handicap op speeltempo. Flightgrootte heeft wél een gemeten effect, en dat zit al verwerkt in het verschil tussen de drie bereiken.",
   "Bewust geen 'gedragsfactor' die de lat verlaagt voor langzamer spel — de drie bereiken zijn een ambitieuze, realistische streeftijd, niet een gemiddelde van hoe traag er nu daadwerkelijk gespeeld wordt.",
   "De status op het trackerscherm werkt met een harde minutenbuffer t.o.v. de maximale streeftijd: groen bij minder dan 5 minuten erboven, oranje bij 5–10 minuten, rood bij meer dan 10 minuten. Minuten in plaats van holes, omdat op De Goyer de holes dicht op elkaar liggen — een kleine vertraging op de green kan anders al lijken op een achterstand van een hele hole.",
@@ -2719,30 +2741,24 @@ async function vulAdminParametersTab(inhoud) {
   // v0.20.0 (Kay's verzoek 28 oktober 2026): het per-hole-type-model (checkpointtijd + hcp-/
   // flightgrootte-correctie per par-type, v0.18.0-v0.19.5) bleek te indirect — Kay wilde alleen de
   // UITKOMST sturen, niet de per-hole bouwstenen. Vervangen door drie rechtstreeks ingevulde
-  // bereiken (min + max, in minuten) per flight-grootte. Zie rondetijdBereikVoor() en schema.sql
-  // "Fase 2k".
-  const iBal2Min = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal2_min_minuten });
-  const iBal2Max = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal2_max_minuten });
-  const iBal3Min = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal3_min_minuten });
-  const iBal3Max = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal3_max_minuten });
-  const iBal4Min = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal4_min_minuten });
-  const iBal4Max = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal4_max_minuten });
-  // v0.21.0 (Kay's verzoek 28 oktober 2026): een 9-holes ronde las tot nu toe de 18-holes-velden
-  // hierboven, gehalveerd (zie de oude rondetijdBereikVoor()). Nu zes eigen velden, apart in te
-  // stellen — zie schema.sql "Fase 2l" en de herschreven rondetijdBereikVoor().
+  // bereiken (min + max, in minuten) per flight-grootte.
+  // v0.21.0: een eigen set voor 9 holes toegevoegd (schema.sql "Fase 2l"), aanvankelijk NAAST een
+  // losse 18-holes-set.
+  // v0.21.1 (Kay's verzoek, screenshot van v0.21.0): "Alleen de drie rijen streeftijd 9 holes zijn
+  // noodzakelijk. De streeftijden 18 holes zijn het dubbele daarvan." De 18-holes-invoervelden
+  // (bal{n}_min/max_minuten, zonder "_9h"-suffix) zijn uit de UI gehaald — de 9-holes-velden zijn nu
+  // de ENIGE bron. Zie de herschreven rondetijdBereikVoor() hieronder: 18 holes = 9-holes-waarde × 2.
   const iBal2Min9 = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal2_min_minuten_9h });
   const iBal2Max9 = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal2_max_minuten_9h });
   const iBal3Min9 = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal3_min_minuten_9h });
   const iBal3Max9 = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal3_max_minuten_9h });
   const iBal4Min9 = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal4_min_minuten_9h });
   const iBal4Max9 = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal4_max_minuten_9h });
-  const alleVelden = [iBal2Min, iBal2Max, iBal3Min, iBal3Max, iBal4Min, iBal4Max,
-    iBal2Min9, iBal2Max9, iBal3Min9, iBal3Max9, iBal4Min9, iBal4Max9];
+  const alleVelden = [iBal2Min9, iBal2Max9, iBal3Min9, iBal3Max9, iBal4Min9, iBal4Max9];
 
-  // "Verwachte rondetijden" is een kale weergave-mirror van de velden hiernaast — puur een directe
-  // "#u## - #u##"-leesbaarheidscontrole op wat net is ingetypt. v0.21.0: de 9-holes-tabel is nu ook
-  // een kale mirror van haar EIGEN zes velden (iBal*Min9/Max9) i.p.v. de 18-holes-waarden gehalveerd
-  // — zie de herschreven rondetijdBereikVoor(), die nu hetzelfde doet op de Tracker zelf.
+  // "Verwachte rondetijden" is een kale weergave-mirror — 9 holes rechtstreeks van de zes velden
+  // hiernaast, 18 holes als het dubbele daarvan (v0.21.1), zelfde verhouding als
+  // rondetijdBereikVoor() nu op de Tracker zelf toepast.
   const vbBereik9_2 = el("div", { class: "vbcelbereik" });
   const vbBereik9_3 = el("div", { class: "vbcelbereik" });
   const vbBereik9_4 = el("div", { class: "vbcelbereik" });
@@ -2761,22 +2777,22 @@ async function vulAdminParametersTab(inhoud) {
   const voorbeeldtabel18 = maakVoorbeeldtabel(vbBereik18_2, vbBereik18_3, vbBereik18_4);
   const minutenGetal = (input) => parseFloat(input.value) || 0;
   const herbereken = () => {
-    const paar = (min, max) => `${formatUurMin(minutenGetal(min))} - ${formatUurMin(minutenGetal(max))}`;
-    vbBereik18_2.textContent = paar(iBal2Min, iBal2Max);
-    vbBereik18_3.textContent = paar(iBal3Min, iBal3Max);
-    vbBereik18_4.textContent = paar(iBal4Min, iBal4Max);
-    vbBereik9_2.textContent = paar(iBal2Min9, iBal2Max9);
-    vbBereik9_3.textContent = paar(iBal3Min9, iBal3Max9);
-    vbBereik9_4.textContent = paar(iBal4Min9, iBal4Max9);
+    const paar9 = (min, max) => `${formatUurMin(minutenGetal(min))} - ${formatUurMin(minutenGetal(max))}`;
+    const paar18 = (min, max) => `${formatUurMin(minutenGetal(min) * 2)} - ${formatUurMin(minutenGetal(max) * 2)}`;
+    vbBereik9_2.textContent = paar9(iBal2Min9, iBal2Max9);
+    vbBereik9_3.textContent = paar9(iBal3Min9, iBal3Max9);
+    vbBereik9_4.textContent = paar9(iBal4Min9, iBal4Max9);
+    vbBereik18_2.textContent = paar18(iBal2Min9, iBal2Max9);
+    vbBereik18_3.textContent = paar18(iBal3Min9, iBal3Max9);
+    vbBereik18_4.textContent = paar18(iBal4Min9, iBal4Max9);
   };
   herbereken();
   // v0.19.4 (Kay's verzoek): de "Opslaan"-knop grijs/niet-klikbaar zodra de waarden overeenkomen met
-  // wat net geladen/opgeslagen is, en weer actief zodra een van de parametervelden wijzigt (nu 6
-  // i.p.v. 9). Omdat vulAdminParametersTab() sowieso opnieuw draait (via render()) ná elke
-  // opslagpoging — mét een verse fetch van de huidige database-waarden — hoeft dit geen apart "is
-  // dit gewijzigd t.o.v. wat is opgeslagen"-vergelijking te zijn: elke keer dat deze functie
-  // opnieuw draait staan de velden per definitie gelijk aan wat net geladen is, dus de knop mag dan
-  // simpelweg disabled starten.
+  // wat net geladen/opgeslagen is, en weer actief zodra een van de parametervelden wijzigt. Omdat
+  // vulAdminParametersTab() sowieso opnieuw draait (via render()) ná elke opslagpoging — mét een
+  // verse fetch van de huidige database-waarden — hoeft dit geen apart "is dit gewijzigd t.o.v. wat
+  // is opgeslagen"-vergelijking te zijn: elke keer dat deze functie opnieuw draait staan de velden
+  // per definitie gelijk aan wat net geladen is, dus de knop mag dan simpelweg disabled starten.
   const markeerGewijzigd = () => { opslaanBtn.disabled = false; };
   alleVelden.forEach((input) => input.addEventListener("input", () => { herbereken(); markeerGewijzigd(); }));
 
@@ -2803,15 +2819,10 @@ async function vulAdminParametersTab(inhoud) {
 
   const opslaan = async () => {
     adminLocal.paramFout = null;
+    // v0.21.1: alleen nog de zes 9-holes-velden — zie schema.sql "Fase 2l". De oude 18-holes-
+    // kolommen (bal{n}_min/max_minuten, zonder "_9h") worden niet meer vanuit de UI geschreven;
+    // 18 holes is nu overal het dubbele van deze zes waarden (rondetijdBereikVoor()).
     const nieuw = {
-      bal2_min_minuten: parseFloat(iBal2Min.value),
-      bal2_max_minuten: parseFloat(iBal2Max.value),
-      bal3_min_minuten: parseFloat(iBal3Min.value),
-      bal3_max_minuten: parseFloat(iBal3Max.value),
-      bal4_min_minuten: parseFloat(iBal4Min.value),
-      bal4_max_minuten: parseFloat(iBal4Max.value),
-      // v0.21.0: de zes 9-holes-velden, los van de 18-holes-velden hierboven — zie schema.sql
-      // "Fase 2l".
       bal2_min_minuten_9h: parseFloat(iBal2Min9.value),
       bal2_max_minuten_9h: parseFloat(iBal2Max9.value),
       bal3_min_minuten_9h: parseFloat(iBal3Min9.value),
@@ -2826,10 +2837,10 @@ async function vulAdminParametersTab(inhoud) {
     }
     // v0.20.0: nieuwe check zonder directe tegenhanger in het oude model — bij een vast min/max-
     // bereik moet maximaal nu eenmaal groter zijn dan minimaal, anders is het geen bereik.
-    // v0.21.0: nu voor alle zes paren (18 holes + 9 holes), niet meer alleen de 18-holes-drie.
-    if (nieuw.bal2_max_minuten <= nieuw.bal2_min_minuten || nieuw.bal3_max_minuten <= nieuw.bal3_min_minuten || nieuw.bal4_max_minuten <= nieuw.bal4_min_minuten
-      || nieuw.bal2_max_minuten_9h <= nieuw.bal2_min_minuten_9h || nieuw.bal3_max_minuten_9h <= nieuw.bal3_min_minuten_9h || nieuw.bal4_max_minuten_9h <= nieuw.bal4_min_minuten_9h) {
-      adminLocal.paramFout = "Maximaal moet groter zijn dan minimaal, voor elke flight-grootte (9 en 18 holes).";
+    // v0.21.1: nu alleen nog de drie 9-holes-paren (18 holes is afgeleid, dus automatisch ook
+    // geldig zodra 9 holes het is).
+    if (nieuw.bal2_max_minuten_9h <= nieuw.bal2_min_minuten_9h || nieuw.bal3_max_minuten_9h <= nieuw.bal3_min_minuten_9h || nieuw.bal4_max_minuten_9h <= nieuw.bal4_min_minuten_9h) {
+      adminLocal.paramFout = "Maximaal moet groter zijn dan minimaal, voor elke flight-grootte.";
       render();
       return;
     }
@@ -2861,9 +2872,10 @@ async function vulAdminParametersTab(inhoud) {
   opslaanBtn.disabled = true;
 
   // v0.21.0 (Kay's verzoek, "STREEFTIJDEN 9 HOLES en vervolgens wat er nu al staat"): een los
-  // bouwblokje voor een rij-paar (eyebrow + drie paramrows), hergebruikt voor zowel de nieuwe
-  // 9-holes-sectie (eerst) als de bestaande 18-holes-sectie (nu expliciet zo gelabeld, was
-  // "Streeftijden").
+  // bouwblokje voor een rij-paar (eyebrow + drie paramrows).
+  // v0.21.1: de 18-holes-sectie die hier ook mee gebouwd werd, is vervallen (zie opmerking bij
+  // rondetijdBereikVoor()) — deze helper bouwt nu alleen nog de ene 9-holes-sectie, maar blijft
+  // een functie (i.p.v. inline) voor als er later weer een tweede sectie bij moet.
   const maakStreeftijdenSectie = (titel, min2, max2, min3, max3, min4, max4, eersteSectie) => [
     el("div", { class: "eyebrow", style: eersteSectie ? "" : "margin-top:14px", text: titel }),
     el("div", { class: "paramrow" }, [
@@ -2891,7 +2903,6 @@ async function vulAdminParametersTab(inhoud) {
 
   const paramKaart = el("div", { class: "card" }, [
     ...maakStreeftijdenSectie("Streeftijden — 9 holes", iBal2Min9, iBal2Max9, iBal3Min9, iBal3Max9, iBal4Min9, iBal4Max9, true),
-    ...maakStreeftijdenSectie("Streeftijden — 18 holes", iBal2Min, iBal2Max, iBal3Min, iBal3Max, iBal4Min, iBal4Max, false),
     el("div", { class: "eyebrow", style: "margin-top:14px", text: "Verwachte rondetijden — 9 holes" }),
     voorbeeldtabel9,
     el("div", { class: "eyebrow", style: "margin-top:14px", text: "Verwachte rondetijden — 18 holes" }),
