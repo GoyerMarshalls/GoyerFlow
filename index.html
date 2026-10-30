@@ -807,8 +807,17 @@
        voor je. Klopt dat?"
    (3) De "Ja"-vervolgtekst ("Probeer aansluiting te vinden met de flight voor je.") is nu
        vetgedrukt.
+   v0.21.5 (Kay's verzoek, screenshot van de beheerder-Tracker-tab): in het "Flights nu en
+       binnenkort"-overzicht (vulAdminTrackerTab) tonen de spelerspillen nu alleen de achternaam
+       i.p.v. de volledige naam — visueel rustiger bij flights met meerdere spelers. Zelfde
+       achternaam-benadering als de al bestaande flightTitel() (laatste woord van de naam, geen
+       tussenvoegsel-detectie — zie de toelichting daar), nu uit die functie getrokken in een
+       gedeelde achternaamVan()-helper. Bewust ALLEEN deze kaartenlijst aangepast: de
+       flight-detailpopup (bouwSpelersoverzichtBeheer) en het leden-eigen trackerscherm
+       (bouwSpelersoverzicht) blijven de volledige voor- en achternaam tonen, exact zoals Kay
+       vroeg ("in de pop-up wel gewoon voor- en achternaam laten staan zoals nu").
    ============================================================================================ */
-const APP_VERSIE = "0.21.4";
+const APP_VERSIE = "0.21.5";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -2465,14 +2474,22 @@ function berekenFlightPositie(flight, params, nu) {
   return { flight, minutenPerHole, zelfPos, weergave, voltooid, heeftMelding, conclusie, gestartNog };
 }
 
+// Achternaam uit een volledige naam: laatste woord, geen tussenvoegsel-detectie (dus bij
+// bijv. "Diederik Zeeuw van der Laan" komt er "Laan" uit, niet "Zeeuw van der Laan") — een
+// benadering, niet gegarandeerd correct voor elke naam. Gedeeld door flightTitel() hieronder en
+// vulAdminTrackerTab's spelerspillen (v0.21.5).
+function achternaamVan(naam) {
+  return naam.trim().split(/\s+/).pop();
+}
+
 // Titel voor het flight-detailscherm, naar het voorbeeld van de Marshal App ("Wekking + 2
-// spelers"): achternaam (laatste woord van de naam) van de eerste speler + aantal overigen. Een
-// benadering, geen gegarandeerde 1-op-1 match met hoe de Marshal App dit precies bepaalt (die
-// broncode is niet in deze sessie beschikbaar) — bij één speler gewoon de volledige naam.
+// spelers"): achternaam van de eerste speler + aantal overigen. Een benadering, geen
+// gegarandeerde 1-op-1 match met hoe de Marshal App dit precies bepaalt (die broncode is niet in
+// deze sessie beschikbaar) — bij één speler gewoon de volledige naam.
 function flightTitel(spelers) {
   if (!spelers || spelers.length === 0) return "Flight";
   if (spelers.length === 1) return spelers[0].naam;
-  const achternaam = spelers[0].naam.trim().split(/\s+/).pop();
+  const achternaam = achternaamVan(spelers[0].naam);
   const rest = spelers.length - 1;
   return `${achternaam} + ${rest} speler${rest === 1 ? "" : "s"}`;
 }
@@ -2590,7 +2607,10 @@ async function vulAdminTrackerTab(inhoud, opts = {}) {
                 ? el("div", { class: "flightnaampillen" }, [el("span", { class: "flightnaampil", text: `${flight.lus} · ${flight.aantal_spelers}-bal` })])
                 : el("div", { class: "flightnaampillen" }, spelersVanFlight.map((s) => {
                     const spelerKleur = tcKleur(s.kleur);
-                    return el("span", { class: "flightnaampil", style: `background:${spelerKleur.bg};color:${spelerKleur.fg}`, text: s.naam });
+                    // v0.21.5: alleen achternaam in dit overzicht (zie achternaamVan hierboven) —
+                    // de flight-detailpopup (bouwSpelersoverzichtBeheer) toont nog steeds s.naam
+                    // volledig, bewust ongewijzigd.
+                    return el("span", { class: "flightnaampil", style: `background:${spelerKleur.bg};color:${spelerKleur.fg}`, text: achternaamVan(s.naam) });
                   })),
               el("div", { class: "flightmeta" }, [
                 clockSvg("#9A9385"),
