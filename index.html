@@ -251,6 +251,14 @@
     background:var(--accent-soft);border-radius:8px;padding:6px 4px;align-self:center}
   .voorbeeldtabel .vbcelbereik{white-space:nowrap}
 
+  /* v0.21.6: per-hole streeftijd-raster onder de 4-bal-rij — 4 kolommen (label, veld, label, veld),
+     18 rijen-waard aan cellen maar grid-auto-flow vult ze gewoon 4 per rij, dus H1-H9 staan links,
+     H10-H18 rechts, exact zoals Kay aangaf. */
+  .holeparamgrid{display:grid;grid-template-columns:auto minmax(0,1fr) auto minmax(0,1fr);
+    gap:6px 10px;margin-top:6px;align-items:center}
+  .holeparamgrid .holelabel{font-size:13px;font-weight:700;color:var(--muted-ink);text-align:right}
+  .holeparamgrid .paraminput{width:100%;box-sizing:border-box;padding:7px 6px;font-size:14px}
+
   /* v0.19.0: "Verantwoording"-popup bij de Parameters-tab — zelfde modal-opzet als .tipsoverlay/
      .tipsmodal (zie hieronder), alleen de inhoud is prose i.p.v. een tips-lijst. */
   .verantwoordingtekst p{font-size:14px;line-height:1.5;color:#3A362C;margin:0 0 10px 0}
@@ -816,8 +824,24 @@
        flight-detailpopup (bouwSpelersoverzichtBeheer) en het leden-eigen trackerscherm
        (bouwSpelersoverzicht) blijven de volledige voor- en achternaam tonen, exact zoals Kay
        vroeg ("in de pop-up wel gewoon voor- en achternaam laten staan zoals nu").
+   v0.21.6 (Kay's verzoek): eerste stap naar een per-hole streeftijd i.p.v. één vlakke waarde per
+       hole (120/9 = 13,3 min voor elke hole, ongeacht holelengte). Kay gaf de werkelijke
+       (gevolgde, dogleg-bewuste) holelengtes uit de North Course-KML door; 18 nieuwe kolommen
+       (bal4_h1_minuten .. bal4_h18_minuten, schema.sql-migratie apart aangeleverd) met per hole
+       een vaste basistijd (6 min) plus de rest van de 120 minuten verdeeld naar lengte-aandeel,
+       afgerond zodat elke negen-holes-helft weer precies op 120 optelt. Admin Parameters-tab:
+       nieuw blokje "4-bal — streeftijd per hole (minuten)" direct onder de bestaande 4-bal-rij
+       (4 kolommen: H1-H9 label+veld, H10-H18 label+veld — zelfde rij-layout als Kay opgaf). De
+       twee "Verwachte rondetijden"-previewtabellen (9 en 18 holes, kale mirror van de vlakke
+       min/max-velden) zijn hier weggehaald — die pasten niet meer bij een per-hole model, en Kay
+       vroeg er expliciet om. BELANGRIJK, nog NIET gedaan: rondetijdBereikVoor()/minutenPerHole
+       (de rekenkern die de Tracker/positievoorspelling voedt) leest deze 18 nieuwe velden nog
+       NIET — die rekent voor 4-bal nog steeds met de vlakke bal4_min/max_minuten_9h × factor.
+       Dit is bewust alleen de parameter-invoer; het doorkoppelen naar de rekenkern is een
+       volgende, aparte stap zodra Kay deze waarden heeft gecontroleerd. 2-bal en 3-bal zijn
+       ongewijzigd (nog steeds vlak) - niet gevraagd voor deze stap.
    ============================================================================================ */
-const APP_VERSIE = "0.21.5";
+const APP_VERSIE = "0.21.6";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -2830,39 +2854,18 @@ async function vulAdminParametersTab(inhoud) {
   const iBal3Max9 = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal3_max_minuten_9h });
   const iBal4Min9 = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal4_min_minuten_9h });
   const iBal4Max9 = el("input", { class: "paraminput", type: "number", step: "1", value: params.bal4_max_minuten_9h });
-  const alleVelden = [iBal2Min9, iBal2Max9, iBal3Min9, iBal3Max9, iBal4Min9, iBal4Max9];
 
-  // "Verwachte rondetijden" is een kale weergave-mirror — 9 holes rechtstreeks van de zes velden
-  // hiernaast, 18 holes als het dubbele daarvan (v0.21.1), zelfde verhouding als
-  // rondetijdBereikVoor() nu op de Tracker zelf toepast.
-  const vbBereik9_2 = el("div", { class: "vbcelbereik" });
-  const vbBereik9_3 = el("div", { class: "vbcelbereik" });
-  const vbBereik9_4 = el("div", { class: "vbcelbereik" });
-  const vbBereik18_2 = el("div", { class: "vbcelbereik" });
-  const vbBereik18_3 = el("div", { class: "vbcelbereik" });
-  const vbBereik18_4 = el("div", { class: "vbcelbereik" });
-  const maakVoorbeeldtabel = (b2, b3, b4) => el("div", { class: "voorbeeldtabel" }, [
-    el("div", { class: "vbkop", text: "2-Bal" }),
-    el("div", { class: "vbkop", text: "3-Bal" }),
-    el("div", { class: "vbkop", text: "4-Bal" }),
-    el("div", { class: "vbcel" }, [b2]),
-    el("div", { class: "vbcel" }, [b3]),
-    el("div", { class: "vbcel" }, [b4]),
-  ]);
-  const voorbeeldtabel9 = maakVoorbeeldtabel(vbBereik9_2, vbBereik9_3, vbBereik9_4);
-  const voorbeeldtabel18 = maakVoorbeeldtabel(vbBereik18_2, vbBereik18_3, vbBereik18_4);
-  const minutenGetal = (input) => parseFloat(input.value) || 0;
-  const herbereken = () => {
-    const paar9 = (min, max) => `${formatUurMin(minutenGetal(min))} - ${formatUurMin(minutenGetal(max))}`;
-    const paar18 = (min, max) => `${formatUurMin(minutenGetal(min) * 2)} - ${formatUurMin(minutenGetal(max) * 2)}`;
-    vbBereik9_2.textContent = paar9(iBal2Min9, iBal2Max9);
-    vbBereik9_3.textContent = paar9(iBal3Min9, iBal3Max9);
-    vbBereik9_4.textContent = paar9(iBal4Min9, iBal4Max9);
-    vbBereik18_2.textContent = paar18(iBal2Min9, iBal2Max9);
-    vbBereik18_3.textContent = paar18(iBal3Min9, iBal3Max9);
-    vbBereik18_4.textContent = paar18(iBal4Min9, iBal4Max9);
-  };
-  herbereken();
+  // v0.21.6: per-hole streeftijd voor 4-bal — 18 losse velden (bal4_h1_minuten..bal4_h18_minuten,
+  // migratie los aangeleverd). Startwaarden hieronder zijn Kay's eigen berekening (vaste basistijd
+  // + rest naar gevolgde holelengte uit de North Course-KML) — alleen gebruikt als de kolom in de
+  // database nog leeg is (vóór de migratie/eerste PATCH), daarna leidend is wat er in `parameters`
+  // staat.
+  const BAL4_PER_HOLE_DEFAULT = [12, 10, 14, 17, 8, 14, 17, 15, 13, 13, 10, 12, 17, 10, 14, 14, 16, 14];
+  const iBal4Holes = BAL4_PER_HOLE_DEFAULT.map((def, i) =>
+    el("input", { class: "paraminput", type: "number", step: "1", value: params[`bal4_h${i + 1}_minuten`] ?? def }));
+
+  const alleVelden = [iBal2Min9, iBal2Max9, iBal3Min9, iBal3Max9, iBal4Min9, iBal4Max9, ...iBal4Holes];
+
   // v0.19.4 (Kay's verzoek): de "Opslaan"-knop grijs/niet-klikbaar zodra de waarden overeenkomen met
   // wat net geladen/opgeslagen is, en weer actief zodra een van de parametervelden wijzigt. Omdat
   // vulAdminParametersTab() sowieso opnieuw draait (via render()) ná elke opslagpoging — mét een
@@ -2870,7 +2873,15 @@ async function vulAdminParametersTab(inhoud) {
   // is opgeslagen"-vergelijking te zijn: elke keer dat deze functie opnieuw draait staan de velden
   // per definitie gelijk aan wat net geladen is, dus de knop mag dan simpelweg disabled starten.
   const markeerGewijzigd = () => { opslaanBtn.disabled = false; };
-  alleVelden.forEach((input) => input.addEventListener("input", () => { herbereken(); markeerGewijzigd(); }));
+  alleVelden.forEach((input) => input.addEventListener("input", markeerGewijzigd));
+
+  // v0.21.6: 4 kolommen (H1-H9 label+veld, H10-H18 label+veld) — grid-auto-flow vult gewoon 4
+  // cellen per rij, dus dit levert precies de kolomindeling op die Kay aangaf.
+  const bal4HoleGrid = el("div", { class: "holeparamgrid" },
+    Array.from({ length: 9 }, (_, i) => [
+      el("div", { class: "holelabel", text: `H${i + 1}` }), iBal4Holes[i],
+      el("div", { class: "holelabel", text: `H${i + 10}` }), iBal4Holes[i + 9],
+    ]).flat());
 
   // v0.19.0 (Kay's verzoek): korte uitleg-popup bij de parameterkeuzes — zelfde modal-opzet als de
   // tips-popup (.tipsoverlay/.tipsmodal), bewust NIET via render() geopend/gesloten (dat zou de
@@ -2905,6 +2916,9 @@ async function vulAdminParametersTab(inhoud) {
       bal3_max_minuten_9h: parseFloat(iBal3Max9.value),
       bal4_min_minuten_9h: parseFloat(iBal4Min9.value),
       bal4_max_minuten_9h: parseFloat(iBal4Max9.value),
+      // v0.21.6: de 18 per-hole 4-bal-velden horen in dezelfde PATCH mee, anders raakt de knop-
+      // disabled-status (die over alle alleVelden gaat) uit de pas met wat er echt is opgeslagen.
+      ...Object.fromEntries(iBal4Holes.map((input, i) => [`bal4_h${i + 1}_minuten`, parseFloat(input.value)])),
     };
     if (Object.values(nieuw).some((v) => Number.isNaN(v) || v < 0)) {
       adminLocal.paramFout = "Vul voor elk veld een geldig, niet-negatief getal in.";
@@ -2982,10 +2996,8 @@ async function vulAdminParametersTab(inhoud) {
 
   const paramKaart = el("div", { class: "card" }, [
     ...maakStreeftijdenSectie("Streeftijden — 9 holes", iBal2Min9, iBal2Max9, iBal3Min9, iBal3Max9, iBal4Min9, iBal4Max9, true),
-    el("div", { class: "eyebrow", style: "margin-top:14px", text: "Verwachte rondetijden — 9 holes" }),
-    voorbeeldtabel9,
-    el("div", { class: "eyebrow", style: "margin-top:14px", text: "Verwachte rondetijden — 18 holes" }),
-    voorbeeldtabel18,
+    el("div", { class: "eyebrow", style: "margin-top:14px", text: "4-bal — streeftijd per hole (minuten)" }),
+    bal4HoleGrid,
     ...(fout ? [fout] : []),
     el("button", { class: "btn secondary", style: "margin-top:12px", onclick: toonVerantwoording, text: "Verantwoording" }),
     opslaanBtn,
