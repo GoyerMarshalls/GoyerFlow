@@ -305,6 +305,9 @@
     gap:6px 10px;margin-top:6px;align-items:center}
   .holeparamgrid .holelabel{font-size:13px;font-weight:700;color:var(--muted-ink);text-align:right}
   .holeparamgrid .paraminput{width:100%;box-sizing:border-box;padding:7px 6px;font-size:14px}
+  /* v0.21.9: live subtotaal per negen holes, onder elke kolomhelft van .holeparamgrid. */
+  .holeparamgrid .holesomcel{margin-top:4px}
+  .holeparamgrid .holesom{font-size:13px;font-weight:700;color:var(--muted-ink)}
 
   /* v0.19.0: "Verantwoording"-popup bij de Parameters-tab — zelfde modal-opzet als .tipsoverlay/
      .tipsmodal (zie hieronder), alleen de inhoud is prose i.p.v. een tips-lijst. */
@@ -941,8 +944,32 @@
        bewust niet opgeloste beperking: een klik op een marker (opent de flight-detailpopup) of een
        tabwissel herbouwt het hele beheerscherm en sluit fullscreen daardoor alsnog af — geen
        probleem voor het hoofdgebruik (de kaart laten staan op een extern scherm).
+     v0.21.9: drie UI-verzoeken op het v0.21.6-"streeftijd per hole"-blokje (Parameters-tab),
+       met screenshot van de live site. (1) Kopje "4-bal — streeftijd per hole (minuten)" → kaal
+       "Streeftijd per hole (minuten)" (het "4-bal —" voorvoegsel weg). (2) Veldlabels "H1".."H18"
+       → voluit "Hole 1".."Hole 18". (3) Nieuwe, live herberekenende subtotalen direct onder de
+       twee kolomhelften: "1e 9: … min" (som Hole 1 t/m 9) onder de linkerkolom, "2e 9: … min"
+       (som Hole 10 t/m 18) onder de rechterkolom — puur afgeleid van de 18 invoervelden, geen
+       eigen opslaanbaar veld.
+       Zelfde reactie, grotere vraag: Kay veronderstelde dat de Tracker al op de per-hole-cijfers
+       rekent — dat was NIET zo (rondetijdBereikVoor()/minutenPerHole gebruikten voor 4-bal nog
+       altijd uitsluitend de vlakke bal4_min/max_minuten_9h, zie de v0.21.6-notitie hierboven) —
+       teruggekoppeld i.p.v. stilzwijgend overgenomen. Voorgelegd of de Tracker moet omschakelen,
+       en zo ja: alleen voor 4-bal, of één universeel per-hole-model voor alle flightgroottes
+       (het 2-/3-/4-bal-onderscheid vervalt dan helemaal). **Kay koos: één universeel model.**
+       Als directe consequentie zijn de 18 kolomnamen hernoemd van het nog niet gemigreerde
+       (en, bleek bij navraag, nooit aan Kay gegeven — mijn fout, rechtgezet) bal4_h1..h18_minuten
+       naar flightgrootte-neutraal hole_h1_minuten..hole_h18_minuten (params-object-sleutels in
+       zowel het inlezen als de opslaan()-PATCH), want deze velden gelden na deze keuze voor elke
+       flightgrootte, niet alleen 4-bal. **BELANGRIJK, nog niet gedaan:** de daadwerkelijke
+       rekenkern-omzetting (rondetijdBereikVoor()/minutenPerHole laten lezen uit deze 18 velden
+       i.p.v. de vlakke bal{2,3,4}_min/max_minuten_9h, en een losse vraag of de verwachte-positie-
+       berekening zelf hole-gewogen moet worden i.p.v. de huidige vlakke-gemiddelde-aanpak) — deze
+       build is uitsluitend de dataveld-hernoeming + SQL-correctie; de vlakke 2-/3-/4-bal-
+       streeftijden blijven dus voorlopig nog de daadwerkelijke bron voor de Tracker, anders breekt
+       de positieberekening voor elke flight. Zie de chat voor de vervolgvraag.
    ============================================================================================ */
-const APP_VERSIE = "0.21.8";
+const APP_VERSIE = "0.21.9";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -3207,7 +3234,7 @@ async function vulAdminParametersTab(inhoud) {
   // staat.
   const BAL4_PER_HOLE_DEFAULT = [12, 10, 14, 17, 8, 14, 17, 15, 13, 13, 10, 12, 17, 10, 14, 14, 16, 14];
   const iBal4Holes = BAL4_PER_HOLE_DEFAULT.map((def, i) =>
-    el("input", { class: "paraminput", type: "number", step: "1", value: params[`bal4_h${i + 1}_minuten`] ?? def }));
+    el("input", { class: "paraminput", type: "number", step: "1", value: params[`hole_h${i + 1}_minuten`] ?? def }));
 
   const alleVelden = [iBal2Min9, iBal2Max9, iBal3Min9, iBal3Max9, iBal4Min9, iBal4Max9, ...iBal4Holes];
 
@@ -3220,13 +3247,41 @@ async function vulAdminParametersTab(inhoud) {
   const markeerGewijzigd = () => { opslaanBtn.disabled = false; };
   alleVelden.forEach((input) => input.addEventListener("input", markeerGewijzigd));
 
-  // v0.21.6: 4 kolommen (H1-H9 label+veld, H10-H18 label+veld) — grid-auto-flow vult gewoon 4
-  // cellen per rij, dus dit levert precies de kolomindeling op die Kay aangaf.
-  const bal4HoleGrid = el("div", { class: "holeparamgrid" },
-    Array.from({ length: 9 }, (_, i) => [
-      el("div", { class: "holelabel", text: `H${i + 1}` }), iBal4Holes[i],
-      el("div", { class: "holelabel", text: `H${i + 10}` }), iBal4Holes[i + 9],
-    ]).flat());
+  // v0.21.6: 4 kolommen ("Hole 1"-"Hole 9" label+veld, "Hole 10"-"Hole 18" label+veld) —
+  // grid-auto-flow vult gewoon 4 cellen per rij, dus dit levert precies de kolomindeling op die
+  // Kay aangaf.
+  // v0.21.9 (Kay's verzoek): "H1"/"H10" → voluit "Hole 1"/"Hole 10" (puur label-tekst). Eronder,
+  // in een 10e rij die elk kolomdoublet (label+veld) overspant, een live subtotaal per negen holes
+  // — "1e 9"/"2e 9" — zodat Kay in één oogopslag ziet of elke helft op de bedoelde 120 minuten
+  // uitkomt zonder zelf te hoeven optellen. Geen eigen opslaanbaar veld, puur afgeleid van de 18
+  // invoervelden hierboven; herberekent bij elke wijziging (zelfde listener-aanpak als
+  // markeerGewijzigd, los toegevoegd zodat een toekomstige wijziging aan de een de ander niet kan
+  // raken).
+  const somEersteNegen = el("div", { class: "holesom", text: "1e 9: — min" });
+  const somTweedeNegen = el("div", { class: "holesom", text: "2e 9: — min" });
+  const herberekenHoleSom = () => {
+    const som = (vanaf, tot) => {
+      let totaal = 0;
+      for (let i = vanaf; i < tot; i++) {
+        const v = parseFloat(iBal4Holes[i].value);
+        if (!Number.isNaN(v)) totaal += v;
+      }
+      return totaal;
+    };
+    somEersteNegen.textContent = `1e 9: ${som(0, 9)} min`;
+    somTweedeNegen.textContent = `2e 9: ${som(9, 18)} min`;
+  };
+  iBal4Holes.forEach((input) => input.addEventListener("input", herberekenHoleSom));
+  herberekenHoleSom();
+
+  const bal4HoleGrid = el("div", { class: "holeparamgrid" }, [
+    ...Array.from({ length: 9 }, (_, i) => [
+      el("div", { class: "holelabel", text: `Hole ${i + 1}` }), iBal4Holes[i],
+      el("div", { class: "holelabel", text: `Hole ${i + 10}` }), iBal4Holes[i + 9],
+    ]).flat(),
+    el("div", { class: "holesomcel", style: "grid-column: span 2" }, [somEersteNegen]),
+    el("div", { class: "holesomcel", style: "grid-column: span 2" }, [somTweedeNegen]),
+  ]);
 
   // v0.19.0 (Kay's verzoek): korte uitleg-popup bij de parameterkeuzes — zelfde modal-opzet als de
   // tips-popup (.tipsoverlay/.tipsmodal), bewust NIET via render() geopend/gesloten (dat zou de
@@ -3263,7 +3318,7 @@ async function vulAdminParametersTab(inhoud) {
       bal4_max_minuten_9h: parseFloat(iBal4Max9.value),
       // v0.21.6: de 18 per-hole 4-bal-velden horen in dezelfde PATCH mee, anders raakt de knop-
       // disabled-status (die over alle alleVelden gaat) uit de pas met wat er echt is opgeslagen.
-      ...Object.fromEntries(iBal4Holes.map((input, i) => [`bal4_h${i + 1}_minuten`, parseFloat(input.value)])),
+      ...Object.fromEntries(iBal4Holes.map((input, i) => [`hole_h${i + 1}_minuten`, parseFloat(input.value)])),
     };
     if (Object.values(nieuw).some((v) => Number.isNaN(v) || v < 0)) {
       adminLocal.paramFout = "Vul voor elk veld een geldig, niet-negatief getal in.";
@@ -3341,7 +3396,7 @@ async function vulAdminParametersTab(inhoud) {
 
   const paramKaart = el("div", { class: "card" }, [
     ...maakStreeftijdenSectie("Streeftijden — 9 holes", iBal2Min9, iBal2Max9, iBal3Min9, iBal3Max9, iBal4Min9, iBal4Max9, true),
-    el("div", { class: "eyebrow", style: "margin-top:14px", text: "4-bal — streeftijd per hole (minuten)" }),
+    el("div", { class: "eyebrow", style: "margin-top:14px", text: "Streeftijd per hole (minuten)" }),
     bal4HoleGrid,
     ...(fout ? [fout] : []),
     el("button", { class: "btn secondary", style: "margin-top:12px", onclick: toonVerantwoording, text: "Verantwoording" }),
