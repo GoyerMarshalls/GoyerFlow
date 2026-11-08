@@ -1097,8 +1097,21 @@
        twee bijna-maar-niet-helemaal gelijke tinten. Opgelost door de ECHTE kleur van de afbeelding te
        meten (alle vier de hoeken van basemap.webp gaven exact dezelfde waarde, rgb(236,238,230) =
        #ECEEE6 — geen schatting, een meting) en .baanflowkaartwrap's achtergrond daarop te zetten.
+   v0.22.5: eerste stap in het permanent maken van lidcode-only inloggen (sparsessie 8 november 2026 —
+       zie bouwgeschiedenis: geen pincode meer, vergelijkbaar bezit-niveau als Tagmarshal's gps-tag,
+       de bestaande "geboekte flight vandaag + 15 min voor starttijd"-gate is de facto poort genoeg).
+       Twee cosmetische wijzigingen op het inlogscherm (renderPersoonscode) — de onderliggende logica
+       (TIJDELIJK_SKIP_PINCODE_VOOR_VELDTEST, nog ongewijzigd) stond al op true: (1) de waarschuwing
+       "⚠️ Veldtest-modus: ..." verwijderd — niet meer gepast nu dit geen tijdelijke veldtest-modus
+       meer is maar de bedoelde permanente opzet; (2) placeholder van het lidcode-veld van "bv. 1234"
+       naar "bv. LIND 6" — een voorbeeld dat daadwerkelijk op het bestaande lidcode-formaat lijkt
+       (letters + cijfer, zie ook de "WEL 1"-bugfix uit v0.11.x), i.p.v. een puur numeriek voorbeeld
+       dat leden op het verkeerde been kon zetten. NB: de constante TIJDELIJK_SKIP_PINCODE_VOOR_VELDTEST
+       en het bijbehorende commentaarblok hierboven heten nog "tijdelijk"/"veldtest" — dat is na deze
+       wijziging een stale naam geworden (de bedoeling is nu permanent), maar bewust nog niet hernoemd
+       in deze stap; zie "Nog door Kay te doen".
    ============================================================================================ */
-const APP_VERSIE = "0.22.4";
+const APP_VERSIE = "0.22.5";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -2113,7 +2126,7 @@ async function zoekSpelerOpPersoonscode(ruw) {
 
 /* ---- Scherm 1: persoonscode ---- */
 function renderPersoonscode(app) {
-  const input = el("input", { type: "text", id: "persoonscode", inputmode: "text", placeholder: "bv. 1234", maxlength: "12" });
+  const input = el("input", { type: "text", id: "persoonscode", inputmode: "text", placeholder: "bv. LIND 6", maxlength: "12" });
   const err = meldingNode();
 
   const submit = async () => {
@@ -2180,9 +2193,6 @@ function renderPersoonscode(app) {
       el("p", { class: "authtagline", text: "De Speeltempo-tracker" }),
     ]),
     el("p", { class: "authdesc", text: "Deze app biedt inzicht in het speeltempo van jouw flight, eventueel met suggesties om dat te verbeteren." }),
-    ...(TIJDELIJK_SKIP_PINCODE_VOOR_VELDTEST
-      ? [el("p", { class: "msg warn", text: "⚠️ Veldtest-modus: de pincode-check is tijdelijk uitgeschakeld. Een lidcode is op zichzelf genoeg om in te loggen." })]
-      : []),
     el("label", { text: "Log in met je Goyer Lidcode" }),
     input,
     ...(err ? [err] : []),
