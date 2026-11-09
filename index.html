@@ -1222,8 +1222,32 @@
        Patch, geen minor: uitsluitend verfijning/bugfix van de net in v0.23.0 geleverde knelpunten-
        analyse, geen nieuwe functionaliteit — zelfde precedent als eerdere snelle verfijningsronden
        direct na een net geleverde minor (bijv. v0.21.1).
+   v0.23.2: Kay's vraag "hoe isoleer je de ene schuldige in een rij van 10 opgehouden flights?" legde
+       bloot dat de houdtOp-toekenning puur paarsgewijs was: elke flight die zelf opgehouden werd, zette
+       zijn eigen voorganger op houdtOp=true — in een aaneengesloten file van opgehoudenen kreeg dus
+       bijna iedereen (behalve de laatste) de magenta ring, niet alleen de werkelijke kop ervan. Fix:
+       een voorganger wordt alleen nog als houdtOp gemarkeerd als hijzelf NIET ook al opgehouden wordt
+       (knelpuntPerId heeft deze .opgehouden-vlag al per flight, geen nieuwe berekening nodig) — isoleert
+       zo precies de kop van elke file; de flights daartussenin geven de vertraging door zonder zelf een
+       ring te krijgen. Ook bevestigd (geen codewijziging, bestaand gedrag correct): 10 even langzaam
+       spelende flights die hun normale onderlinge afstand behouden (groot gat, niet < KNELPUNT_GAT_
+       DREMPEL_MINUTEN) krijgen GEEN van allen een ring — isOpgehouden() vereist zowel "achter op eigen
+       schema" als "klein gat", en alleen beide samen is een knelpunt. Daarnaast is de Verantwoording-
+       popup op de Parameters-tab herschreven: korter, zonder versiegeschiedenis/wijzigingstaal (die
+       hoort in de bouwgeschiedenis, niet hier), met Kay's eigen tekst als basis, plus een nieuwe
+       paragraaf die de knelpunten-analyse in gewone taal uitlegt (inclusief de net gefixte kop-isolatie).
+       Patch: bugfix + tekstherschrijving, geen nieuwe functionaliteit.
+   v0.23.3: Kay betrapte een ambiguïteit in de net geschreven knelpunten-paragraaf van de Verant-
+       woording-popup: "Hoe verder die achterligger achter op schema staat, hoe groter het icoon"
+       leest grammaticaal alsof het icoon VAN DE ACHTERLIGGER zelf groter wordt — terwijl het in
+       werkelijkheid het icoon van de OPHOUDER (de kop van de file) is dat groter wordt, geschaald
+       op hoe ver de achterligger achter op schema staat. Zelfde soort fout als bij v0.23.2 (gat-
+       grootte-verwarring), nu een wie-krijgt-het-grotere-icoon-verwarring. Alleen de tekst aangepast
+       naar "Het icoon van die ophoudende flight wordt groter naarmate de flight erachter verder
+       achter op schema staat." — geen enkele codewijziging aan de daadwerkelijke schaallogica.
+       Patch: tekstcorrectie, geen gedragswijziging.
    ============================================================================================ */
-const APP_VERSIE = "0.23.1";
+const APP_VERSIE = "0.23.3";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -1966,20 +1990,17 @@ const TIPS = [
   "Zet de trolley of buggy aan de kant van de volgende afslag neer, niet terug bij de green.",
 ];
 
-// v0.19.0 (Kay's verzoek): uitleg bij de knop "Verantwoording" in de admin Parameters-tab — waarom
-// deze opzet, niet de huidige ingevulde getallen zelf (die kan een beheerder wijzigen; deze tekst
-// moet kloppen blijven ongeacht de actuele waarden). Zie de bouwgeschiedenis voor de volledige
-// achtergrond van Kay's keuzes hierin.
-// v0.20.0: herschreven — niet langer "checkpointtijd + hcp-correctie + flightgrootte-correctie per
-// hole-type" (v0.18.0-v0.19.5), maar een rechtstreeks ingesteld bereik per flight-grootte.
+// Uitleg bij de knop "Verantwoording" in de admin Parameters-tab — waarom deze opzet werkt zoals
+// hij werkt, niet de huidige ingevulde getallen zelf (die kan een beheerder wijzigen op de
+// Parameters-tab; deze tekst moet kloppen blijven ongeacht de actuele waarden). Bewust kort en
+// zonder versiegeschiedenis — wat er ooit anders was staat in de bouwgeschiedenis, niet hier.
 const VERANTWOORDING_PARAMETERS = [
-  "Eén streeftijd per hole (18 velden, 'Streeftijd per hole') is de enige bron voor de hele berekening — geen formule meer op basis van losse par-tijden, en sinds v0.22.0 ook geen apart minimum/maximum meer per flight-grootte.",
-  "Deze 18 waarden zijn geijkt op een 4-bal. Een 2-bal en een 3-bal spelen in de praktijk sneller, dus wordt elke hole-tijd voor hen geschaald: 2-bal × 0,75 (±90 minuten per 9 holes), 3-bal × 0,875 (±105 minuten), 4-bal × 1,0 (120 minuten, ongewijzigd — en gelijk aan De Goyer's eigen officiële regel voor 9 holes). Zo blijft een 2-bal structureel vóór een 4-bal liggen in de berekening, i.p.v. allebei tegen dezelfde maatstaf beoordeeld te worden — dat maakt de Tracker ook bruikbaar om dreigende congestie tussen verschillende flightgroottes te voorspellen.",
-  "De positie van een flight wordt per hole opgebouwd (niet meer als één plat gemiddelde over de hele ronde): een lange hole 'kost' meer speeltijd dan een korte voordat de verwachte positie naar de volgende hole opschuift. Elke hole weegt dus mee met zijn eigen ingevulde streeftijd.",
-  "Handicap is bewust geen factor: pace-of-play-onderzoek (zie de bouwgeschiedenis) vond geen aantoonbaar effect van handicap op speeltempo.",
-  "Bewust geen 'gedragsfactor' die de lat verlaagt voor langzamer spel — de ingevulde tijden zijn een ambitieuze, realistische streeftijd, niet een gemiddelde van hoe traag er nu daadwerkelijk gespeeld wordt.",
-  "De status op het trackerscherm werkt met een harde minutenbuffer t.o.v. de streeftijd: groen bij minder dan 5 minuten erboven, oranje bij 5–10 minuten, rood bij meer dan 10 minuten. Minuten in plaats van holes, omdat op De Goyer de holes dicht op elkaar liggen — een kleine vertraging op de green kan anders al lijken op een achterstand van een hele hole.",
-  "Vooruitlopen op schema krijgt sinds v0.21.4 een eigen (blauwe) status i.p.v. gewoon 'op schema' — puur signalerend, geen aansporing om sneller te spelen: te snel spelen is op zich geen probleem.",
+  "Voor iedere hole is een streeftijd vastgesteld. Op basis van die streeftijden wordt de positie van een flight in de baan berekend. De streeftijden tellen op tot 120 minuten per negen holes.",
+  "Deze tijden gaan uit van een 4-bal. Een 2-bal speelt sneller (75%) en een 3-bal iets sneller (88%).",
+  "De positie van een flight wordt per hole opgebouwd: een lange hole kost meer speeltijd dan een korte.",
+  "Handicap speelt geen rol in de berekening omdat onderzoek naar speelsnelheid geen aantoonbaar verband tussen handicap en speelsnelheid heeft vastgesteld.",
+  "Op het trackerscherm is een flight groen tot 5 minuten boven de streeftijd, oranje bij 5 tot 10 minuten boven de streeftijd, en rood boven de 10 minuten. Een flight die sneller loopt dan de streeftijd wordt blauw.",
+  "Op de Baan Flow-kaart wordt ook gekeken of een flight de flight erachter ophoudt. Dat geldt alleen voor de kop van zo'n file: een flight die zelf niet wordt opgehouden, maar waar een andere flight wel dicht achter zit en zelf achter op schema staat. Het icoon van die ophoudende flight wordt groter naarmate de flight erachter verder achter op schema staat. Lopen alle flights gelijk langzaam met voldoende ruimte ertussen, dan wordt niemand als ophouder gemarkeerd.",
 ];
 
 // Kleine chevron-svg, voor de hole-steppers en de terug-knop.
@@ -3529,10 +3550,17 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
       minutenAchter: positie.conclusie ? positie.conclusie.minutenAchter : 0,
     });
   }
+  // v0.23.2 (Kay's vraag): zonder de `!voorgangerInfo.opgehouden`-voorwaarde zou ELKE flight in een
+  // aaneengesloten rij opgehoudenen zelf ook als "houdt op" worden gemarkeerd (B houdt C op → B krijgt
+  // de ring, A houdt B op → A krijgt óók de ring, enzovoort) — bij een lange file van bijv. 10 op
+  // elkaar gepropte, trage flights zou dat 9 magenta ringen geven in plaats van 1. Door een flight
+  // alleen als "houdt op" te markeren als hijzelf NIET ook al opgehouden wordt, isoleert dit precies
+  // de KOP van zo'n file: de ene flight die zelf vrij speelt maar wel de rest blokkeert. De flights
+  // daartussenin geven de vertraging alleen door en krijgen geen eigen ring.
   for (const info of knelpuntPerId.values()) {
     if (info.opgehouden && info.voorganger) {
       const voorgangerInfo = knelpuntPerId.get(info.voorganger.flight.id);
-      if (voorgangerInfo) voorgangerInfo.houdtOp = true;
+      if (voorgangerInfo && !voorgangerInfo.opgehouden) voorgangerInfo.houdtOp = true;
     }
   }
   // Trend (t.o.v. de laatst opgeslagen meting) + achtergrond-PATCH van de nieuwe meting — best
