@@ -205,24 +205,24 @@
     border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;
     font-size:13px;font-weight:800;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.35);
     cursor:pointer;z-index:2}
-  /* Gestippelde rand = pure tijdschatting (nog geen melding); volle witte rand = bevestigde
-     melding — zie de toelichting bij vulAdminBaanFlowTab. */
-  .baanflowmarker.geschat{border-style:dashed;border-color:rgba(255,255,255,0.8)}
-  /* v0.23.0: knelpunten-ring, ADDITIEF op de bestaande vulkleur (die blijft de eigen-schema-
+  /* v0.23.1 (sparsessie, Kay's "optie 3"): het .geschat-onderscheid (gestippeld = tijdschatting vs.
+     volle rand = bevestigde melding) is VERWIJDERD — Kay's punt: dat onderscheid klopt
+     conceptueel niet, want ALLE posities zijn in principe schattingen (zie de bouwgeschiedenis).
+     Het exacte laatste-melding-tijdstip blijft wel beschikbaar, nu alleen in de detailpopup i.p.v.
+     als visueel onderscheid op de kaart zelf (zie bouwFlightDetailModal hieronder). Om dezelfde
+     reden is ook de "Opgehouden door voorganger"-ring hier verwijderd (zie v0.23.1 bij .houdtop
+     verderop) — .houdtop (magenta, "ophouder") blijft de enige ring op de kaart.
+  v0.23.0: knelpunten-ring, ADDITIEF op de bestaande vulkleur (die blijft de eigen-schema-
      magnitude uit conclusieVoor — zie de bouwgeschiedenis voor waarom dit bewust twee aparte
      dimensies zijn, net als bij TagMarshal kleur vs. grootte). Een extra box-shadow-laag buiten de
-     witte rand, zodat .geschat (gestippeld) en de kleur van de marker zelf ongemoeid blijven. */
-  .baanflowmarker.opgehouden{box-shadow:0 0 0 3px var(--warn),0 2px 6px rgba(0,0,0,0.35)}
+     witte rand. */
   .baanflowmarker.houdtop{box-shadow:0 0 0 3px var(--magenta),0 2px 6px rgba(0,0,0,0.35)}
-  .baanflowmarker.opgehouden.houdtop{box-shadow:0 0 0 3px var(--warn),0 0 0 6px var(--magenta),0 2px 6px rgba(0,0,0,0.35)}
   .baanflowlegenda{display:flex;flex-wrap:wrap;gap:12px 16px;margin-top:12px}
   .baanflowlegendaitem{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted-ink);
     font-weight:600}
   .baanflowlegendadot{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0}
   .baanflowlegendaring{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0;
     border:2px solid var(--muted-ink);box-sizing:border-box}
-  .baanflowlegendaring.gestippeld{border-style:dashed}
-  .baanflowlegendaring.opgehouden{border-color:var(--warn)}
   .baanflowlegendaring.houdtop{border-color:var(--magenta)}
 
   /* Volledig-scherm-knop (v0.21.8, Kay's verzoek: de kaart op een iPad/laptop/desktop/extern
@@ -253,7 +253,13 @@
      linkerranden exact samen met de linkerrand van de kaart. Sinds v0.22.2 gebruikt die formule de
      CSS-variabele --baanflow-wrap-ratio (inline gezet op #baanflowCard, zie de script) i.p.v. de
      hardgecodeerde 1598/1044-verhouding, zodat hij automatisch meebeweegt met de fijnrotatie-hoek. */
+  /* v0.23.1 (Kay's verzoek): .baanflowsubtekst (de altijd-zichtbare "Op dit moment zijn er ##
+     flights in de baan."-regel, zie vulAdminBaanFlowTab) toegevoegd aan dezelfde selectorlijst —
+     de oude voorwaardelijke lege-staat-tekst viel hier níet onder (ze was een sibling van
+     .baanflowheader, geen lid van deze regel) en lijnde daardoor op volledig scherm te veel links
+     uit t.o.v. de kaart/legenda zelf. */
   #baanflowCard:fullscreen .baanflowheader, #baanflowCard:-webkit-full-screen .baanflowheader,
+  #baanflowCard:fullscreen .baanflowsubtekst, #baanflowCard:-webkit-full-screen .baanflowsubtekst,
   #baanflowCard:fullscreen .baanflowlegenda, #baanflowCard:-webkit-full-screen .baanflowlegenda{
     width:calc((100vh - 170px) * var(--baanflow-wrap-ratio));align-self:center}
   #baanflowCard:fullscreen .eyebrow, #baanflowCard:-webkit-full-screen .eyebrow{font-size:15px}
@@ -1171,8 +1177,53 @@
        overstemmen. Nieuwe kleurvariabele --magenta (nog niet bevestigd). Legenda en de Baan
        Flow-detailpopup (bouwFlightDetailModal, nieuwe optionele 5e parameter knelpuntInfo) breiden
        mee uit. Raakt het ledenscherm, de Tracker-tab en conclusieVoor() zelf op geen enkele manier.
+   v0.23.1: sparsessie met Kay (8/9 november 2026) over de legenda/kaart van v0.23.0 — vier losse
+       conclusies, alle vier verwerkt:
+       (1) "Bevestigde melding" vs. "Tijdschatting" is een vals onderscheid (Kay's analyse: álle
+       posities zijn in principe schattingen, zowel de pure tijdschatting als iedere melding zodra
+       er tijd verstrijkt zonder nieuwe melding — GoyerFlow is in de eerste plaats een zelf-check-
+       tool voor spelers, pas in de tweede plaats bottleneck-inzicht voor Marshals/wedstrijdleiders,
+       die dat inzicht zelf moeten verifiëren i.p.v. blind vertrouwen). Kay's "optie 3": onderscheid
+       weg van de kaart (geen .geschat-CSS/-class meer); het laatste-melding-tijdstip blijft wél
+       bruikbaar, nu als tekstregel in de detailpopup (bouwFlightDetailModal) i.p.v. als visueel
+       onderscheid op de kaart.
+       (2) Kay's vraag "als 'die' flight de flight achter zich ophoudt, is er toch geen gat?" legde
+       een echte bug bloot in de markergrootte-formule: die schaalde op knelpunt.gat (het gat tussen
+       een opgehouden flight en ZIJN voorganger), dat per definitie van isOpgehouden() altijd al
+       klein is (< KNELPUNT_GAT_DREMPEL_MINUTEN=5) — de marker kon zijn bedoelde maximale grootte
+       dus nooit bereiken, én de schaal-richting was omgekeerd (kleiner gat = intuïtief ergere
+       opstopping, maar kleinere marker). Fix: conclusieVoor() geeft nu ook minutenAchter terug
+       (was al intern berekend); de schaal-formule gebruikt voortaan de EIGEN achterstand-op-schema
+       van de achterligger i.p.v. het gat naar de voorganger. KNELPUNT_SCHAAL_MAX_GAT_MINUTEN
+       hernoemd naar KNELPUNT_SCHAAL_MAX_ACHTERSTAND_MINUTEN.
+       (3) Kay's herformulering van de legenda: de 4 eigen-schema-kleuren heten nu Snel/Op schema/
+       Langzaam/Traag (kleuren/drempels zelf ongewijzigd). Op de vraag "hoe kan iemand die zelf
+       niets fout doet toch de bottleneck zijn?" zijn twee concrete, code-gegronde scenario's
+       bevestigd: (a) de relatieve flightgrootte-schaling uit v0.22.0 (2-/3-/4-bal op 0.75/0.875/
+       1.0× dezelfde 18 checkpointtijden) laat een structureel sneller-op-eigen-schema-flight
+       inlopen op een structureel trager-op-eigen-schema-flight, ook als beide "op hun eigen schema"
+       lopen; (b) de ±5-minuten-brede "op schema"-band laat twee flights aan weerszijden van die
+       band wél meetbaar van tempo verschillen terwijl beide groen tonen. Dit bevestigt dat "houdt
+       op"/"ophouder" GEEN redundante status is (kan bij elke eigen pace-status optreden) — in
+       tegenstelling tot "opgehouden", die per definitie altijd al samenvalt met de eigen achter/
+       ver_achter-vulkleur en dus geen eigen informatie aan de kaart toevoegde. Daarom is de oranje
+       "opgehouden"-ring (CSS, class, legenda-item) volledig van de kaart verwijderd — dichter bij
+       TagMarshal's eigen oorspronkelijke 4-elkaar-uitsluitende-statussen-ontwerp (zie de v0.23.0-
+       research) dan de tot nu toe gebouwde 2-onafhankelijke-lagen-opzet. De magenta "houdtop"-ring
+       blijft de enige ring op de kaart; de trendpijl is beperkt tot alleen houdtOp (stond eerst ook
+       bij opgehouden). Het "opgehouden"-gat/-trend blijft intern berekend en beschikbaar via de
+       hover-title en de detailpopup (knelpuntKaart) — alleen de kaart-ring is weg.
+       (4) UI-verzoek los van de sparsessie: titel vereenvoudigd naar puur "Baan Flow"; de
+       voorwaardelijke lege-staat-tekst vervangen door een altijd zichtbare subtekst ("Op dit moment
+       zijn er N flights in de baan."/"...is er 1 flight..."/"...zijn er geen flights..."); nieuwe
+       class .baanflowsubtekst toegevoegd aan de bestaande fullscreen-breedte/centreer-CSS-regel
+       (de oude tekst viel daar niet onder — ze was een sibling van .baanflowheader, geen lid van
+       die selectorlijst — en bleef daardoor op volledig scherm te links staan).
+       Patch, geen minor: uitsluitend verfijning/bugfix van de net in v0.23.0 geleverde knelpunten-
+       analyse, geen nieuwe functionaliteit — zelfde precedent als eerdere snelle verfijningsronden
+       direct na een net geleverde minor (bijv. v0.21.1).
    ============================================================================================ */
-const APP_VERSIE = "0.23.0";
+const APP_VERSIE = "0.23.1";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -1769,10 +1820,16 @@ function conclusieVoor(deltaMinuten) {
   const achterText = `${minutenAchter} minuten achter op schema`;
   const minutenVoor = Math.round(Math.max(0, deltaMinuten));
   const voorText = `${minutenVoor} minuten voor op schema`;
-  if (deltaMinuten >= 5) return { key: "voor_schema", label: voorText, kleur: "var(--blue)", resultaatTekst: `je loopt ${voorText}`, zin: `Dus je loopt ${voorText}.` };
-  if (deltaMinuten > -5) return { key: "op_schema", label: "Op schema", kleur: "var(--accent)", resultaatTekst: "je loopt op schema", zin: "Dus je loopt op schema." };
-  if (deltaMinuten > -10) return { key: "achter", label: achterText, kleur: "var(--warn)", resultaatTekst: `je loopt ${achterText}`, zin: `Dus je loopt ${achterText}.` };
-  return { key: "ver_achter", label: achterText, kleur: "var(--err)", resultaatTekst: `je loopt ${achterText}`, zin: `Dus je loopt ${achterText}.` };
+  // v0.23.1: minutenAchter voortaan ook TERUGGEGEVEN (was al intern berekend, maar werd weggegooid)
+  // — nodig voor de Baan Flow-markergrootte hieronder (zie KNELPUNT_SCHAAL_MAX_ACHTERSTAND_MINUTEN/
+  // vulAdminBaanFlowTab): die moet schalen op de eigen achterstand van de "ophouder" t.o.v. ZIJN
+  // EIGEN schema, niet op het (per definitie kleine) gat naar diens voorganger — zie de
+  // bouwgeschiedenis voor de bug die dit repareert. Puur een additieve veldtoevoeging, verandert
+  // niets aan het bestaande gedrag van deze functie voor alle bestaande aanroepers.
+  if (deltaMinuten >= 5) return { key: "voor_schema", label: voorText, kleur: "var(--blue)", resultaatTekst: `je loopt ${voorText}`, zin: `Dus je loopt ${voorText}.`, minutenAchter: 0 };
+  if (deltaMinuten > -5) return { key: "op_schema", label: "Op schema", kleur: "var(--accent)", resultaatTekst: "je loopt op schema", zin: "Dus je loopt op schema.", minutenAchter: 0 };
+  if (deltaMinuten > -10) return { key: "achter", label: achterText, kleur: "var(--warn)", resultaatTekst: `je loopt ${achterText}`, zin: `Dus je loopt ${achterText}.`, minutenAchter };
+  return { key: "ver_achter", label: achterText, kleur: "var(--err)", resultaatTekst: `je loopt ${achterText}`, zin: `Dus je loopt ${achterText}.`, minutenAchter };
 }
 
 /* ============================================================================================
@@ -3334,9 +3391,14 @@ function gatNaarVoorgangerMinuten(zelf, voorganger) {
 // schatting (dezelfde grens als conclusieVoor()'s eigen "achter"-band), nog niet door Kay bevestigd.
 const KNELPUNT_GAT_DREMPEL_MINUTEN = 5;
 
-// Vanaf dit gat (in minuten die een flight de achterligger laat wachten) staat de marker op zijn
-// maximale grootte (zie KNELPUNT_SCHAAL_MAX hieronder) — GEEN BEVESTIGDE WAARDE, eerste voorstel.
-const KNELPUNT_SCHAAL_MAX_GAT_MINUTEN = 15;
+// Vanaf hoeveel minuten EIGEN achterstand-op-schema (conclusieVoor()'s minutenAchter) van de
+// "ophouder" zelf staat de marker op zijn maximale grootte (zie KNELPUNT_SCHAAL_MAX hieronder) —
+// GEEN BEVESTIGDE WAARDE, eerste voorstel. v0.23.1: hernoemd van KNELPUNT_SCHAAL_MAX_GAT_MINUTEN —
+// de oude naam/formule schaalde abusievelijk op het GAT naar de voorganger, dat per definitie van
+// isOpgehouden() altijd klein is (< KNELPUNT_GAT_DREMPEL_MINUTEN), waardoor de marker nooit zijn
+// bedoelde maximale grootte kon bereiken én de schaal-richting omgekeerd was (een kleiner/strakker
+// gat — intuïtief een ERGERE opstopping — gaf een KLEINERE marker). Zie de bouwgeschiedenis.
+const KNELPUNT_SCHAAL_MAX_ACHTERSTAND_MINUTEN = 15;
 // Hoeveel groter (factor t.o.v. 1 = standaardgrootte) een marker maximaal wordt — GEEN BEVESTIGDE
 // WAARDE, eerste voorstel ("the biggest icon is the biggest risk", TagMarshal).
 const KNELPUNT_SCHAAL_MAX = 1.6;
@@ -3459,8 +3521,12 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
   for (const positie of zichtbaar) {
     const voorganger = bepaalVoorganger(positie, zichtbaar);
     const gat = voorganger ? gatNaarVoorgangerMinuten(positie, voorganger) : null;
+    // v0.23.1: minutenAchter meegenomen (zie conclusieVoor()) — de EIGEN achterstand-op-schema van
+    // déze flight, niet het gat naar de voorganger. Nodig voor de markergrootte van een eventuele
+    // achterligger die door DEZE flight wordt opgehouden (zie de schaal-berekening hieronder).
     knelpuntPerId.set(positie.flight.id, {
       voorganger, gat, opgehouden: isOpgehouden(positie.conclusie, gat), houdtOp: false, trend: null,
+      minutenAchter: positie.conclusie ? positie.conclusie.minutenAchter : 0,
     });
   }
   for (const info of knelpuntPerId.values()) {
@@ -3510,33 +3576,42 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
     const kleur = conclusie ? conclusie.kleur : "var(--blue)";
     const statusTekst = conclusie ? conclusie.label : (heeftMelding ? "" : "nog geen melding");
 
-    // v0.23.0: knelpunten-ring + -grootte + -trendpijl, additief op de bestaande vulkleur/tekst
-    // hierboven — zie de toelichting bij knelpuntPerId hierboven en bij .baanflowmarker.opgehouden/
-    // .houdtop in de CSS.
+    // v0.23.1: alleen nog de "houdtop" (magenta) ring op de kaart zelf — de "opgehouden" (oranje)
+    // ring is verwijderd (sparsessie met Kay: die valt structureel altijd samen met de eigen
+    // achter/ver_achter-vulkleur van conclusieVoor(), dus voegt op de kaart geen eigen informatie
+    // toe; "houdt op"/"ophouder" kan juist bij ELKE eigen pace-status voorkomen, dus is niet
+    // redundant — zie de bouwgeschiedenis). De gat-naar-voorganger-info blijft wel beschikbaar via
+    // de hover-title (knelpuntTekst) en de detailpopup (knelpuntKaart). v0.23.0: knelpunten-ring +
+    // -grootte + -trendpijl, additief op de bestaande vulkleur/tekst hierboven.
     const knelpunt = knelpuntPerId.get(flight.id);
-    const knelpuntClass = [knelpunt.opgehouden ? "opgehouden" : "", knelpunt.houdtOp ? "houdtop" : ""]
-      .filter(Boolean).join(" ");
-    // Markergrootte schaalt mee met hoeveel minuten DEZE flight de achterligger laat wachten (niet
-    // met hoeveel zijzelf wordt opgehouden) — TagMarshal: "the biggest icon is the biggest risk"
-    // voor de REST van de baan, niet voor zichzelf. Zoekt het gat van de (eigen) achterligger op
-    // (die flight waarvoor DEZE flight de voorganger is) via knelpuntPerId.
+    const knelpuntClass = knelpunt.houdtOp ? "houdtop" : "";
+    // v0.23.1: markergrootte schaalt nu op de EIGEN achterstand-op-schema van de achterligger
+    // (diens minutenAchter uit conclusieVoor()/knelpuntPerId) i.p.v. het — per definitie van
+    // isOpgehouden() altijd kleine, < KNELPUNT_GAT_DREMPEL_MINUTEN — gat naar DEZE flight: die oude
+    // formule kon de bedoelde maximale grootte nooit bereiken én had de schaal-richting omgekeerd
+    // (een kleiner/strakker gat, intuïtief een ERGERE opstopping, gaf een KLEINERE marker). Zoekt
+    // de grootste eigen-achterstand op van elke achterligger die door DEZE flight wordt opgehouden
+    // (de flight(s) waarvoor DEZE flight de voorganger is) via knelpuntPerId.
     let schaal = 1;
     if (knelpunt.houdtOp) {
-      let achterliggerGat = 0;
+      let achterliggerAchterstand = 0;
       for (const info of knelpuntPerId.values()) {
         if (info.opgehouden && info.voorganger && info.voorganger.flight.id === flight.id) {
-          achterliggerGat = Math.max(achterliggerGat, info.gat ?? 0);
+          achterliggerAchterstand = Math.max(achterliggerAchterstand, info.minutenAchter ?? 0);
         }
       }
-      schaal = 1 + Math.min(1, Math.max(0, achterliggerGat) / KNELPUNT_SCHAAL_MAX_GAT_MINUTEN) * (KNELPUNT_SCHAAL_MAX - 1);
+      schaal = 1 + Math.min(1, Math.max(0, achterliggerAchterstand) / KNELPUNT_SCHAAL_MAX_ACHTERSTAND_MINUTEN) * (KNELPUNT_SCHAAL_MAX - 1);
     }
-    const trendPijl = knelpunt.trend && (knelpunt.opgehouden || knelpunt.houdtOp) ? KNELPUNT_TREND_PIJL[knelpunt.trend] : "";
+    // v0.23.1: trendpijl nu alleen nog bij houdtOp (de "opgehouden"-status zelf krijgt geen eigen
+    // visuele indicator meer op de kaart, zie hierboven — de waarde blijft intern berekend t.b.v.
+    // de hover-title/detailpopup).
+    const trendPijl = knelpunt.trend && knelpunt.houdtOp ? KNELPUNT_TREND_PIJL[knelpunt.trend] : "";
     const knelpuntTekst = knelpunt.opgehouden
       ? ` · opgehouden door voorganger (ca. ${Math.round(knelpunt.gat)} min)${knelpunt.trend ? ", " + KNELPUNT_TREND_LABEL[knelpunt.trend] : ""}`
       : knelpunt.houdtOp ? " · houdt achterligger op" : "";
 
     const marker = el("div", {
-      class: "baanflowmarker" + (heeftMelding ? "" : " geschat") + (knelpuntClass ? " " + knelpuntClass : ""),
+      class: "baanflowmarker" + (knelpuntClass ? " " + knelpuntClass : ""),
       style: `left:${punt.xPct}%;top:${punt.yPct}%;background:${kleur};--kp-schaal:${schaal.toFixed(2)}`,
       title: `${flightTitel(flight.teecontrol_spelers || [])} · Hole ${fysiek} · ${statusTekst}${knelpuntTekst}`,
       text: String(flight.aantal_spelers) + (trendPijl ? " " + trendPijl : ""),
@@ -3546,9 +3621,12 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
   }).filter(Boolean);
 
   const legenda = el("div", { class: "baanflowlegenda" }, [
+    // v0.23.1 (sparsessie, Kay's herformulering): labels hernoemd naar Snel/Op schema/Langzaam/
+    // Traag — de kleuren/drempels van conclusieVoor() zelf zijn ONGEWIJZIGD, dit is puur de
+    // legenda-tekst op de kaart.
     el("span", { class: "baanflowlegendaitem" }, [
       el("span", { class: "baanflowlegendadot", style: "background:var(--blue)" }),
-      document.createTextNode("Voor op schema"),
+      document.createTextNode("Snel"),
     ]),
     el("span", { class: "baanflowlegendaitem" }, [
       el("span", { class: "baanflowlegendadot", style: "background:var(--accent)" }),
@@ -3556,34 +3634,40 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
     ]),
     el("span", { class: "baanflowlegendaitem" }, [
       el("span", { class: "baanflowlegendadot", style: "background:var(--warn)" }),
-      document.createTextNode("Achter"),
+      document.createTextNode("Langzaam"),
     ]),
     el("span", { class: "baanflowlegendaitem" }, [
       el("span", { class: "baanflowlegendadot", style: "background:var(--err)" }),
-      document.createTextNode("Ver achter"),
+      document.createTextNode("Traag"),
     ]),
-    el("span", { class: "baanflowlegendaitem" }, [
-      el("span", { class: "baanflowlegendaring" }),
-      document.createTextNode("Bevestigde melding"),
-    ]),
-    el("span", { class: "baanflowlegendaitem" }, [
-      el("span", { class: "baanflowlegendaring gestippeld" }),
-      document.createTextNode("Tijdschatting"),
-    ]),
-    // v0.23.0: knelpunten-analyse, zie de toelichting boven isOpgehouden/bepaalVoorganger.
-    el("span", { class: "baanflowlegendaitem" }, [
-      el("span", { class: "baanflowlegendaring opgehouden" }),
-      document.createTextNode("Opgehouden door voorganger"),
-    ]),
+    // v0.23.0/v0.23.1: knelpunten-analyse, zie de toelichting boven isOpgehouden/bepaalVoorganger.
+    // De "Bevestigde melding"/"Tijdschatting"-ringen en de "Opgehouden door voorganger"-ring zijn
+    // in v0.23.1 verwijderd (Kay's "optie 3" + de ophouder/opgehouden-sparsessie, zie de
+    // bouwgeschiedenis) — .houdtop (magenta) is de enige ring die overblijft.
     el("span", { class: "baanflowlegendaitem" }, [
       el("span", { class: "baanflowlegendaring houdtop" }),
-      document.createTextNode("Houdt achterligger op (groter icoon = groter gat)"),
+      document.createTextNode("Ophouder (groter icoon = grotere vertraging die hij veroorzaakt)"),
     ]),
   ]);
 
+  // v0.23.1 (Kay's verzoek): titel vereenvoudigd naar puur "Baan Flow" (het "— flights nu op de
+  // baan"-staartje verviel) en de oude VOORWAARDELIJKE lege-staat-tekst ("Geen flights op dit
+  // moment op de baan.") vervangen door een ALTIJD zichtbare subtekst-regel, zowel voor de
+  // lege als de niet-lege staat — dat is ook precies waarom de oude tekst nooit door de
+  // fullscreen-breedteregel werd gevangen (ze bestond letterlijk niet als er wél flights waren,
+  // dus er was nooit een algemene selector voor nodig) en op volledig scherm te links bleef
+  // staan: zie .baanflowsubtekst in de CSS hierboven. Enkelvoud/meervoud ("1 flight" vs. "2
+  // flights") is een eigen toevoeging, niet letterlijk door Kay gevraagd maar wel voor de hand
+  // liggend — zeg het als "1 flights" liever gewoon zo blijft staan.
+  const subtekst = zichtbaar.length === 0
+    ? "Op dit moment zijn er geen flights in de baan."
+    : zichtbaar.length === 1
+      ? "Op dit moment is er 1 flight in de baan."
+      : `Op dit moment zijn er ${zichtbaar.length} flights in de baan.`;
+
   const kaartInhoud = [
     el("div", { class: "baanflowheader" }, [
-      el("div", { class: "eyebrow", text: "Baan Flow — flights nu op de baan" }),
+      el("div", { class: "eyebrow", text: "Baan Flow" }),
       baanflowFullscreenOndersteund()
         ? el("button", {
             id: "baanflowFsBtn", class: "baanflowfsbtn", type: "button",
@@ -3592,9 +3676,7 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
           })
         : null,
     ].filter(Boolean)),
-    zichtbaar.length === 0
-      ? el("p", { class: "help", text: "Geen flights op dit moment op de baan." })
-      : null,
+    el("p", { class: "help baanflowsubtekst", text: subtekst }),
     el("div", {
       class: "baanflowkaartwrap",
       // v0.22.2: de wrap is precies zo groot als de bounding box van de geroteerde afbeelding (zie
@@ -3778,6 +3860,14 @@ function bouwFlightDetailModal(positie, params, nu, ververs = render, knelpuntIn
       ? "Ronde waarschijnlijk afgerond — klopt dit niet? Corrigeer de positie hieronder."
       : (heeftMelding ? "Waar is deze flight nu?" : "Maak een keuze: waar is deze flight nu?"),
   })];
+  // v0.23.1 (Kay's "optie 3", sparsessie): het bevestigde-melding/tijdschatting-onderscheid is van
+  // de kaart gehaald (zie de CSS-toelichting bij .baanflowmarker hierboven) omdat álle posities in
+  // principe schattingen zijn — maar het exacte laatste-melding-tijdstip is wél nuttige info om
+  // ergens te kunnen checken, dus die staat nu hier in de popup i.p.v. als visueel onderscheid op
+  // de kaart. Alleen getoond als er daadwerkelijk ooit een melding is geweest.
+  if (heeftMelding && flight.gerapporteerd_tijdstip) {
+    eigenKinderen.push(el("div", { class: "help", style: "margin-top:-4px", text: `Laatst gemeld om ${formatTijd(flight.gerapporteerd_tijdstip)}.` }));
+  }
   eigenKinderen.push(
     el("div", { class: "stepperrow big" }, [stepMin, el("div", { class: "stepvalue big", text: String(fysiekeHole(flight.ronde_type, holeWeergave)) }), stepPlus]),
     el("div", { class: "markerrow big" }, markerKnoppen)
