@@ -18,6 +18,10 @@
     --cream:#F7F5EF; --ink:#1B2B22; --accent:#1F4D36; --accent-soft:rgba(31,77,54,0.14);
     --border:#ECE7DA; --muted:#9A9385; --muted-ink:#6B6558; --warn:#A85E1C; --warn-bg:rgba(168,94,28,0.08);
     --err:#A33434; --err-bg:rgba(163,52,52,0.08); --blue:#3E74A8; --blue-dark:#1F4566;
+    /* v0.23.0: nieuw voor de knelpunten-analyse op de Baan Flow-kaart (TagMarshal-achtige
+       "houdt achterligger op"-ring) — geen bestaande kleur in de app om op aan te sluiten, dus een
+       eerste, nog niet door Kay bevestigd voorstel. */
+    --magenta:#9B3FA8;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--cream);color:var(--ink);font-family:'Inter',system-ui,sans-serif;
@@ -190,13 +194,27 @@
   /* .baanflowkaart: breedte/hoogte/rotatie worden sinds v0.22.2 inline gezet (afhankelijk van
      BAANFLOW_FIJNROTATIE_GRADEN) — hier alleen de vaste centrering op de wrap. */
   .baanflowkaart{position:absolute;left:50%;top:50%;display:block;object-fit:cover}
-  .baanflowmarker{position:absolute;transform:translate(-50%,-50%);width:30px;height:30px;
+  /* v0.23.0: breedte/hoogte lopen voortaan via calc()+--kp-schaal (standaard 1, gezet per marker
+     in vulAdminBaanFlowTab) i.p.v. een vast getal — zodat een flight die de achterligger ophoudt
+     groter getoond kan worden ("the biggest icon is the biggest risk", zie de TagMarshal-research
+     in de bouwgeschiedenis) zonder de fullscreen-clamp()-regel hieronder te breken: een vaste
+     inline width/height zou die regel altijd overstemmen (inline wint van elke CSS-specificiteit),
+     een CSS-variabele binnen dezelfde calc() juist niet. */
+  .baanflowmarker{position:absolute;transform:translate(-50%,-50%);
+    width:calc(30px * var(--kp-schaal,1));height:calc(30px * var(--kp-schaal,1));
     border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;
     font-size:13px;font-weight:800;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.35);
     cursor:pointer;z-index:2}
   /* Gestippelde rand = pure tijdschatting (nog geen melding); volle witte rand = bevestigde
      melding — zie de toelichting bij vulAdminBaanFlowTab. */
   .baanflowmarker.geschat{border-style:dashed;border-color:rgba(255,255,255,0.8)}
+  /* v0.23.0: knelpunten-ring, ADDITIEF op de bestaande vulkleur (die blijft de eigen-schema-
+     magnitude uit conclusieVoor — zie de bouwgeschiedenis voor waarom dit bewust twee aparte
+     dimensies zijn, net als bij TagMarshal kleur vs. grootte). Een extra box-shadow-laag buiten de
+     witte rand, zodat .geschat (gestippeld) en de kleur van de marker zelf ongemoeid blijven. */
+  .baanflowmarker.opgehouden{box-shadow:0 0 0 3px var(--warn),0 2px 6px rgba(0,0,0,0.35)}
+  .baanflowmarker.houdtop{box-shadow:0 0 0 3px var(--magenta),0 2px 6px rgba(0,0,0,0.35)}
+  .baanflowmarker.opgehouden.houdtop{box-shadow:0 0 0 3px var(--warn),0 0 0 6px var(--magenta),0 2px 6px rgba(0,0,0,0.35)}
   .baanflowlegenda{display:flex;flex-wrap:wrap;gap:12px 16px;margin-top:12px}
   .baanflowlegendaitem{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted-ink);
     font-weight:600}
@@ -204,6 +222,8 @@
   .baanflowlegendaring{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0;
     border:2px solid var(--muted-ink);box-sizing:border-box}
   .baanflowlegendaring.gestippeld{border-style:dashed}
+  .baanflowlegendaring.opgehouden{border-color:var(--warn)}
+  .baanflowlegendaring.houdtop{border-color:var(--magenta)}
 
   /* Volledig-scherm-knop (v0.21.8, Kay's verzoek: de kaart op een iPad/laptop/desktop/extern
      scherm groot kunnen zetten). .baanflowheader is de rij eyebrow+knop boven de kaart; de knop
@@ -239,8 +259,12 @@
   #baanflowCard:fullscreen .eyebrow, #baanflowCard:-webkit-full-screen .eyebrow{font-size:15px}
   #baanflowCard:fullscreen .baanflowlegendaitem, #baanflowCard:-webkit-full-screen .baanflowlegendaitem{
     font-size:14px}
+  /* v0.23.0: dezelfde --kp-schaal-vermenigvuldiging als de niet-fullscreen regel hierboven, nu
+     toegepast op de clamp()-waarde i.p.v. een vast getal — zo blijft de bestaande responsieve
+     fullscreen-schaling intact én schaalt een knelpunt-marker daarbovenop nog een keer mee. */
   #baanflowCard:fullscreen .baanflowmarker, #baanflowCard:-webkit-full-screen .baanflowmarker{
-    width:clamp(30px,3.2vw,64px);height:clamp(30px,3.2vw,64px);font-size:clamp(13px,1.3vw,24px)}
+    width:calc(clamp(30px,3.2vw,64px) * var(--kp-schaal,1));height:calc(clamp(30px,3.2vw,64px) * var(--kp-schaal,1));
+    font-size:clamp(13px,1.3vw,24px)}
 
   /* Beheerder — Tracker-tab: overzicht van alle flights (v0.6.0: Marshal App-achtige lijstvorm —
      cirkel-badge, naam-pills, klok+hole/status-regel, dunne voortgangsbalk — i.p.v. de platte
@@ -1110,8 +1134,45 @@
        en het bijbehorende commentaarblok hierboven heten nog "tijdelijk"/"veldtest" — dat is na deze
        wijziging een stale naam geworden (de bedoeling is nu permanent), maar bewust nog niet hernoemd
        in deze stap; zie "Nog door Kay te doen".
+   v0.23.0: knelpunten-analyse op de Baan Flow-kaart (sparsessie 8/9 november 2026 — zie
+       bouwgeschiedenis). Kay's eerdere conclusie: de kern-metric moet niet "tijd t.o.v. eigen schema"
+       zijn maar "gat t.o.v. de flight direct ervoor", met een trend (loopt het dicht/stabiel/open) —
+       en het echte probleem is niet rekenkundig maar organisatorisch: "wie loopt voor wie" is bij
+       meerdere startpunten (hole 1 én 10, 9- én 18-holes-flights) niet uit starttijd af te leiden.
+       Vóór het bouwen eerst uitgezocht hoe TagMarshal dit zelf oplost (tagmarshal.com/system-features
+       + een door Kay aangeleverd transcript/screenshots van hun "How it works"-video): een gekleurd
+       icoon per flight op hun Live Map (groen op schema, rood achter/eigen schuld, oranje achter/
+       opgehouden door de voorganger, magenta houdt zelf de achterligger op), met de icoongrootte
+       als aparte dimensie voor de ERNST ("the biggest icon is the biggest risk") en een korte
+       "Pace Trend"-sparkline in hun detailpaneel. Kay's keuzes op basis daarvan: dit komt op de
+       bestaande Baan Flow-kaart (geen nieuwe tab, geen wijziging aan de Tracker-tab), wél een trend
+       bijhouden (anders dan TagMarshal zelf) maar alleen de laatste meting onthouden (geen logboek/
+       sparkline).
+       Nieuwe primitives (ongewijzigde rekenkern hergebruikt, zie fysiekeHole/rondeIndexVanFysiek/
+       minutenVoorFractie): fysiekePositie() (continue fysieke-holepositie 0-18), bepaalVoorganger()
+       (dichtstbijzijnde flight die fysiek verder is, lineair over hole 1→18, niet circulair — een
+       flight zonder voorganger is de koploper, zelfde filosofie als de verwijderde "voor jou"-kaart),
+       gatNaarVoorgangerMinuten() (vertaalt de voorganger-positie naar zelf's EIGEN ronde-relatieve
+       telling via rondeIndexVanFysiek, zodat een 18holes- en een 18holes_vanaf10-flight elkaar
+       correct als buren herkennen; null als de voorganger fysiek buiten zelf's eigen ronde-bereik
+       valt — nieuwe fysiekeHoleBinnenRonde(), nodig omdat rondeIndexVanFysiek() zelf altijd klemt).
+       Classificatie (isOpgehouden(), NAAST de bestaande conclusieVoor()-magnitudekleur, niet in
+       plaats daarvan): "opgehouden" (oranje ring) als de eigen conclusie al achter/ver_achter is
+       ÉN het gat naar de voorganger klein is (KNELPUNT_GAT_DREMPEL_MINUTEN, nog niet bevestigd);
+       "houdt op" (magenta ring) is het spiegelbeeld, berekend vanuit het perspectief van de
+       achterligger. Trend (gatTrend()) t.o.v. de nieuwe kolommen flights.laatste_gat_minuten/
+       -tijdstip (schema.sql "Fase 2m", NOG DOOR KAY UIT TE VOEREN), met een minimuminterval tussen
+       twee metingen (GAT_TREND_MIN_INTERVAL_MINUTEN, nog niet bevestigd) zodat de 20-seconden-
+       achtergrondverversing geen ruis als trend toont; de PATCH die de nieuwe meting wegschrijft is
+       bewust best-effort/niet afgewacht. Marker-grootte schaalt mee met het gat dat een "houdt
+       op"-flight veroorzaakt (KNELPUNT_SCHAAL_MAX_GAT_MINUTEN/KNELPUNT_SCHAAL_MAX, nog niet
+       bevestigd) via een nieuwe CSS-variabele --kp-schaal in een calc()-formule — bewust niet via
+       een inline width/height, dat zou de bestaande fullscreen-clamp()-regel (v0.21.8) altijd
+       overstemmen. Nieuwe kleurvariabele --magenta (nog niet bevestigd). Legenda en de Baan
+       Flow-detailpopup (bouwFlightDetailModal, nieuwe optionele 5e parameter knelpuntInfo) breiden
+       mee uit. Raakt het ledenscherm, de Tracker-tab en conclusieVoor() zelf op geen enkele manier.
    ============================================================================================ */
-const APP_VERSIE = "0.22.5";
+const APP_VERSIE = "0.23.0";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -1207,6 +1268,20 @@ function rondeIndexVanFysiek(rondeType, fysiekeHoleNr) {
   const { startHole, holesInRonde } = rondeInfo(rondeType);
   const ongeklemd = ((fysiekeHoleNr - startHole + 18) % 18) + 1;
   return Math.max(1, Math.min(holesInRonde, ongeklemd));
+}
+
+// rondeIndexVanFysiek() hierboven KLEMT altijd naar een geldige ronde-relatieve hole (nodig voor
+// zijn enige bestaande gebruik: een GPS-match moet altijd een bruikbare stepper-waarde opleveren).
+// Voor de knelpunten-analyse hieronder is dat klemmen juist ongewenst: als een ANDERE flight fysiek
+// op een hole staat die buiten het eigen ronde_type-bereik valt (bijv. een 9holes_voor-flight
+// t.o.v. een voorganger die al op fysieke hole 14 speelt — daar komt een 9-holes-voor-flight nooit),
+// is er geen zinnig "zoveel minuten tot daar"-antwoord. Deze functie TOETST dat onderscheid vooraf
+// (zelfde ongeklemde berekening als hierboven, nu om te controleren i.p.v. om een bruikbare waarde
+// te forceren) — zie gatNaarVoorgangerMinuten().
+function fysiekeHoleBinnenRonde(rondeType, fysiekeHoleNr) {
+  const { startHole, holesInRonde } = rondeInfo(rondeType);
+  const ongeklemd = ((fysiekeHoleNr - startHole + 18) % 18) + 1;
+  return ongeklemd >= 1 && ongeklemd <= holesInRonde;
 }
 
 // GPS-coördinaten per hole (North Course), zelf ingemeten door Kay op de baan (23 oktober 2026) —
@@ -3189,6 +3264,115 @@ function baanflowIsZichtbaar(positie) {
   return !positie.gestartNog && !positie.voltooid;
 }
 
+/* ============================================================================================
+   Knelpunten-analyse (v0.23.0) — gat-naar-voorganger + TagMarshal-achtige status op de Baan Flow-
+   kaart. Zie claude/bouwgeschiedenis-goyerflow-app.md (8/9 november 2026) voor de volledige
+   sparsessie en de TagMarshal-research (tagmarshal.com/system-features + een door Kay aangeleverd
+   transcript/screenshots van hun "How it works"-video) die hieraan vooraf ging. Kernidee: niet
+   alleen "loop ik op MIJN schema" (dat blijft conclusieVoor(), hieronder ongewijzigd), maar "word ik
+   opgehouden door de flight voor me, of houd ik zelf de flight achter me op" — plus een trend (loopt
+   het gat dicht/stabiel/open). Beheerder-only, uitsluitend op de Baan Flow-kaart (Kay's keuze) —
+   raakt het ledenscherm, de Tracker-tab en conclusieVoor() zelf op geen enkele manier.
+   ============================================================================================ */
+
+// Continue fysieke positie op de baan (bereik 0-18): fysiek holenummer (1-18) plus de fractie
+// BINNEN die hole (0 = afslag, 1 = green) — dezelfde twee ingrediënten die vulAdminBaanFlowTab/
+// trackerSortHole al los berekenen voor resp. de marker-plek en de Tracker-tab-sortering, hier
+// samengevoegd tot één vergelijkbaar getal.
+function fysiekePositie(fysiekeHoleNr, restFractie) {
+  return (fysiekeHoleNr - 1) + Math.max(0, Math.min(1, restFractie));
+}
+
+// Voorganger = de dichtstbijzijnde andere flight die nu fysiek VERDER is (eerder klaar) dan
+// `positie` zelf — "flight direct voor je", ongeacht ronde_type/lus (zie de bouwgeschiedenis: bij
+// meerdere startpunten — hole 1 én hole 10, 9- én 18-holes-flights — is starttijd/lus hiervoor niet
+// betrouwbaar; fysieke positie op de baan wel). Lineair over fysieke hole 1→18, NIET circulair: een
+// flight zonder iemand verder dan haarzelf (de koploper op de baan nu) heeft geen voorganger —
+// dezelfde filosofie als de inmiddels verwijderde "voor jou"-kaart ("Geen flight voor jou
+// gevonden"), geen kunstmatige wrap terug naar de eerste afslag. `kandidaten` moet al gefilterd
+// zijn op flights die daadwerkelijk op de baan staan (zie baanflowIsZichtbaar) — deze functie
+// filtert zelf niet nogmaals.
+function bepaalVoorganger(positie, kandidaten) {
+  const eigenRest = positie.weergave.fractie - Math.floor(positie.weergave.fractie);
+  const eigenPos = fysiekePositie(fysiekeHole(positie.flight.ronde_type, positie.weergave.hole), eigenRest);
+  let beste = null;
+  let bestePos = Infinity;
+  for (const kandidaat of kandidaten) {
+    if (kandidaat.flight.id === positie.flight.id) continue;
+    const kandidaatRest = kandidaat.weergave.fractie - Math.floor(kandidaat.weergave.fractie);
+    const kandidaatPos = fysiekePositie(fysiekeHole(kandidaat.flight.ronde_type, kandidaat.weergave.hole), kandidaatRest);
+    if (kandidaatPos > eigenPos && kandidaatPos < bestePos) {
+      beste = kandidaat;
+      bestePos = kandidaatPos;
+    }
+  }
+  return beste;
+}
+
+// Hoeveel minuten het, op het EIGEN tempo van `zelf`, zou kosten om te komen waar `voorganger` nu
+// fysiek staat. Vertaalt de fysieke positie van de voorganger eerst naar zelf's EIGEN
+// ronde-relatieve telling (rondeIndexVanFysiek) — nodig omdat twee flights met een verschillend
+// ronde_type (bijv. 18holes vs. 18holes_vanaf10) niet dezelfde fractie-telling delen, ook al staan
+// ze toevallig op dezelfde fysieke hole. Geeft `null` als de voorganger fysiek op een hole staat
+// die buiten zelf's eigen ronde-bereik valt (zie fysiekeHoleBinnenRonde) — geen bug, gewoon geen
+// zinnig gat te berekenen (zelf komt daar fysiek nooit). Hergebruikt uitsluitend bestaande
+// primitives (fysiekeHole, rondeIndexVanFysiek, minutenVoorFractie) — geen nieuwe rekenkern.
+function gatNaarVoorgangerMinuten(zelf, voorganger) {
+  const voorgangerFysiek = fysiekeHole(voorganger.flight.ronde_type, voorganger.weergave.hole);
+  if (!fysiekeHoleBinnenRonde(zelf.flight.ronde_type, voorgangerFysiek)) return null;
+  const voorgangerRest = voorganger.weergave.fractie - Math.floor(voorganger.weergave.fractie);
+  const voorgangerHoleInZelfTermen = rondeIndexVanFysiek(zelf.flight.ronde_type, voorgangerFysiek);
+  const voorgangerFractieInZelfTermen = (voorgangerHoleInZelfTermen - 1) + voorgangerRest;
+  return minutenVoorFractie(voorgangerFractieInZelfTermen, zelf.holeMinuten) -
+    minutenVoorFractie(zelf.weergave.fractie, zelf.holeMinuten);
+}
+
+// Drempel: onder dit aantal minuten gat t.o.v. de voorganger wordt een eigen achter/ver_achter-
+// status toegeschreven aan DIE voorganger (TagMarshal-achtig: "opgehouden", geen eigen-schuld-
+// signaal) i.p.v. aan de flight zelf. GEEN BEVESTIGDE WAARDE — zelfde conventie als eerdere nieuwe
+// drempels in dit project (bijv. STARTBUUR_MAX_VERSCHIL_MINUTEN): een eerste, beredeneerde
+// schatting (dezelfde grens als conclusieVoor()'s eigen "achter"-band), nog niet door Kay bevestigd.
+const KNELPUNT_GAT_DREMPEL_MINUTEN = 5;
+
+// Vanaf dit gat (in minuten die een flight de achterligger laat wachten) staat de marker op zijn
+// maximale grootte (zie KNELPUNT_SCHAAL_MAX hieronder) — GEEN BEVESTIGDE WAARDE, eerste voorstel.
+const KNELPUNT_SCHAAL_MAX_GAT_MINUTEN = 15;
+// Hoeveel groter (factor t.o.v. 1 = standaardgrootte) een marker maximaal wordt — GEEN BEVESTIGDE
+// WAARDE, eerste voorstel ("the biggest icon is the biggest risk", TagMarshal).
+const KNELPUNT_SCHAAL_MAX = 1.6;
+
+// TagMarshal-achtige classificatie (zie de bouwgeschiedenis voor de research): "opgehouden" = de
+// eigen conclusie is al achter/ver_achter ÉN het gat naar de voorganger is klein — dan is de
+// vertraging vermoedelijk niet eigen schuld. "Houdt op" is het spiegelbeeld hiervan (zie
+// vulAdminBaanFlowTab: berekend vanuit het perspectief van de ACHTERLIGGER van elke flight, niet
+// hier). Geeft puur de classificatie terug, geen kleur/tekst — dat blijft aan de aanroeper.
+function isOpgehouden(conclusie, gatMinuten) {
+  if (!conclusie || (conclusie.key !== "achter" && conclusie.key !== "ver_achter")) return false;
+  return gatMinuten != null && gatMinuten < KNELPUNT_GAT_DREMPEL_MINUTEN;
+}
+
+// Minimale tijd tussen twee trend-metingen van dezelfde flight (flight.laatste_gat_minuten/
+// laatste_gat_tijdstip, zie schema.sql "Fase 2m"), en de marge waarbinnen een verandering als
+// "stabiel" geldt i.p.v. als dicht-/openlopend. Beide GEEN BEVESTIGDE WAARDE. Zonder het
+// minimuminterval zou elke 20-seconden-achtergrondverversing van de Baan Flow-kaart
+// (TRACKER_VERVERS_MS) een "trend" laten zien die puur ruis is, geen echte beweging.
+const GAT_TREND_MIN_INTERVAL_MINUTEN = 5;
+const GAT_TREND_STABIEL_MARGE_MINUTEN = 1;
+const KNELPUNT_TREND_LABEL = { dichtlopend: "loopt dicht", stabiel: "stabiel", openlopend: "loopt open" };
+const KNELPUNT_TREND_PIJL = { dichtlopend: "↘", stabiel: "→", openlopend: "↗" };
+
+// Trend t.o.v. de laatst OPGESLAGEN meting. Geeft `null` als er nog geen eerdere meting is, of als
+// die te vers is om er een zinnige trend uit af te leiden (zie GAT_TREND_MIN_INTERVAL_MINUTEN) —
+// in beide gevallen toont de UI simpelweg geen trendpijl, niet een foutieve "stabiel".
+function gatTrend(flight, nieuwGatMinuten, nu) {
+  if (nieuwGatMinuten == null || flight.laatste_gat_minuten == null || !flight.laatste_gat_tijdstip) return null;
+  const minutenSindsVorigeMeting = (nu.getTime() - new Date(flight.laatste_gat_tijdstip).getTime()) / 60000;
+  if (minutenSindsVorigeMeting < GAT_TREND_MIN_INTERVAL_MINUTEN) return null;
+  const verschil = nieuwGatMinuten - flight.laatste_gat_minuten;
+  if (Math.abs(verschil) <= GAT_TREND_STABIEL_MARGE_MINUTEN) return "stabiel";
+  return verschil < 0 ? "dichtlopend" : "openlopend";
+}
+
 /* ---- Volledig scherm voor de Baan Flow-kaart (v0.21.8) ---------------------------------------
    Kay's verzoek: de kaart op een iPad/laptop/desktop/extern scherm groot kunnen zetten. Gebouwd op
    de browser-eigen Fullscreen API, rechtstreeks op #baanflowCard (niet op <body>/#app) zodat de
@@ -3266,6 +3450,45 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
   const allePosities = flights.map((flight) => berekenFlightPositie(flight, params, nu));
   const zichtbaar = allePosities.filter(baanflowIsZichtbaar);
 
+  // Knelpunten-analyse (v0.23.0, zie de toelichting boven bepaalVoorganger/isOpgehouden hierboven).
+  // Twee passes: (1) per flight de eigen voorganger/gat/"opgehouden" — afhankelijk van alleen de
+  // eigen conclusie + het eigen gat; (2) "houdt op" als het spiegelbeeld daarvan — afhankelijk van
+  // wat de ACHTERLIGGER van elke flight laat zien, dus pas te bepalen nadat pass 1 voor iedereen
+  // klaar is.
+  const knelpuntPerId = new Map();
+  for (const positie of zichtbaar) {
+    const voorganger = bepaalVoorganger(positie, zichtbaar);
+    const gat = voorganger ? gatNaarVoorgangerMinuten(positie, voorganger) : null;
+    knelpuntPerId.set(positie.flight.id, {
+      voorganger, gat, opgehouden: isOpgehouden(positie.conclusie, gat), houdtOp: false, trend: null,
+    });
+  }
+  for (const info of knelpuntPerId.values()) {
+    if (info.opgehouden && info.voorganger) {
+      const voorgangerInfo = knelpuntPerId.get(info.voorganger.flight.id);
+      if (voorgangerInfo) voorgangerInfo.houdtOp = true;
+    }
+  }
+  // Trend (t.o.v. de laatst opgeslagen meting) + achtergrond-PATCH van de nieuwe meting — best
+  // effort, bewust NIET afgewacht: dit is een nevenproduct van het renderen van de kaart, geen actie
+  // die de beheerder zelf heeft geïnitieerd (zelfde "stil"-filosofie als de rest van deze functie).
+  // De PATCH gebeurt alleen als GAT_TREND_MIN_INTERVAL_MINUTEN verstreken is sinds de vorige meting
+  // — anders blijft de oude meting staan tot dat wél zo is (zie de toelichting bij gatTrend()).
+  for (const positie of zichtbaar) {
+    const info = knelpuntPerId.get(positie.flight.id);
+    info.trend = gatTrend(positie.flight, info.gat, nu);
+    if (info.gat == null) continue;
+    const minutenSindsVorigeMeting = positie.flight.laatste_gat_tijdstip
+      ? (nu.getTime() - new Date(positie.flight.laatste_gat_tijdstip).getTime()) / 60000
+      : Infinity;
+    if (minutenSindsVorigeMeting >= GAT_TREND_MIN_INTERVAL_MINUTEN) {
+      sb(`flights?id=eq.${positie.flight.id}`, {
+        method: "PATCH", prefer: "return=minimal",
+        body: JSON.stringify({ laatste_gat_minuten: info.gat, laatste_gat_tijdstip: nu.toISOString() }),
+      }).catch((e) => console.error("Kon laatste_gat niet bijwerken:", e));
+    }
+  }
+
   // v0.22.1 (Kay's verzoek): een marker-klik mag #baanflowCard niet uit de DOM halen zolang die het
   // fullscreen-element is (zie de uitgebreide toelichting hierboven) — dus NIET de globale render()
   // (die het hele beheerscherm herbouwt), maar een lokale her-aanroep van deze functie zelf, die al
@@ -3286,11 +3509,37 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
     if (!punt) return null; // zou niet moeten voorkomen (holenummers 1-18 hebben allemaal een pad)
     const kleur = conclusie ? conclusie.kleur : "var(--blue)";
     const statusTekst = conclusie ? conclusie.label : (heeftMelding ? "" : "nog geen melding");
+
+    // v0.23.0: knelpunten-ring + -grootte + -trendpijl, additief op de bestaande vulkleur/tekst
+    // hierboven — zie de toelichting bij knelpuntPerId hierboven en bij .baanflowmarker.opgehouden/
+    // .houdtop in de CSS.
+    const knelpunt = knelpuntPerId.get(flight.id);
+    const knelpuntClass = [knelpunt.opgehouden ? "opgehouden" : "", knelpunt.houdtOp ? "houdtop" : ""]
+      .filter(Boolean).join(" ");
+    // Markergrootte schaalt mee met hoeveel minuten DEZE flight de achterligger laat wachten (niet
+    // met hoeveel zijzelf wordt opgehouden) — TagMarshal: "the biggest icon is the biggest risk"
+    // voor de REST van de baan, niet voor zichzelf. Zoekt het gat van de (eigen) achterligger op
+    // (die flight waarvoor DEZE flight de voorganger is) via knelpuntPerId.
+    let schaal = 1;
+    if (knelpunt.houdtOp) {
+      let achterliggerGat = 0;
+      for (const info of knelpuntPerId.values()) {
+        if (info.opgehouden && info.voorganger && info.voorganger.flight.id === flight.id) {
+          achterliggerGat = Math.max(achterliggerGat, info.gat ?? 0);
+        }
+      }
+      schaal = 1 + Math.min(1, Math.max(0, achterliggerGat) / KNELPUNT_SCHAAL_MAX_GAT_MINUTEN) * (KNELPUNT_SCHAAL_MAX - 1);
+    }
+    const trendPijl = knelpunt.trend && (knelpunt.opgehouden || knelpunt.houdtOp) ? KNELPUNT_TREND_PIJL[knelpunt.trend] : "";
+    const knelpuntTekst = knelpunt.opgehouden
+      ? ` · opgehouden door voorganger (ca. ${Math.round(knelpunt.gat)} min)${knelpunt.trend ? ", " + KNELPUNT_TREND_LABEL[knelpunt.trend] : ""}`
+      : knelpunt.houdtOp ? " · houdt achterligger op" : "";
+
     const marker = el("div", {
-      class: "baanflowmarker" + (heeftMelding ? "" : " geschat"),
-      style: `left:${punt.xPct}%;top:${punt.yPct}%;background:${kleur}`,
-      title: `${flightTitel(flight.teecontrol_spelers || [])} · Hole ${fysiek} · ${statusTekst}`,
-      text: String(flight.aantal_spelers),
+      class: "baanflowmarker" + (heeftMelding ? "" : " geschat") + (knelpuntClass ? " " + knelpuntClass : ""),
+      style: `left:${punt.xPct}%;top:${punt.yPct}%;background:${kleur};--kp-schaal:${schaal.toFixed(2)}`,
+      title: `${flightTitel(flight.teecontrol_spelers || [])} · Hole ${fysiek} · ${statusTekst}${knelpuntTekst}`,
+      text: String(flight.aantal_spelers) + (trendPijl ? " " + trendPijl : ""),
     });
     marker.addEventListener("click", () => openDetail(flight.id));
     return marker;
@@ -3320,6 +3569,15 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
     el("span", { class: "baanflowlegendaitem" }, [
       el("span", { class: "baanflowlegendaring gestippeld" }),
       document.createTextNode("Tijdschatting"),
+    ]),
+    // v0.23.0: knelpunten-analyse, zie de toelichting boven isOpgehouden/bepaalVoorganger.
+    el("span", { class: "baanflowlegendaitem" }, [
+      el("span", { class: "baanflowlegendaring opgehouden" }),
+      document.createTextNode("Opgehouden door voorganger"),
+    ]),
+    el("span", { class: "baanflowlegendaitem" }, [
+      el("span", { class: "baanflowlegendaring houdtop" }),
+      document.createTextNode("Houdt achterligger op (groter icoon = groter gat)"),
     ]),
   ]);
 
@@ -3397,7 +3655,12 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
   // i.p.v. de globale render().
   if (adminLocal.flightDetailId != null) {
     const geselecteerd = allePosities.find((r) => r.flight.id === adminLocal.flightDetailId);
-    if (geselecteerd) kaartNode.append(bouwFlightDetailModal(geselecteerd, params, nu, verversLokaal));
+    // v0.23.0: knelpuntinfo meegeven aan de popup (zie bouwFlightDetailModal's nieuwe 5e parameter)
+    // — alleen beschikbaar als de geselecteerde flight ook in `zichtbaar` zit (een flight die de
+    // beheerder al open had staan kan daarbuiten gevallen zijn, zie de toelichting bij
+    // trackerIsAankomend/vulAdminTrackerTab's "allePosities blijft berekend"-opmerking); in dat
+    // geval toont de popup simpelweg geen knelpunt-regel, geen crash.
+    if (geselecteerd) kaartNode.append(bouwFlightDetailModal(geselecteerd, params, nu, verversLokaal, knelpuntPerId.get(geselecteerd.flight.id) || null));
   }
 }
 
@@ -3421,7 +3684,10 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
 // elke klik in de popup, niet alleen bij het openen ervan (Kay's verzoek: "pop-up box moet
 // verschijnen OVER het full screen", niet fullscreen beëindigen). De Tracker-tab (geen fullscreen-
 // concern) blijft gewoon de default render() gebruiken.
-function bouwFlightDetailModal(positie, params, nu, ververs = render) {
+// v0.23.0: nieuwe optionele 5e parameter `knelpuntInfo` (default null) — alleen door de Baan
+// Flow-tab meegegeven (zie vulAdminBaanFlowTab); de Tracker-tab-aanroep (geen knelpunten-analyse,
+// Kay's keuze om dit uitsluitend op de kaart te tonen) laat 'm gewoon weg, dus `null`.
+function bouwFlightDetailModal(positie, params, nu, ververs = render, knelpuntInfo = null) {
   const { flight, weergave, voltooid, heeftMelding, conclusie, holeMinuten } = positie;
   const spelers = flight.teecontrol_spelers || [];
 
@@ -3545,6 +3811,21 @@ function bouwFlightDetailModal(positie, params, nu, ververs = render) {
   if (adminLocal.flightDetailFout) eigenKinderen.push(el("div", { class: "msg err", text: adminLocal.flightDetailFout }));
   const eigenKaart = el("div", { class: "card me detaileigenkaart", style: "background:" + kaartKleur }, eigenKinderen);
 
+  // v0.23.0: knelpunt-regel (zie knelpuntInfo hierboven) — alleen getoond als er daadwerkelijk een
+  // actieve opgehouden/houdt-op-status is, zelfde "niet onnodig opdringerig"-filosofie als de rest
+  // van de knelpunten-analyse (geen regel bij een neutrale flight).
+  let knelpuntKaart = null;
+  if (knelpuntInfo && (knelpuntInfo.opgehouden || knelpuntInfo.houdtOp)) {
+    const trendTekst = knelpuntInfo.trend ? `, ${KNELPUNT_TREND_LABEL[knelpuntInfo.trend]} ${KNELPUNT_TREND_PIJL[knelpuntInfo.trend]}` : "";
+    const tekst = knelpuntInfo.opgehouden
+      ? `Wordt opgehouden door de flight voor je — gat ca. ${Math.round(knelpuntInfo.gat)} minuten${trendTekst}.`
+      : "Houdt de flight achter zich op.";
+    knelpuntKaart = el("div", { class: "card", style: `border-left:4px solid ${knelpuntInfo.opgehouden ? "var(--warn)" : "var(--magenta)"}` }, [
+      el("div", { class: "eyebrow", text: "Knelpunt" }),
+      el("p", { class: "help", text: tekst }),
+    ]);
+  }
+
   const modal = el("div", { class: "detailoverlay" }, [
     el("div", { class: "detailmodal" }, [
       el("div", { class: "detailheader" }, [
@@ -3559,6 +3840,7 @@ function bouwFlightDetailModal(positie, params, nu, ververs = render) {
         ]),
       ]),
       ...spelersoverzicht,
+      knelpuntKaart,
       eigenKaart,
       el("button", {
         class: "btn secondary",
