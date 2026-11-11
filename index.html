@@ -34,7 +34,7 @@
      (zie .authtitle), dus is de merknaam/ondertitel hierboven in de topbar overbodig — alleen
      het versienummer blijft daar zichtbaar, met minder gereserveerde ruimte erboven/eronder. */
   .topbar.compact{padding:10px 0 2px 0}
-  .topbar.compact .brandwrap{display:none}
+  .topbar.compact .brand{display:none}
   /* Uitlogknop (v0.7.0): vervangt het oude linker-pijltje (.backbtn, tot v0.6.0) — dat zag eruit als
      "terug naar een ander menu" terwijl het eigenlijk uitlogde. Nu een expliciete tekstknop rechts in
      de topbar, na het versienummer (zie de insertievolgorde in render()). */
@@ -518,7 +518,7 @@
    "Gem. handicap flight"), bovenaan het scherm — dezelfde lay-out als de admin-popup, nu via de
    gedeelde bouwSpelersoverzicht()-functie in beide gebruikt. (2) In beide spelersoverzichten staan
    lidcode en lidtype nu op dezelfde regel als de naam, niet meer op een eigen regel eronder.
-   (3) Persoonscode-login accepteert nu zowel "LIND 6" als "LIND6" (met of zonder spatie) — zie
+   (3) Persoonscode-login accepteert nu zowel "ABCD 6" als "ABCD6" (met of zonder spatie) — zie
    zoekSpelerOpPersoonscode(): eerst een exacte match op precies wat is ingetypt (zoals altijd al
    gebeurde), en pas als die niets oplevert alsnog de meest waarschijnlijke spatie-varianten
    proberen — bewust niet blind herschreven naar één vast formaat, om geen kloppende exacte match
@@ -610,7 +610,7 @@
    titel — Kay vond één gedeelde titel voor beide knoppen prima, geen codewijziging nodig.)
    v0.12.0: bundel bugfixes + kleine features na Kay's eerste veldtest op de baan (27 oktober 2026,
    zie bouwgeschiedenis). (1) Login met een lidcode van 3 (of 5+) letters i.p.v. de aangenomen vaste
-   4 ("WEL 1") werkte niet zonder zelf de spatie te typen — zoekSpelerOpPersoonscode() gebruikt nu de
+   4 ("ABC 1") werkte niet zonder zelf de spatie te typen — zoekSpelerOpPersoonscode() gebruikt nu de
    werkelijke grens tussen letters en cijfers i.p.v. een vaste prefixlengte. (2) "Voor jou"/"achter
    jou" konden voor onbepaalde tijd de plek innemen van een allang uitgespeelde, nooit afgesloten
    buur-flight — nieuwe kandidaatVoltooid()-check slaat zulke buren nu over bij het kiezen van de
@@ -1199,8 +1199,8 @@
        (TIJDELIJK_SKIP_PINCODE_VOOR_VELDTEST, nog ongewijzigd) stond al op true: (1) de waarschuwing
        "⚠️ Veldtest-modus: ..." verwijderd — niet meer gepast nu dit geen tijdelijke veldtest-modus
        meer is maar de bedoelde permanente opzet; (2) placeholder van het lidcode-veld van "bv. 1234"
-       naar "bv. LIND 6" — een voorbeeld dat daadwerkelijk op het bestaande lidcode-formaat lijkt
-       (letters + cijfer, zie ook de "WEL 1"-bugfix uit v0.11.x), i.p.v. een puur numeriek voorbeeld
+       naar "bv. ABCD 6" — een voorbeeld dat daadwerkelijk op het bestaande lidcode-formaat lijkt
+       (letters + cijfer, zie ook de "ABC 1"-bugfix uit v0.11.x), i.p.v. een puur numeriek voorbeeld
        dat leden op het verkeerde been kon zetten. NB: de constante TIJDELIJK_SKIP_PINCODE_VOOR_VELDTEST
        en het bijbehorende commentaarblok hierboven heten nog "tijdelijk"/"veldtest" — dat is na deze
        wijziging een stale naam geworden (de bedoeling is nu permanent), maar bewust nog niet hernoemd
@@ -1371,8 +1371,62 @@
        kaartafmeting). Nieuw element: .baanflowzoomlaag rond de afbeelding + markers (zelfde
        percentage-coördinaten als voorheen, dus baanflowPuntVoor ongewijzigd).
        Patch: nieuwe bediening, geen wijziging in de rekenkern of het schema.
+
+   v0.24.0 (11 november 2026) — "NIET VOORBIJ LATEN GAAN" + sortering Tracker op zelfde hole gecorrigeerd.
+   Aanleiding (Kay, screenshot van de Tracker): Gonggrijp (2-bal, start 12:00) stond op hole 7 terwijl Haan (3-bal,
+   start 11:52) op hole 6 stond, en bij gelijke hole stond de eerder gestarte flight bovenaan (Graaf 11:36 boven
+   Geus 11:44). Kay verwachtte op lijst én kaart: 12:00, 11:52, 11:44, 11:36, 11:28.
+   Oorzaak (gereproduceerd met de echte functies, standaardparameters 180 min voor een 2-bal, 210 min voor een 3-bal;
+   Kay's eigen parameters waren niet beschikbaar): (1) een 2-bal heeft een kortere schema-rondetijd en "haalt" in het
+   schema dus een eerder gestarte 3-bal in, wat op de baan niet kan; (2) trackerSelecteerEnSorteer sorteerde bij gelijke
+   hole actieve flights op OPLOPENDE starttijd (v0.11.0, overgenomen uit de Marshal App) — fout, de later gestarte flight
+   zit verder achteraan.
+   - begrensInhalen(): voor flights ZONDER melding wordt de weergavepositie begrensd tot INHAAL_MIN_GAT_MINUTEN (1 min,
+     niet bevestigd) achter de dichtstbijzijnde eerder gestarte flight die nog loopt, binnen dezelfde startgroep
+     (rondeInfo().startHole). Flights MET melding worden nooit begrensd (melding = echte informatie). De begrensde flight
+     krijgt een herberekende conclusie (achter op schema) en de toevoeging "(geschat: vlak achter de flight ervoor)";
+     via de bestaande knelpunten-analyse krijgt de flight ervoor dan een Ophouder-ring, ook als die zelf op schema loopt.
+     Kay's keuze: dat is precies de bedoeling — een marshal gaat gericht kijken, en een melding zet de flight op zijn
+     echte plek. Toegepast in vulAdminTrackerTab én vulAdminBaanFlowTab (lijst en kaart dus gelijk).
+   - Sortering: bij gelijke hole staat de later gestarte actieve flight nu bovenaan.
+   BEPERKINGEN: flights met een verschillend startpunt (hole 1 vs hole 10) worden onderling niet begrensd; het ledenscherm
+   (eigen flight) kent de andere flights niet en is niet aangepast; het minimale gat van 1 minuut is een technische
+   schatting. Zonder melding blijft alles schema-extrapolatie — de begrenzing is een aanname dat niemand inhaalt.
+
+   v0.24.1 (11 november 2026) — knelpunt-teksten voorzichtiger en zonder getallen (Kay): elke positie is een
+   schatting (schema-extrapolatie of een melding met maar drie stappen, onnauwkeuriger dan de 5-minutengrens), dus
+   "mogelijk" hoort altijd in de tekst, ook bij verse meldingen; een grens voor "recent" zou een nieuwe verzonnen
+   constante zijn. Popup: "Wordt mogelijk opgehouden door de flight ervoor." / "Houdt mogelijk de flight achter zich
+   op." Hovertekst op de kaart idem. Het gat in minuten is uit de tekst gehaald — ook omdat bij een flight die alleen
+   door begrensInhalen() (v0.24.0) vlak achter zijn voorganger staat, dat gat de technische 1 minuut is en dus
+   schijnnauwkeurigheid. De trendtekst (loopt dicht/stabiel/open) is uit de popup-regel gehaald; de trendpijl op de
+   kaart bij een Ophouder blijft. Patch: alleen teksten.
+
+   v0.24.2 (11 november 2026) — FIX op v0.24.0 (Kay's screenshot): Gonggrijp (2-bal, 12:00) stond als "Ronde voltooid"
+   terwijl Geus en Graaf, die EERDER startten, nog op hun laatste hole stonden. Oorzaak: begrensInhalen() sloeg flights
+   over die volgens het schema al voltooid waren, dus "niet voorbijgaan" gold wel onderweg maar niet bij de finish.
+   Nu wordt ook zo'n flight begrensd (tot vlak achter de eerder gestarte flight die nog loopt) en pas voltooid als die
+   flight klaar is. Kay las "Hole 9/18" als "pas 9 holes gespeeld": dit zijn "18holes_vanaf10"-flights (start op hole
+   10), waarvan hole 9 de LAATSTE hole is — het getal is het fysieke holenummer, de 18 het aantal holes in de ronde.
+   Die weergave is niet gewijzigd (voorstel apart aan Kay). Gereproduceerd met vanaf-10-flights en standaardparameters:
+   de eerste screenshot (14:40) en deze (15:05) komen overeen met het model.
+
+   v0.24.3 (11 november 2026) — weergave ronde: Tracker-rij en flight-popup tonen nu "[klok] [starttijd] · [aantal
+   holes] holes vanaf hole [starthole]" (bijv. "11:52 · 18 holes vanaf hole 10") i.p.v. "Hole 9/18" resp. "Start ·
+   Hole 7 · 18 holes" (Kay). Aanleiding: "Hole 9/18" bij een flight die op hole 10 start las als "pas 9 holes". Het
+   huidige holenummer staat al in het cijfer-bolletje (rij) resp. de stepper (popup) en is uit de tekst gehaald; de
+   statustekst ("nog geen melding" e.d.) blijft in de rij staan. Alleen weergave; geen rekenwijziging.
+
+   v0.24.4 (11 november 2026) — twee wijzigingen op het inlogscherm (Kay): (1) versienummer zichtbaar op het
+   startscherm. Het stond al in de DOM, maar `.topbar.compact .brandwrap{display:none}` (v0.20.x, bedoeld om alleen de
+   merknaam te verbergen omdat de titel al in het scherm staat) verborg ook de versieregel, ondanks de toelichting
+   dat het versienummer daar zichtbaar bleef. Nu verbergt de regel alleen `.brand`. (2) Het lidcode-veld toont geen
+   voorbeeld meer: de placeholder "bv. [code]" was een daadwerkelijk bestaande lidcode. Veld heeft nu een aria-label
+   ("Goyer lidcode"), autocomplete uit en autocapitalize aan. Ook uit de broncode-commentaren zijn de echte
+   lidcodes die daar als voorbeeld stonden vervangen door neutrale voorbeelden (ABCD 6 / ABC 1) — de eerder
+   gepubliceerde versies van het bestand (GitHub Pages, git-geschiedenis) bevatten ze nog.
    ============================================================================================ */
-const APP_VERSIE = "0.23.7";
+const APP_VERSIE = "0.24.4";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -2143,6 +2197,13 @@ function chevronSvg(richting, kleur) {
 }
 
 // Klok-svg, voor de klok+tijd-regel in de admin Tracker-tab (v0.6.0).
+// v0.24.3: "18 holes vanaf hole 10" — vervangt "Hole 9/18" in de Tracker-rij en "Hole 7 · 18 holes" in de
+// flight-popup (Kay): het oude "Hole 9/18" was het FYSIEKE holenummer over het aantal holes in de ronde en
+// las bij een flight die op hole 10 start als "pas 9 holes gespeeld".
+function rondeTekst(rondeType) {
+  const { startHole, holesInRonde } = rondeInfo(rondeType);
+  return `${holesInRonde} holes vanaf hole ${startHole}`;
+}
 function clockSvg(kleur) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("width", "12"); svg.setAttribute("height", "12"); svg.setAttribute("viewBox", "0 0 24 24");
@@ -2370,7 +2431,7 @@ function meldingNode() {
   return el("div", { class: "msg err", text: state.fout });
 }
 
-// Lidcode-opzoeking tolerant voor spaties (v0.7.0, Kay's feedback: "LIND6" of "LIND 6" moeten allebei
+// Lidcode-opzoeking tolerant voor spaties (v0.7.0, Kay's feedback: "ABCD6" of "ABCD 6" moeten allebei
 // werken bij het inloggen). Lidcode-formaat volgens Kay en de live Teecontrol-data (zie
 // teecontrol-sync/index.ts, "RAPP 1"): vier letters, een spatie, dan een cijfer(s) — Teecontrol levert
 // 'm altijd MET die spatie aan en zo staat hij ook in de database (vindPersoonscode doet daar alleen
@@ -2384,10 +2445,10 @@ async function zoekSpelerOpPersoonscode(ruw) {
   const zonderSpaties = schoon.replace(/\s+/g, "");
   if (zonderSpaties !== schoon && !kandidaten.includes(zonderSpaties)) kandidaten.push(zonderSpaties);
   // Spatie invoegen op de grens tussen het letterdeel en het cijferdeel (bugfix 27 oktober 2026,
-  // gevonden tijdens Kay's veldtest: "WEL 1" — een lidcode met maar DRIE letters, want gebaseerd op
+  // gevonden tijdens Kay's veldtest: "ABC 1" — een lidcode met maar DRIE letters, want gebaseerd op
   // de korte achternaam "Wel" — kon niet inloggen zonder zelf de spatie te typen). De oude aanpak
   // ging uit van een VASTE 4-letter-prefix (zonderSpaties.slice(0,4) + " " + slice(4)) en probeerde
-  // die bovendien alleen bij een lengte > 4 — bij "WEL1" (lengte 4) werd deze variant dus nooit
+  // die bovendien alleen bij een lengte > 4 — bij "ABC1" (lengte 4) werd deze variant dus nooit
   // geprobeerd. Nu op basis van de werkelijke grens tussen letters en cijfers, ongeacht hun aantal —
   // werkt dus voor elke combinatie (3, 4, 5+ letters).
   const grensMatch = zonderSpaties.match(/^([A-Z]+)(\d+)$/);
@@ -2405,7 +2466,7 @@ async function zoekSpelerOpPersoonscode(ruw) {
 
 /* ---- Scherm 1: persoonscode ---- */
 function renderPersoonscode(app) {
-  const input = el("input", { type: "text", id: "persoonscode", inputmode: "text", placeholder: "bv. LIND 6", maxlength: "12" });
+  const input = el("input", { type: "text", id: "persoonscode", inputmode: "text", "aria-label": "Goyer lidcode", autocomplete: "off", autocapitalize: "characters", maxlength: "12" });
   const err = meldingNode();
 
   const submit = async () => {
@@ -3294,6 +3355,66 @@ function achternaamVan(naam) {
   return naam.trim().split(/\s+/).pop();
 }
 
+// v0.24.0 — "NIET VOORBIJ LATEN GAAN" (Kay, 11 november 2026). Aanleiding: een 2-bal (Gonggrijp, start
+// 12:00) stond volgens het schema verder op de baan dan een 3-bal die 8 minuten eerder startte (Haan,
+// 11:52), omdat een 2-bal een kortere schema-rondetijd heeft. Op de baan kan dat niet: wie achter een
+// tragere flight start, loopt vast achter die flight. Voor flights ZONDER melding (dus pure schema-
+// extrapolatie) wordt de weergavepositie daarom begrensd tot INHAAL_MIN_GAT_MINUTEN achter de
+// dichtstbijzijnde eerder gestarte flight die nog op de baan loopt (zelfde startpunt/looprichting:
+// groepering op rondeInfo().startHole, dus 18holes + 9holes_voor samen en 18holes_vanaf10 +
+// 9holes_achter samen). Flights MÉT melding worden nooit begrensd: een melding is echte informatie
+// en wint van het schema. Gevolg, bewust: de begrensde flight telt nu als "achter" t.o.v. zijn EIGEN
+// schema (conclusie wordt herberekend), en de flight ervoor kan daardoor via de bestaande
+// knelpunten-analyse een Ophouder-ring krijgen — ook als die flight zelf precies op schema loopt.
+// Dat is een signaal om te gaan KIJKEN, geen vaststelling; een melding zet de flight op zijn
+// werkelijke plek. De begrenzing gebruikt een minimaal gat (niet 0): bepaalVoorganger() telt alleen
+// een flight als voorganger die STRIKT verder staat.
+// INHAAL_MIN_GAT_MINUTEN = 1: GEEN BEVESTIGDE WAARDE, technische eerste schatting (een flight "vlak
+// achter" de voorganger); aangeven als een andere afstand beter past. Beperking: flights met een
+// verschillend startpunt (hole 1 vs. hole 10) worden onderling niet begrensd.
+const INHAAL_MIN_GAT_MINUTEN = 1;
+function begrensInhalen(posities) {
+  const groepen = new Map();
+  for (const p of posities) {
+    const sleutel = rondeInfo(p.flight.ronde_type).startHole;
+    if (!groepen.has(sleutel)) groepen.set(sleutel, []);
+    groepen.get(sleutel).push(p);
+  }
+  const eind = new Map();
+  for (const groep of groepen.values()) {
+    const start = (p) => new Date(p.flight.starttijd_effectief).getTime();
+    const gesorteerd = [...groep].sort((a, b) => start(a) - start(b));
+    let vorige = null;
+    for (const p of gesorteerd) {
+      if (p.gestartNog) { eind.set(p.flight.id, p); continue; }
+      let resultaat = p;
+      // v0.24.2: ook een flight die volgens het schema al "voltooid" zou zijn wordt begrensd zolang een
+      // eerder gestarte flight nog loopt — niet voorbijgaan geldt ook voor de finish (v0.24.0 sloeg
+      // voltooide flights over, waardoor een 2-bal als "klaar" getoond werd terwijl 3-ballen die eerder
+      // startten nog op hun laatste hole stonden).
+      if (vorige && !p.heeftMelding && start(vorige) < start(p)) {
+        const hm = p.holeMinuten;
+        const capMin = minutenVoorFractie(vorige.weergave.fractie, hm) - INHAAL_MIN_GAT_MINUTEN;
+        if (minutenVoorFractie(p.weergave.fractie, hm) > capMin) {
+          const fractie = Math.max(0, fractieVoorVerstrekenTijd(capMin, hm));
+          const { holesInRonde } = rondeInfo(p.flight.ronde_type);
+          const rest = fractie - Math.floor(fractie);
+          let checkpoint = "afslag";
+          if (rest >= 0.75) checkpoint = "green";
+          else if (rest >= 0.25) checkpoint = "fairway";
+          const hole = Math.max(1, Math.min(holesInRonde, Math.floor(fractie) + 1));
+          const weergave = { ...p.weergave, hole, checkpoint, fractie };
+          const conclusie = conclusieVoor(minutenVoorFractie(fractie, hm) - minutenVoorFractie(p.zelfPos.fractie, hm));
+          resultaat = { ...p, weergave, conclusie, begrensd: true, voltooid: rondeVoltooid({ fractie }, p.flight.ronde_type) };
+        }
+      }
+      eind.set(p.flight.id, resultaat);
+      if (!resultaat.voltooid) vorige = resultaat; // een afgeronde flight staat niet meer op de baan
+    }
+  }
+  return posities.map((p) => eind.get(p.flight.id));
+}
+
 // Titel voor het flight-detailscherm, naar het voorbeeld van de Marshal App ("Wekking + 2
 // spelers"): achternaam van de eerste speler + aantal overigen. Een benadering, geen
 // gegarandeerde 1-op-1 match met hoe de Marshal App dit precies bepaalt (die broncode is niet in
@@ -3361,8 +3482,9 @@ function trackerSelecteerEnSorteer(allePosities, params, nu) {
     // bij het scannen van de lijst). Geldt alleen binnen dezelfde hole — zie trackerSortHole
     // hierboven, die een afgeronde flight al op zijn laatste (fysieke) hole vastzet.
     if (a.positie.voltooid !== b.positie.voltooid) return a.positie.voltooid ? 1 : -1;
-    // Beide actief: gewone sortering op starttijd.
-    return ta - tb;
+    // Beide actief, zelfde hole: de flight die LATER startte staat verder achteraan op de baan en komt
+    // dus bovenaan (v0.24.0 — was ta - tb, oplopend, waardoor 11:36 boven 11:44 stond; Kay 11 nov).
+    return tb - ta;
   });
   return items.map((i) => i.positie);
 }
@@ -3391,18 +3513,18 @@ async function vulAdminTrackerTab(inhoud, opts = {}) {
   // Alle posities blijven berekend (nodig voor het flight-detailscherm hieronder, óók als die
   // specifieke flight inmiddels buiten het actief/aankomend-venster is gevallen terwijl de
   // beheerder 'm open had staan) — alleen de KAART-lijst wordt tot het venster beperkt.
-  const allePosities = flights.map((flight) => berekenFlightPositie(flight, params, nu));
+  const allePosities = begrensInhalen(flights.map((flight) => berekenFlightPositie(flight, params, nu)));
   const rijen = trackerSelecteerEnSorteer(allePosities, params, nu);
 
   const kaart = el("div", { class: "card" }, [
     el("div", { class: "eyebrow", text: "Flights nu en binnenkort" }),
     rijen.length === 0
       ? el("p", { class: "help", text: "Geen actieve of binnenkort startende flights gevonden." })
-      : el("div", {}, rijen.map(({ flight, weergave, voltooid, heeftMelding, conclusie, gestartNog }) => {
+      : el("div", {}, rijen.map(({ flight, weergave, voltooid, heeftMelding, conclusie, gestartNog, begrensd }) => {
           const kleur = voltooid ? "#9B9585" : gestartNog ? "#B9B2A0" : (conclusie ? conclusie.kleur : "var(--blue)");
           const statustekst = voltooid ? "Ronde voltooid"
             : gestartNog ? `start om ${formatTijd(flight.starttijd_effectief)}`
-            : (conclusie ? conclusie.label : "nog geen melding");
+            : (conclusie ? conclusie.label + (begrensd ? " (geschat: vlak achter de flight ervoor)" : "") : "nog geen melding");
           const bolTekst = voltooid ? "✓" : gestartNog ? formatTijd(flight.starttijd_effectief) : String(fysiekeHole(flight.ronde_type, weergave.hole));
           const restFractie = weergave.fractie - Math.floor(weergave.fractie);
           const voortgangPct = voltooid ? 100 : gestartNog ? 0 : tijdlijnPercentage(restFractie);
@@ -3431,7 +3553,7 @@ async function vulAdminTrackerTab(inhoud, opts = {}) {
                 // huidige tijd"). De Marshal App's eigen renderFlightItem/renderFlightItemAankomend
                 // koppelt het klokicoon altijd aan f.starttijd (🕐 ${f.starttijd}), nooit aan "nu" —
                 // hier dus gecorrigeerd naar het GoyerFlow-equivalent: flight.starttijd_effectief.
-                document.createTextNode(` ${formatTijd(flight.starttijd_effectief)}  ·  Hole ${fysiekeHole(flight.ronde_type, weergave.hole)}/${rondeInfo(flight.ronde_type).holesInRonde}  ·  ${statustekst}`),
+                document.createTextNode(` ${formatTijd(flight.starttijd_effectief)}  ·  ${rondeTekst(flight.ronde_type)}  ·  ${statustekst}`),
               ]),
               el("div", { class: "flightprogressvak" }, [
                 el("div", { class: "flightprogressvoortgang", style: `width:${voortgangPct}%;background:${kleur}` }),
@@ -3859,7 +3981,7 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
   }
 
   const nu = new Date();
-  const allePosities = flights.map((flight) => berekenFlightPositie(flight, params, nu));
+  const allePosities = begrensInhalen(flights.map((flight) => berekenFlightPositie(flight, params, nu)));
   const zichtbaar = allePosities.filter(baanflowIsZichtbaar);
 
   // Knelpunten-analyse (v0.23.0, zie de toelichting boven bepaalVoorganger/isOpgehouden hierboven).
@@ -3925,13 +4047,13 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
   }
 
   const markers = zichtbaar.map((positie) => {
-    const { flight, weergave, heeftMelding, conclusie } = positie;
+    const { flight, weergave, heeftMelding, conclusie, begrensd } = positie;
     const fysiek = fysiekeHole(flight.ronde_type, weergave.hole);
     const restFractie = weergave.fractie - Math.floor(weergave.fractie);
     const punt = baanflowPuntVoor(fysiek, restFractie);
     if (!punt) return null; // zou niet moeten voorkomen (holenummers 1-18 hebben allemaal een pad)
     const kleur = conclusie ? conclusie.kleur : "var(--blue)";
-    const statusTekst = conclusie ? conclusie.label : (heeftMelding ? "" : "nog geen melding");
+    const statusTekst = conclusie ? conclusie.label + (begrensd ? " (geschat: vlak achter de flight ervoor)" : "") : (heeftMelding ? "" : "nog geen melding");
 
     // v0.23.1: alleen nog de "houdtop" (magenta) ring op de kaart zelf — de "opgehouden" (oranje)
     // ring is verwijderd (sparsessie met Kay: die valt structureel altijd samen met de eigen
@@ -3964,8 +4086,8 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
     // de hover-title/detailpopup).
     const trendPijl = knelpunt.trend && knelpunt.houdtOp ? KNELPUNT_TREND_PIJL[knelpunt.trend] : "";
     const knelpuntTekst = knelpunt.opgehouden
-      ? ` · opgehouden door voorganger (ca. ${Math.round(knelpunt.gat)} min)${knelpunt.trend ? ", " + KNELPUNT_TREND_LABEL[knelpunt.trend] : ""}`
-      : knelpunt.houdtOp ? " · houdt achterligger op" : "";
+      ? " · mogelijk opgehouden door de flight ervoor"
+      : knelpunt.houdtOp ? " · houdt mogelijk de flight achter zich op" : "";
 
     const marker = el("div", {
       class: "baanflowmarker" + (knelpuntClass ? " " + knelpuntClass : ""),
@@ -4266,10 +4388,9 @@ function bouwFlightDetailModal(positie, params, nu, ververs = render, knelpuntIn
   // van de knelpunten-analyse (geen regel bij een neutrale flight).
   let knelpuntKaart = null;
   if (knelpuntInfo && (knelpuntInfo.opgehouden || knelpuntInfo.houdtOp)) {
-    const trendTekst = knelpuntInfo.trend ? `, ${KNELPUNT_TREND_LABEL[knelpuntInfo.trend]} ${KNELPUNT_TREND_PIJL[knelpuntInfo.trend]}` : "";
     const tekst = knelpuntInfo.opgehouden
-      ? `Wordt opgehouden door de flight voor je — gat ca. ${Math.round(knelpuntInfo.gat)} minuten${trendTekst}.`
-      : "Houdt de flight achter zich op.";
+      ? "Wordt mogelijk opgehouden door de flight ervoor."
+      : "Houdt mogelijk de flight achter zich op.";
     knelpuntKaart = el("div", { class: "card", style: `border-left:4px solid ${knelpuntInfo.opgehouden ? "var(--warn)" : "var(--magenta)"}` }, [
       el("div", { class: "eyebrow", text: "Knelpunt" }),
       el("p", { class: "help", text: tekst }),
@@ -4281,7 +4402,10 @@ function bouwFlightDetailModal(positie, params, nu, ververs = render, knelpuntIn
       el("div", { class: "detailheader" }, [
         el("div", {}, [
           el("div", { class: "detailtitle", text: flightTitel(spelers) }),
-          el("div", { class: "detailsub", text: `Start ${formatTijd(flight.starttijd_effectief)} · Hole ${fysiekeHole(flight.ronde_type, weergave.hole)} · ${rondeInfo(flight.ronde_type).holesInRonde} holes` }),
+          el("div", { class: "detailsub", style: "display:flex;align-items:center;gap:5px" }, [
+            clockSvg("#9A9385"),
+            document.createTextNode(`${formatTijd(flight.starttijd_effectief)} · ${rondeTekst(flight.ronde_type)}`),
+          ]),
           flight.toernooi_naam ? el("div", { class: "detailtoernooi", text: `🏆 ${flight.toernooi_naam}` }) : null,
         ].filter(Boolean)),
         el("button", { class: "detailclose", "aria-label": "Sluiten", onclick: sluiten }, [
