@@ -227,9 +227,9 @@
 
   /* Volledig-scherm-knop (v0.21.8, Kay's verzoek: de kaart op een iPad/laptop/desktop/extern
      scherm groot kunnen zetten). .baanflowheader is de rij eyebrow+knop boven de kaart; de knop
-     zelf is alleen aanwezig als de browser de Fullscreen API daadwerkelijk ondersteunt (zie
-     baanflowFullscreenOndersteund) — op een iPhone (waar Safari dit niet voor gewone elementen
-     ondersteunt) wordt hij bewust niet getoond. */
+     zelf is sinds v0.23.4 ALTIJD aanwezig: ondersteunt de browser de Fullscreen API niet (of doet die
+     niets, zoals Safari op een iPhone of oudere iPad), dan valt hij terug op .baanflow-pseudofullscreen
+     hieronder (zie baanflowToggleFullscreen). */
   .baanflowheader{display:flex;align-items:center;justify-content:space-between;gap:10px}
   .baanflowheader .eyebrow{margin-bottom:0}
   .baanflowfsbtn{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:6px 11px;
@@ -239,12 +239,16 @@
      beschikbare hoogte (i.p.v. breedte zoals normaal) zodat hij ook op een breed extern scherm
      niet onnodig breed/laag wordt. Markers schalen mee via clamp() — op een groot scherm anders
      onleesbaar klein t.o.v. de nu veel grotere kaartafbeelding. */
+  /* v0.23.4: de breedte-regels hieronder gebruiken sinds deze versie min(100%, hoogte-afgeleide breedte)
+     i.p.v. alleen de hoogte-afgeleide breedte. Alleen-hoogte gaf op een STAAND scherm (iPad portret,
+     820x1180) een kaart van ~1480px breed in een 820px-brede viewport — de kaart liep buiten beeld.
+     Op een liggend/breed scherm wint de hoogte-tak nog steeds, dus daar verandert niets. */
   #baanflowCard:fullscreen, #baanflowCard:-webkit-full-screen{
     background:var(--cream);border:none;border-radius:0;box-shadow:none;
     display:flex;flex-direction:column;justify-content:center;
     width:100vw;height:100vh;padding:28px;overflow:auto}
   #baanflowCard:fullscreen .baanflowkaartwrap, #baanflowCard:-webkit-full-screen .baanflowkaartwrap{
-    width:auto;height:calc(100vh - 170px);align-self:center;margin-top:10px}
+    width:min(100%, calc((100vh - 170px) * var(--baanflow-wrap-ratio)));height:auto;align-self:center;margin-top:10px}
   /* v0.22.1 (Kay's verzoek): .baanflowheader/.baanflowlegenda stonden links uitgelijnd tegen de
      volledige-scherm-breedte (via de flex-column's default align-items:stretch), terwijl de kaart
      zelf smaller is en gecentreerd staat (align-self:center hierboven) — de tekst begon dus niet bij
@@ -261,7 +265,7 @@
   #baanflowCard:fullscreen .baanflowheader, #baanflowCard:-webkit-full-screen .baanflowheader,
   #baanflowCard:fullscreen .baanflowsubtekst, #baanflowCard:-webkit-full-screen .baanflowsubtekst,
   #baanflowCard:fullscreen .baanflowlegenda, #baanflowCard:-webkit-full-screen .baanflowlegenda{
-    width:calc((100vh - 170px) * var(--baanflow-wrap-ratio));align-self:center}
+    width:min(100%, calc((100vh - 170px) * var(--baanflow-wrap-ratio)));align-self:center}
   #baanflowCard:fullscreen .eyebrow, #baanflowCard:-webkit-full-screen .eyebrow{font-size:15px}
   #baanflowCard:fullscreen .baanflowlegendaitem, #baanflowCard:-webkit-full-screen .baanflowlegendaitem{
     font-size:14px}
@@ -271,6 +275,37 @@
   #baanflowCard:fullscreen .baanflowmarker, #baanflowCard:-webkit-full-screen .baanflowmarker{
     width:calc(clamp(30px,3.2vw,64px) * var(--kp-schaal,1));height:calc(clamp(30px,3.2vw,64px) * var(--kp-schaal,1));
     font-size:clamp(13px,1.3vw,24px)}
+
+  /* v0.23.4: identieke regels voor de CSS-terugval — bewust als APARTE regels, niet in dezelfde
+     selectorlijst als :fullscreen/:-webkit-full-screen: een browser die één selector in een lijst niet
+     kent (Safari < 16.4 kent :fullscreen niet) verwerpt de HELE regel, en dat zijn precies de toestellen
+     waarvoor deze terugval bestaat. */
+  #baanflowCard.baanflow-pseudofullscreen{
+    background:var(--cream);border:none;border-radius:0;box-shadow:none;
+    display:flex;flex-direction:column;justify-content:center;
+    width:100vw;height:100vh;padding:28px;overflow:auto}
+  #baanflowCard.baanflow-pseudofullscreen .baanflowkaartwrap{
+    width:min(100%, calc((100vh - 170px) * var(--baanflow-wrap-ratio)));height:auto;align-self:center;margin-top:10px}
+  #baanflowCard.baanflow-pseudofullscreen .baanflowheader,
+  #baanflowCard.baanflow-pseudofullscreen .baanflowsubtekst,
+  #baanflowCard.baanflow-pseudofullscreen .baanflowlegenda{
+    width:min(100%, calc((100vh - 170px) * var(--baanflow-wrap-ratio)));align-self:center}
+  #baanflowCard.baanflow-pseudofullscreen .eyebrow{font-size:15px}
+  #baanflowCard.baanflow-pseudofullscreen .baanflowlegendaitem{
+    font-size:14px}
+  #baanflowCard.baanflow-pseudofullscreen .baanflowmarker{
+    width:calc(clamp(30px,3.2vw,64px) * var(--kp-schaal,1));height:calc(clamp(30px,3.2vw,64px) * var(--kp-schaal,1));
+    font-size:clamp(13px,1.3vw,24px)}
+
+  /* v0.23.4 (Kay's verzoek: "geen full screen optie voor het Baan Flow scherm in iPad/Tablet mode"):
+     CSS-terugval voor toestellen/browsers waar de Fullscreen API ontbreekt of niets doet (oudere
+     iPadOS/Safari, < 16.4). Dezelfde regels als hierboven, maar de kaart wordt met position:fixed over
+     het hele scherm gelegd i.p.v. via de browser-API. Safari's eigen adresbalk blijft in deze modus
+     zichtbaar (alleen echte API-fullscreen verbergt die). inset:0 + auto-afmetingen i.p.v. 100vw/100vh
+     hierboven, want op iOS is 100vh hoger dan het zichtbare gebied. z-index 40: boven de
+     beheerschermen, onder .detailoverlay (50, dat toch binnen deze kaart als kind wordt getekend). */
+  #baanflowCard.baanflow-pseudofullscreen{position:fixed;inset:0;z-index:40;width:auto;height:auto;
+    max-width:none;margin:0;box-sizing:border-box}
 
   /* Beheerder — Tracker-tab: overzicht van alle flights (v0.6.0: Marshal App-achtige lijstvorm —
      cirkel-badge, naam-pills, klok+hole/status-regel, dunne voortgangsbalk — i.p.v. de platte
@@ -1246,8 +1281,37 @@
        naar "Het icoon van die ophoudende flight wordt groter naarmate de flight erachter verder
        achter op schema staat." — geen enkele codewijziging aan de daadwerkelijke schaallogica.
        Patch: tekstcorrectie, geen gedragswijziging.
+   v0.23.4: Kay's verzoek: "Hier zie ik geen full screen optie voor het Baan Flow scherm in iPad/
+       Tablet mode." Onderzocht in de code in plaats van aangenomen: baanflowFullscreenOndersteund()
+       (checkt document.fullscreenEnabled / webkitFullscreenEnabled) bepaalde sinds v0.21.8 of de
+       "Volledig scherm"-knop helemaal werd opgebouwd — gaf die false (iPhone-Safari, en een iPad met
+       iPadOS < 16.4, waar Element-fullscreen voor gewone elementen niet bestaat), dan ontbrak de knop
+       volledig. Dat is exact wat Kay zag. (Zelfde oorzaak en zelfde oplossing als in de Marshal App,
+       v1.13.2 — zie claude/bouwgeschiedenis-marshal-app.md.) Opgelost: de knop wordt nu ALTIJD getoond.
+       baanflowToggleFullscreen() probeert eerst de echte Fullscreen API (verbergt ook Safari's
+       adresbalk); wordt die niet ondersteund, weigert de aanroep (promise-reject), of gebeurt er binnen
+       400ms stilletjes niets, dan valt hij terug op een CSS-"pseudo-fullscreen": de klasse
+       .baanflow-pseudofullscreen op #baanflowCard (position:fixed; inset:0; z-index:40) met exact
+       dezelfde opmaakregels als :fullscreen — als APARTE CSS-regels, niet in dezelfde selectorlijst
+       (een browser die één selector in een lijst niet kent, zoals Safari < 16.4 met :fullscreen,
+       verwerpt de héle regel; juist die toestellen hebben de terugval nodig). Nieuwe helpers:
+       baanflowIsPseudoFullscreen / baanflowActiveerPseudoFullscreen / baanflowVerlaatFullscreen;
+       baanflowIsFullscreen() telt nu beide vormen mee, waardoor de bestaande in-place-update in
+       vulAdminBaanFlowTab (de 20-seconden-achtergrondverversing en de detailpopup mogen de kaart-node
+       niet vervangen) ook voor de terugval werkt zonder verdere codewijziging. Escape sluit de
+       terugval (de browser doet dat alleen voor echte fullscreen).
+       Bijvangst, ook gefixed: de bestaande fullscreen-breedteregels leidden de kaartbreedte ALLEEN af
+       uit de schermhoogte (calc((100vh - 170px) * ratio)). Op een STAAND scherm (iPad portret 820x1180)
+       is dat ~1480px in een 820px-brede viewport — de kaart liep buiten beeld, ook bij echte
+       API-fullscreen op een nieuwe iPad. Nu min(100%, hoogte-afgeleide breedte); op liggende/brede
+       schermen wint de hoogte-tak nog steeds, dus daar verandert niets. Beperking, expliciet: in de
+       terugval blijft Safari's adresbalk zichtbaar (alleen echte API-fullscreen verbergt die), en
+       op een telefoon blijft de kaart in staand formaat breedte-gebonden (klein) — dat is de vaste
+       liggende beeldverhouding van de kaart, geen bug. Niet aangepakt: de standaard (niet-fullscreen)
+       Baan Flow-weergave blijft binnen de 480px-.wrap staan.
+       Patch: ontbrekende knop + portret-overflow, geen nieuwe schermen of schemawijziging.
    ============================================================================================ */
-const APP_VERSIE = "0.23.3";
+const APP_VERSIE = "0.23.4";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -3461,9 +3525,9 @@ function gatTrend(flight, nieuwGatMinuten, nu) {
    de browser-eigen Fullscreen API, rechtstreeks op #baanflowCard (niet op <body>/#app) zodat de
    rest van het beheerscherm (tabbalk, topbar) verborgen blijft terwijl de kaart het hele scherm
    vult. Ondersteuning: prima op iPad/laptop/desktop/een extern scherm (Safari 16.4+ ook op iPad
-   zonder prefix, Chrome/Firefox/Edge al jaren) — maar Safari op een iPhone ondersteunt de
-   Fullscreen API niet voor gewone elementen (alleen <video>), dus daar wordt de knop bewust niet
-   getoond (baanflowFullscreenOndersteund) i.p.v. een knop die daar stil niets zou doen.
+   zonder prefix, Chrome/Firefox/Edge al jaren) — maar Safari op een iPhone (en een iPad met
+   iPadOS < 16.4) ondersteunt de Fullscreen API niet voor gewone elementen. Tot v0.23.3 werd de knop
+   daar verborgen; sinds v0.23.4 valt hij daar terug op een CSS-"pseudo-fullscreen" (zie hieronder).
    BELANGRIJKE KANTTEKENING: zodra de flight-detailpopup wordt geopend (klik op een marker) of de
    beheerder van tab wisselt, herbouwt render() het hele beheerscherm — dat verwijdert #baanflowCard
    uit de DOM, en een browser sluit fullscreen automatisch af zodra het fullscreen-element uit de
@@ -3483,20 +3547,47 @@ function baanflowFullscreenOndersteund() {
 function baanflowFullscreenElement() {
   return document.fullscreenElement || document.webkitFullscreenElement || null;
 }
+// v0.23.4: "fullscreen" is nu óf echte API-fullscreen óf de CSS-terugval (.baanflow-pseudofullscreen).
+function baanflowIsPseudoFullscreen() {
+  const kaartEl = document.getElementById("baanflowCard");
+  return !!(kaartEl && kaartEl.classList.contains("baanflow-pseudofullscreen"));
+}
 function baanflowIsFullscreen() {
-  return baanflowFullscreenElement() === document.getElementById("baanflowCard");
+  return baanflowFullscreenElement() === document.getElementById("baanflowCard") || baanflowIsPseudoFullscreen();
+}
+function baanflowActiveerPseudoFullscreen() {
+  const kaartEl = document.getElementById("baanflowCard");
+  if (!kaartEl) return;
+  kaartEl.classList.add("baanflow-pseudofullscreen");
+  baanflowFullscreenKnopBijwerken();
+}
+function baanflowVerlaatFullscreen() {
+  const kaartEl = document.getElementById("baanflowCard");
+  if (kaartEl) kaartEl.classList.remove("baanflow-pseudofullscreen");
+  if (baanflowFullscreenElement() === kaartEl) {
+    if (document.exitFullscreen) document.exitFullscreen();
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+  }
+  baanflowFullscreenKnopBijwerken();
 }
 function baanflowToggleFullscreen() {
   const kaartEl = document.getElementById("baanflowCard");
   if (!kaartEl) return;
-  if (baanflowIsFullscreen()) {
-    if (document.exitFullscreen) document.exitFullscreen();
-    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-  } else if (kaartEl.requestFullscreen) {
-    kaartEl.requestFullscreen();
-  } else if (kaartEl.webkitRequestFullscreen) {
-    kaartEl.webkitRequestFullscreen();
+  if (baanflowIsFullscreen()) { baanflowVerlaatFullscreen(); return; }
+  // Eerst de echte Fullscreen API proberen (verbergt ook Safari's adresbalk); lukt dat niet — API
+  // ontbreekt, de aanroep wordt geweigerd, of er gebeurt stilletjes niets — dan de CSS-terugval.
+  const eis = kaartEl.requestFullscreen || kaartEl.webkitRequestFullscreen;
+  if (!baanflowFullscreenOndersteund() || !eis) { baanflowActiveerPseudoFullscreen(); return; }
+  try {
+    const belofte = eis.call(kaartEl);
+    if (belofte && typeof belofte.catch === "function") belofte.catch(baanflowActiveerPseudoFullscreen);
+  } catch (e) {
+    baanflowActiveerPseudoFullscreen();
+    return;
   }
+  setTimeout(() => {
+    if (document.getElementById("baanflowCard") && !baanflowIsFullscreen()) baanflowActiveerPseudoFullscreen();
+  }, 400);
 }
 function baanflowFullscreenKnopBijwerken() {
   const btn = document.getElementById("baanflowFsBtn");
@@ -3513,6 +3604,10 @@ function baanflowAttachFullscreenListener() {
   baanflowFsListenerAangesloten = true;
   document.addEventListener("fullscreenchange", baanflowFullscreenKnopBijwerken);
   document.addEventListener("webkitfullscreenchange", baanflowFullscreenKnopBijwerken);
+  // v0.23.4: de CSS-terugval kent geen browser-eigen Escape-afhandeling — zelf toevoegen.
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && baanflowIsPseudoFullscreen()) baanflowVerlaatFullscreen();
+  });
 }
 
 async function vulAdminBaanFlowTab(inhoud, opts = {}) {
@@ -3696,14 +3791,13 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
   const kaartInhoud = [
     el("div", { class: "baanflowheader" }, [
       el("div", { class: "eyebrow", text: "Baan Flow" }),
-      baanflowFullscreenOndersteund()
-        ? el("button", {
-            id: "baanflowFsBtn", class: "baanflowfsbtn", type: "button",
-            onclick: baanflowToggleFullscreen,
-            text: "Volledig scherm", // placeholder, baanflowFullscreenKnopBijwerken() zet de echte inhoud (icoon+label)
-          })
-        : null,
-    ].filter(Boolean)),
+      // v0.23.4: knop altijd tonen (voorheen alleen bij Fullscreen API-steun) — zie baanflowToggleFullscreen.
+      el("button", {
+        id: "baanflowFsBtn", class: "baanflowfsbtn", type: "button",
+        onclick: baanflowToggleFullscreen,
+        text: "Volledig scherm", // placeholder, baanflowFullscreenKnopBijwerken() zet de echte inhoud (icoon+label)
+      }),
+    ]),
     el("p", { class: "help baanflowsubtekst", text: subtekst }),
     el("div", {
       class: "baanflowkaartwrap",
@@ -3736,7 +3830,7 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
   // zoals voorheen.
   const bestaandeKaart = document.getElementById("baanflowCard");
   let kaartNode;
-  if (bestaandeKaart && baanflowFullscreenElement() === bestaandeKaart) {
+  if (bestaandeKaart && baanflowIsFullscreen()) {
     bestaandeKaart.innerHTML = "";
     kaartInhoud.forEach((n) => bestaandeKaart.appendChild(n));
     kaartNode = bestaandeKaart;
