@@ -217,13 +217,27 @@
      dimensies zijn, net als bij TagMarshal kleur vs. grootte). Een extra box-shadow-laag buiten de
      witte rand. */
   .baanflowmarker.houdtop{box-shadow:0 0 0 3px var(--magenta),0 2px 6px rgba(0,0,0,0.35)}
-  .baanflowlegenda{display:flex;flex-wrap:wrap;gap:12px 16px;margin-top:12px}
+  /* v0.23.5 (Kay's verzoek): legenda altijd op ÉÉN rij, ook in de kleine kaartweergave — nowrap +
+     gelijkmatig verdeeld; op smallere schermen iets kleinere letters/tussenruimte zodat alle vijf
+     items (incl. Ophouder, sinds v0.23.5 zonder uitlegtekst) passen. In volledig scherm (14px-letters)
+     mag de legenda wel terugvallen op wrappen, zie de regel verderop. */
+  .baanflowlegenda{display:flex;flex-wrap:nowrap;justify-content:flex-start;gap:12px 16px;margin-top:12px}
   .baanflowlegendaitem{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted-ink);
-    font-weight:600}
+    font-weight:600;white-space:nowrap}
   .baanflowlegendadot{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0}
   .baanflowlegendaring{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0;
     border:2px solid var(--muted-ink);box-sizing:border-box}
   .baanflowlegendaring.houdtop{border-color:var(--magenta)}
+  @media (max-width:480px){
+    .baanflowlegenda{justify-content:space-between;gap:6px 6px}
+    .baanflowlegendaitem{font-size:clamp(9px, calc((100vw - 110px) * 0.034), 12px);gap:4px}
+    .baanflowlegendadot,.baanflowlegendaring{width:8px;height:8px}
+  }
+  /* Op een scherm smaller dan 360px (komt vrijwel niet meer voor) is één rij niet meer leesbaar te
+     krijgen: dan valt de legenda terug op wrappen. */
+  @media (max-width:359px){
+    .baanflowlegenda{flex-wrap:wrap;justify-content:flex-start;gap:6px 10px}
+  }
 
   /* Volledig-scherm-knop (v0.21.8, Kay's verzoek: de kaart op een iPad/laptop/desktop/extern
      scherm groot kunnen zetten). .baanflowheader is de rij eyebrow+knop boven de kaart; de knop
@@ -267,6 +281,8 @@
   #baanflowCard:fullscreen .baanflowlegenda, #baanflowCard:-webkit-full-screen .baanflowlegenda{
     width:min(100%, calc((100vh - 170px) * var(--baanflow-wrap-ratio)));align-self:center}
   #baanflowCard:fullscreen .eyebrow, #baanflowCard:-webkit-full-screen .eyebrow{font-size:15px}
+  #baanflowCard:fullscreen .baanflowlegenda{flex-wrap:wrap;justify-content:flex-start;gap:12px 16px}
+  #baanflowCard:-webkit-full-screen .baanflowlegenda{flex-wrap:wrap;justify-content:flex-start;gap:12px 16px}
   #baanflowCard:fullscreen .baanflowlegendaitem, #baanflowCard:-webkit-full-screen .baanflowlegendaitem{
     font-size:14px}
   /* v0.23.0: dezelfde --kp-schaal-vermenigvuldiging als de niet-fullscreen regel hierboven, nu
@@ -291,6 +307,7 @@
   #baanflowCard.baanflow-pseudofullscreen .baanflowlegenda{
     width:min(100%, calc((100vh - 170px) * var(--baanflow-wrap-ratio)));align-self:center}
   #baanflowCard.baanflow-pseudofullscreen .eyebrow{font-size:15px}
+  #baanflowCard.baanflow-pseudofullscreen .baanflowlegenda{flex-wrap:wrap;justify-content:flex-start;gap:12px 16px}
   #baanflowCard.baanflow-pseudofullscreen .baanflowlegendaitem{
     font-size:14px}
   #baanflowCard.baanflow-pseudofullscreen .baanflowmarker{
@@ -1310,8 +1327,25 @@
        liggende beeldverhouding van de kaart, geen bug. Niet aangepakt: de standaard (niet-fullscreen)
        Baan Flow-weergave blijft binnen de 480px-.wrap staan.
        Patch: ontbrekende knop + portret-overflow, geen nieuwe schermen of schemawijziging.
+   v0.23.5: Kay's verzoek (vanuit Portugal, WET = UTC+0): beide apps moeten altijd Nederlandse tijden
+       tonen. GoyerFlow toonde een start van 09:04 (Amsterdam) als 08:04, omdat formatTijd() de tijd
+       van het APPARAAT gebruikte (toLocaleTimeString zonder timeZone). Opgelost: formatTijd() en de
+       "Nog niet beschikbaar — zichtbaar vanaf ..."-melding (login-venster) gebruiken nu expliciet
+       timeZone "Europe/Amsterdam" (zomer-/wintertijd gaat vanzelf goed). Onderzocht: dit zijn de enige
+       twee plekken in het bestand die een kloktijd tonen; verder rekent GoyerFlow uitsluitend met
+       absolute tijdstippen (timestamptz -> getTime()), die tijdzone-onafhankelijk zijn — er is dus
+       geen Date-shim nodig zoals in de Marshal App (v1.13.4), waar starttijden als losse
+       wandkloktijd zonder tijdzone in de database staan.
+       Patch: tijdweergave, geen gedragswijziging in de rekenkern, geen schemawijziging.
+   v0.23.6: Kay's verzoek: (1) de uitleg tussen haakjes achter "Ophouder" in de Baan Flow-legenda
+       ("groter icoon = grotere vertraging die hij veroorzaakt") is verwijderd; (2) de legenda staat nu
+       ook in de kleine kaartweergave op ÉÉN rij — nowrap, links uitgelijnd op tablet/desktop (zoals
+       voorheen), en op schermen <= 480px een letter-/ruimteschaal die met de breedte meeloopt
+       (getest 360-560px: één rij, geen overloop). Onder 360px (komt vrijwel niet voor) valt de legenda
+       terug op wrappen. In volledig scherm blijft de legenda zoals Kay hem goedkeurde (links uitgelijnd,
+       14px, mag wrappen). Patch: alleen legenda-tekst/-opmaak.
    ============================================================================================ */
-const APP_VERSIE = "0.23.4";
+const APP_VERSIE = "0.23.6";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -1827,7 +1861,8 @@ function tijdlijnPercentage(restFractie) {
 }
 
 function formatTijd(iso) {
-  return new Date(iso).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+  // v0.23.5: altijd Nederlandse tijd, ongeacht de tijdzone van het apparaat.
+  return new Date(iso).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" });
 }
 
 function formatDuur(minuten) {
@@ -2371,7 +2406,7 @@ function renderPersoonscode(app) {
       const venstertijd = new Date(new Date(flight.starttijd_effectief).getTime() - ZICHTBAARHEIDSVENSTER_MINUTEN * 60000);
       if (nu < venstertijd) {
         loggen(code, "login", false);
-        const tijdstr = venstertijd.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+        const tijdstr = venstertijd.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" });
         state.fout = `Nog niet beschikbaar — deze flight wordt zichtbaar vanaf ${tijdstr} (15 minuten voor de starttijd).`;
         render();
         return;
@@ -3769,7 +3804,7 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
     // bouwgeschiedenis) — .houdtop (magenta) is de enige ring die overblijft.
     el("span", { class: "baanflowlegendaitem" }, [
       el("span", { class: "baanflowlegendaring houdtop" }),
-      document.createTextNode("Ophouder (groter icoon = grotere vertraging die hij veroorzaakt)"),
+      document.createTextNode("Ophouder"),
     ]),
   ]);
 
