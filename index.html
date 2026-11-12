@@ -217,6 +217,10 @@
      dimensies zijn, net als bij TagMarshal kleur vs. grootte). Een extra box-shadow-laag buiten de
      witte rand. */
   .baanflowmarker.houdtop{box-shadow:0 0 0 3px var(--magenta),0 2px 6px rgba(0,0,0,0.35)}
+  /* v0.24.7: recent gemelde positie (< 30 min, MELDING_GELDIG_MINUTEN) = gekleurde rand i.p.v. de witte. */
+  :root{--meldingrand:#E8B923}
+  .baanflowmarker.meldingvers{border-color:var(--meldingrand)}
+  .flightbol.meldingvers{box-shadow:0 0 0 3px var(--meldingrand)}
   /* v0.23.5 (Kay's verzoek): legenda altijd op ÉÉN rij, ook in de kleine kaartweergave — nowrap +
      gelijkmatig verdeeld; op smallere schermen iets kleinere letters/tussenruimte zodat alle vijf
      items (incl. Ophouder, sinds v0.23.5 zonder uitlegtekst) passen. In volledig scherm (14px-letters)
@@ -246,11 +250,6 @@
   .baanflowkaartwrap.baanflowingezoomd{touch-action:none;cursor:grab}
   .baanflowzoomlaag{position:absolute;inset:0;transform-origin:0 0}
   .baanflowzoomlaag .baanflowmarker{transform:translate(-50%,-50%) scale(var(--bf-inv,1))}
-  .baanflowzoomknoppen{position:absolute;right:8px;bottom:8px;display:flex;flex-direction:column;gap:6px;z-index:5}
-  .baanflowzoombtn{width:34px;height:34px;border-radius:50%;border:1px solid #ECE7DA;background:rgba(255,255,255,0.94);
-    box-shadow:0 1px 4px rgba(0,0,0,0.18);font-family:inherit;font-size:18px;font-weight:700;line-height:1;
-    color:#6B6558;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center}
-  .baanflowzoombtn[data-bfzoom="reset"]{font-size:12px}
 
   /* Volledig-scherm-knop (v0.21.8, Kay's verzoek: de kaart op een iPad/laptop/desktop/extern
      scherm groot kunnen zetten). .baanflowheader is de rij eyebrow+knop boven de kaart; de knop
@@ -1425,8 +1424,37 @@
    ("Goyer lidcode"), autocomplete uit en autocapitalize aan. Ook uit de broncode-commentaren zijn de echte
    lidcodes die daar als voorbeeld stonden vervangen door neutrale voorbeelden (ABCD 6 / ABC 1) — de eerder
    gepubliceerde versies van het bestand (GitHub Pages, git-geschiedenis) bevatten ze nog.
+
+   v0.24.5 (11 november 2026) — (1) de zoomknoppen +, − en 1× zijn van de Baan Flow-kaart verwijderd (Kay); inzoomen blijft
+   mogelijk met de gebaren: knijpen, slepen (alleen ingezoomd), dubbeltikken (in/uit) en het scrollwiel/trackpad.
+   (2) De Volledig-scherm-knop (en daarmee de functie) verschijnt niet meer op een telefoon in liggende stand
+   (iPhone/Samsung): verborgen bij een scherm lager dan 500 px in liggende stand, naast de bestaande regel voor
+   een telefoon in staande stand. Op iPad/tablet blijft de knop staan, en een al actieve volledig-scherm-weergave
+   houdt altijd een uitknop. Alleen weergave/bediening; geen rekenwijziging.
+
+   v0.24.6 (11 november 2026) — een flight ZONDER melding is nu groen ("op schema", de schema-aanname) op de Baan Flow-kaart
+   én in de Tracker-lijst, i.p.v. de standaardkleur blauw (Kay: "geen enkele flight heeft een positiebepaling, waarom
+   zijn de meeste blauw?"). Oorzaak: zonder conclusie viel de kleur terug op var(--blue), terwijl blauw in de legenda
+   "Snel" (minstens 5 minuten voor op schema) betekent. Blauw is nu weer alleen "voor op schema". De detailpopup was al
+   groen. Een door begrensInhalen() (v0.24.0) AFGELEIDE vertraging blijft oranje/rood. Afweging (met Kay besproken):
+   groen suggereert zekerheid bij weinig meldingen; de Ophouder-ring en de "mogelijk"-teksten vangen dat deels op.
+
+   v0.24.7 (12 november 2026) — (1) FIX: de status (kleur, Ophouder, "achter op schema") vergeleek de laatst gemelde plek
+   (bevroren) met de schema-positie van nú (loopt door), waardoor een flight na een melding elke minuut een minuut "later"
+   werd — getest: 11 min achter bij de melding, 26 na 15 min, 71 na een uur, 101 na twee uur, terwijl de weergave netjes
+   meeliep. Nu vergelijkt de status de doorgerekende weergavepositie met het schema (deltaMinutenVoor), constant zolang er
+   geen nieuwe melding is — zoals de Marshal App al deed. Zelfde formule gecorrigeerd op het ledenscherm en in "Analyseer
+   huidige flights". Bijwerking: bij de melding zelf kan de waarde ~1 à 2 minuten afwijken van voorheen (de weergave
+   verankert op het midden van de checkpoint-zone, niet op de grens), dus bij een grenswaarde kan een band net anders
+   uitvallen. (2) Een gemelde positie — via een speler of marshal — blijft maximaal 30 minuten GELDIG
+   (MELDING_GELDIG_MINUTEN, Kay's keuze): gouden rand om de flight-cirkel (kaart en Tracker-lijst) en vrijgesteld van "niet
+   voorbij laten gaan". Na 30 minuten verdwijnt de rand en geldt de begrenzing weer; de positie blijft doorgerekend vanaf de
+   melding (geen sprong). Randkleur goud gekozen boven zwart: zwart valt weg tegen de donkergroene rough en de zwarte
+   schaduw, en botst visueel met de Ophouder-ring; goud (#E8B923) valt op naast magenta en op de donkere fills. Eerder
+   (v0.23.1) was het geschat/gemeld-onderscheid op de kaart bewust verwijderd; dit is een tijdgebonden variant daarvan: de
+   rand betekent "gemeld < 30 min geleden", niet "nauwkeurig".
    ============================================================================================ */
-const APP_VERSIE = "0.24.4";
+const APP_VERSIE = "0.24.7";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -2843,7 +2871,9 @@ async function renderTracker(app, opts = {}) {
   // v0.22.0: niet langer fractieDiff × plat-gemiddeld minutenPerHole, maar het echte, per-hole-
   // variabele verschil in minuten via minutenVoorFractie() (zelfde holeMinuten-array als zelfPos,
   // zie de toelichting bij minutenVoorFractie()/conclusieVoor()).
-  const deltaMinuten = heeftGekozen ? minutenVoorFractie(actueleFractie, zelfPos.holeMinuten) - minutenVoorFractie(zelfPos.fractie, zelfPos.holeMinuten) : null;
+  // v0.24.7: delta t.o.v. de doorgerekende weergavepositie (zie deltaMinutenVoor), niet de bevroren gemelde plek.
+  const zelfWeergavePos = (heeftGekozen ? projecteerVanafMelding(zelf, zelfPos.holeMinuten, nu, zelf.ronde_type) : null) ?? zelfPos;
+  const deltaMinuten = heeftGekozen ? deltaMinutenVoor(zelfWeergavePos, zelfPos, zelfPos.holeMinuten) : null;
   const conclusie = heeftGekozen ? conclusieVoor(deltaMinuten) : null;
   const kaartKleur = conclusie ? conclusie.kleur : "var(--accent)";
   // v0.21.4: de nieuwe "voor_schema"-band (zie conclusieVoor()) mag de "Tips om sneller te
@@ -2856,7 +2886,6 @@ async function renderTracker(app, opts = {}) {
   // sprong naar een andere hole), en loopt hij daarna vanzelf door. zelfPos zelf blijft ongewijzigd
   // en wordt verderop nog los gebruikt voor de "op schema"-vergelijking (deltaHoles/conclusie),
   // want dat vergelijkt een melding bewust tegen het ORIGINELE, ongecorrigeerde rondeschema.
-  const zelfWeergavePos = (heeftGekozen ? projecteerVanafMelding(zelf, zelfPos.holeMinuten, nu, zelf.ronde_type) : null) ?? zelfPos;
 
   // Ronde voltooid: vanaf hier toont de kaart een eindstatus in plaats van door te blijven rekenen
   // aan een hole die niet bestaat (zie rondeVoltooid()). Op basis van de weergavepositie (dus
@@ -3328,6 +3357,18 @@ async function renderAdmin(app) {
 // Berekent dezelfde live positie/conclusie-set als renderTracker's "zelf"-kaart, maar dan voor een
 // WILLEKEURIGE flight (niet per se de ingelogde speler) — hergebruikt door zowel de Tracker-tab-
 // rijen als het flight-detailscherm, zodat beide altijd exact dezelfde cijfers tonen.
+// v0.24.7 (Kay): een gemelde positie — via een speler of een marshal in GoyerFlow — blijft maximaal 30 minuten GELDIG.
+// "Geldig" betekent hier: de flight telt als recent gemeld (gekleurde rand om de flight-cirkel) en is dan vrijgesteld van
+// de "niet voorbij laten gaan"-regel (begrensInhalen). Daarna blijft de positie wel doorgerekend vanaf die melding (de
+// beste informatie die we hebben), maar de rand verdwijnt en de begrenzing geldt weer.
+const MELDING_GELDIG_MINUTEN = 30;
+// Verschil in minuten tussen de (naar nu doorgerekende) weergavepositie en de schema-positie van nu. v0.24.7: vervangt
+// de oude vergelijking "gemelde plek (bevroren) vs. schema nu (loopt door)", waardoor een flight na een melding elke
+// minuut een minuut "later" werd (bijv. 11 min achter bij de melding, 26 na een kwartier, 71 na een uur) terwijl de
+// weergave netjes meeliep. Nu constant zolang er geen nieuwe melding is, zoals in de Marshal App.
+function deltaMinutenVoor(weergave, zelfPos, holeMinuten) {
+  return minutenVoorFractie(weergave.fractie, holeMinuten) - minutenVoorFractie(zelfPos.fractie, holeMinuten);
+}
 function berekenFlightPositie(flight, params, nu) {
   const holeMinuten = holeMinutenVoorRonde(params, flight.aantal_spelers, flight.ronde_type);
   const zelfPos = verwachtePositie(flight.starttijd_effectief, holeMinuten, nu, flight.ronde_type);
@@ -3338,13 +3379,15 @@ function berekenFlightPositie(flight, params, nu) {
   const voltooid = rondeVoltooid(weergave, flight.ronde_type);
   let conclusie = null;
   if (heeftMelding && !voltooid) {
-    const actueleFractie = (flight.gerapporteerde_hole - 1) + checkpointFractie(flight.gerapporteerd_checkpoint);
     // v0.18.0: conclusieVoor() rekent in minuten — zie de toelichting bij renderTracker's gebruik.
-    // v0.22.0: via minutenVoorFractie() i.p.v. fractieDiff × plat-gemiddeld minutenPerHole.
-    conclusie = conclusieVoor(minutenVoorFractie(actueleFractie, holeMinuten) - minutenVoorFractie(zelfPos.fractie, holeMinuten));
+    // v0.24.7: vergelijkt de doorgerekende weergave met het schema (zie deltaMinutenVoor).
+    conclusie = conclusieVoor(deltaMinutenVoor(weergave, zelfPos, holeMinuten));
   }
+  const meldingLeeftijdMin = heeftMelding && flight.gerapporteerd_tijdstip
+    ? (nu.getTime() - new Date(flight.gerapporteerd_tijdstip).getTime()) / 60000 : null;
+  const meldingGeldig = meldingLeeftijdMin != null && meldingLeeftijdMin <= MELDING_GELDIG_MINUTEN;
   const gestartNog = nu.getTime() < new Date(flight.starttijd_effectief).getTime();
-  return { flight, holeMinuten, zelfPos, weergave, voltooid, heeftMelding, conclusie, gestartNog };
+  return { flight, holeMinuten, zelfPos, weergave, voltooid, heeftMelding, meldingGeldig, conclusie, gestartNog };
 }
 
 // Achternaam uit een volledige naam: laatste woord, geen tussenvoegsel-detectie (dus bij
@@ -3392,7 +3435,7 @@ function begrensInhalen(posities) {
       // eerder gestarte flight nog loopt — niet voorbijgaan geldt ook voor de finish (v0.24.0 sloeg
       // voltooide flights over, waardoor een 2-bal als "klaar" getoond werd terwijl 3-ballen die eerder
       // startten nog op hun laatste hole stonden).
-      if (vorige && !p.heeftMelding && start(vorige) < start(p)) {
+      if (vorige && !p.meldingGeldig && start(vorige) < start(p)) {
         const hm = p.holeMinuten;
         const capMin = minutenVoorFractie(vorige.weergave.fractie, hm) - INHAAL_MIN_GAT_MINUTEN;
         if (minutenVoorFractie(p.weergave.fractie, hm) > capMin) {
@@ -3520,8 +3563,8 @@ async function vulAdminTrackerTab(inhoud, opts = {}) {
     el("div", { class: "eyebrow", text: "Flights nu en binnenkort" }),
     rijen.length === 0
       ? el("p", { class: "help", text: "Geen actieve of binnenkort startende flights gevonden." })
-      : el("div", {}, rijen.map(({ flight, weergave, voltooid, heeftMelding, conclusie, gestartNog, begrensd }) => {
-          const kleur = voltooid ? "#9B9585" : gestartNog ? "#B9B2A0" : (conclusie ? conclusie.kleur : "var(--blue)");
+      : el("div", {}, rijen.map(({ flight, weergave, voltooid, heeftMelding, meldingGeldig, conclusie, gestartNog, begrensd }) => {
+          const kleur = voltooid ? "#9B9585" : gestartNog ? "#B9B2A0" : (conclusie ? conclusie.kleur : "var(--accent)");
           const statustekst = voltooid ? "Ronde voltooid"
             : gestartNog ? `start om ${formatTijd(flight.starttijd_effectief)}`
             : (conclusie ? conclusie.label + (begrensd ? " (geschat: vlak achter de flight ervoor)" : "") : "nog geen melding");
@@ -3534,7 +3577,7 @@ async function vulAdminTrackerTab(inhoud, opts = {}) {
           const spelersVanFlight = flight.teecontrol_spelers || [];
 
           const rij = el("div", { class: "flightrij" }, [
-            el("div", { class: "flightbol", style: `background:${kleur}`, text: bolTekst }),
+            el("div", { class: "flightbol" + (meldingGeldig ? " meldingvers" : ""), style: `background:${kleur}`, text: bolTekst }),
             el("div", { class: "flightinfo" }, [
               flight.toernooi_naam ? el("div", { class: "flighttoernooi", text: `🏆 ${flight.toernooi_naam}` }) : null,
               spelersVanFlight.length === 0
@@ -3826,8 +3869,6 @@ function baanflowZoomToepassen() {
   laag.style.setProperty("--bf-inv", (1 / z.s).toFixed(4));
   const ingezoomd = z.s > 1.001;
   wrap.classList.toggle("baanflowingezoomd", ingezoomd);
-  const reset = wrap.querySelector('[data-bfzoom="reset"]');
-  if (reset) reset.style.display = ingezoomd ? "" : "none";
 }
 // Zoom naar niveau s2 rond het punt (px,py) in kaart-pixels (relatief aan de linkerbovenhoek van de kaart).
 function baanflowZoomRond(s2, px, py) {
@@ -3842,22 +3883,6 @@ function baanflowZoomRond(s2, px, py) {
   z.fy = pfy - (pfy - z.fy) * k;
   z.s = s2;
   baanflowZoomToepassen();
-}
-function baanflowZoomReset() {
-  baanflowZoom.s = 1; baanflowZoom.fx = 0; baanflowZoom.fy = 0;
-  baanflowZoomToepassen();
-}
-function baanflowZoomKnoppen() {
-  const d = document.createElement("div");
-  d.className = "baanflowzoomknoppen";
-  [["in", "+", "Inzoomen"], ["uit", "−", "Uitzoomen"], ["reset", "1×", "Terug naar de hele kaart"]].forEach(([k, t, titel]) => {
-    const b = document.createElement("button");
-    b.type = "button"; b.className = "baanflowzoombtn"; b.setAttribute("data-bfzoom", k);
-    b.textContent = t; b.title = titel; b.setAttribute("aria-label", titel);
-    if (k === "reset") b.style.display = "none";
-    d.appendChild(b);
-  });
-  return d;
 }
 // Koppelt de zoom-bediening aan (een nieuwe) kaart-wrap en past de bewaarde zoomstand toe. Veilig om bij elke
 // verversing opnieuw aan te roepen: de gebeurtenis-luisteraars worden per wrap-element maar één keer gezet.
@@ -3924,7 +3949,6 @@ function baanflowZoomKoppel(wrap) {
       }
     };
     wrap.addEventListener("pointerdown", (e) => {
-      if (e.target.closest && e.target.closest(".baanflowzoombtn")) return;
       if (ptrs.size === 0) baanflowZoomBewogen = false;
       ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (ptrs.size === 1) {
@@ -3939,13 +3963,6 @@ function baanflowZoomKoppel(wrap) {
     wrap.addEventListener("click", (e) => {
       if (baanflowZoomBewogen) { e.stopPropagation(); e.preventDefault(); baanflowZoomBewogen = false; }
     }, true);
-    wrap.addEventListener("click", (e) => {
-      const knop = e.target.closest && e.target.closest("[data-bfzoom]");
-      if (!knop) return;
-      const r = wrap.getBoundingClientRect(), k = knop.getAttribute("data-bfzoom");
-      if (k === "reset") baanflowZoomReset();
-      else baanflowZoomRond(baanflowZoom.s * (k === "in" ? 1.6 : 1 / 1.6), r.width / 2, r.height / 2);
-    });
     wrap.addEventListener("wheel", (e) => {
       e.preventDefault();
       const r = wrap.getBoundingClientRect();
@@ -3955,13 +3972,15 @@ function baanflowZoomKoppel(wrap) {
   }
   baanflowZoomToepassen();
 }
-// Telefoon in staande stand: "Volledig scherm" voegt daar niets toe (de kaart wordt niet groter) — knop verbergen,
+// Telefoon (staand én liggend): "Volledig scherm" voegt daar niets toe (de kaart wordt niet groter) — knop verbergen,
 // tenzij volledig scherm al actief is (anders zou je er niet meer uit kunnen).
+// Telefoon = smal scherm in staande stand, of laag scherm in liggende stand (iPhone/Samsung liggend: hoogte < ~430 px).
+const BAANFLOW_TELEFOON_QUERY = "(max-width:599px) and (orientation:portrait), (max-height:500px) and (orientation:landscape)";
 function baanflowFsKnopMoetVerborgen() {
-  return !!(window.matchMedia && window.matchMedia("(max-width:599px) and (orientation:portrait)").matches);
+  return !!(window.matchMedia && window.matchMedia(BAANFLOW_TELEFOON_QUERY).matches);
 }
 if (window.matchMedia) {
-  const mq = window.matchMedia("(max-width:599px) and (orientation:portrait)");
+  const mq = window.matchMedia(BAANFLOW_TELEFOON_QUERY);
   const bijwerken = () => { if (typeof baanflowFullscreenKnopBijwerken === "function") baanflowFullscreenKnopBijwerken(); };
   if (mq.addEventListener) mq.addEventListener("change", bijwerken); else if (mq.addListener) mq.addListener(bijwerken);
 }
@@ -4052,7 +4071,7 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
     const restFractie = weergave.fractie - Math.floor(weergave.fractie);
     const punt = baanflowPuntVoor(fysiek, restFractie);
     if (!punt) return null; // zou niet moeten voorkomen (holenummers 1-18 hebben allemaal een pad)
-    const kleur = conclusie ? conclusie.kleur : "var(--blue)";
+    const kleur = conclusie ? conclusie.kleur : "var(--accent)";
     const statusTekst = conclusie ? conclusie.label + (begrensd ? " (geschat: vlak achter de flight ervoor)" : "") : (heeftMelding ? "" : "nog geen melding");
 
     // v0.23.1: alleen nog de "houdtop" (magenta) ring op de kaart zelf — de "opgehouden" (oranje)
@@ -4090,7 +4109,7 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
       : knelpunt.houdtOp ? " · houdt mogelijk de flight achter zich op" : "";
 
     const marker = el("div", {
-      class: "baanflowmarker" + (knelpuntClass ? " " + knelpuntClass : ""),
+      class: "baanflowmarker" + (knelpuntClass ? " " + knelpuntClass : "") + (positie.meldingGeldig ? " meldingvers" : ""),
       style: `left:${punt.xPct}%;top:${punt.yPct}%;background:${kleur};--kp-schaal:${schaal.toFixed(2)}`,
       title: `${flightTitel(flight.teecontrol_spelers || [])} · Hole ${fysiek} · ${statusTekst}${knelpuntTekst}`,
       text: String(flight.aantal_spelers) + (trendPijl ? " " + trendPijl : ""),
@@ -4178,7 +4197,6 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
       }),
       ...markers,
       ]),
-      baanflowZoomKnoppen(),
     ]),
     legenda,
   ].filter(Boolean);
@@ -4601,8 +4619,8 @@ async function vulAdminParametersTab(inhoud) {
       for (const flight of metMelding) {
         const holeMinuten = holeMinutenVoorRonde(params, flight.aantal_spelers, flight.ronde_type);
         const zelfPos = verwachtePositie(flight.starttijd_effectief, holeMinuten, nu, flight.ronde_type);
-        const actueleFractie = (flight.gerapporteerde_hole - 1) + checkpointFractie(flight.gerapporteerd_checkpoint);
-        const deltaMinuten = minutenVoorFractie(actueleFractie, holeMinuten) - minutenVoorFractie(zelfPos.fractie, holeMinuten);
+        const weergavePos = projecteerVanafMelding(flight, holeMinuten, nu, flight.ronde_type) ?? zelfPos;
+        const deltaMinuten = deltaMinutenVoor(weergavePos, zelfPos, holeMinuten);
         somAfwijkingMin += deltaMinuten;
         const key = conclusieVoor(deltaMinuten).key;
         if (key === "op_schema") opSchema++;
