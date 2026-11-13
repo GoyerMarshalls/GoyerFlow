@@ -446,6 +446,17 @@
     border:1.5px solid rgba(168,94,28,0.35);cursor:pointer;font-size:14px;font-weight:700;color:var(--warn);
     text-align:center}
   .okmsg{font-size:13px;color:var(--accent);font-weight:700;margin-top:8px}
+  /* v0.25.0: schuifknop (Admin > Leden-login). Een <button role="switch">, zodat hij ook met toetsenbord/schermlezer werkt. */
+  .switchrij{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:4px}
+  .switchtekst{font-size:14px;font-weight:700;color:var(--ink);line-height:1.35}
+  .switchtekst.uit{color:var(--err)}
+  .schuif{position:relative;flex-shrink:0;width:54px;height:32px;border-radius:16px;border:0;padding:0;
+    background:#BDB9AE;cursor:pointer;transition:background .15s}
+  .schuif::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);transition:transform .15s}
+  .schuif[aria-checked="true"]{background:var(--accent)}
+  .schuif[aria-checked="true"]::after{transform:translateX(22px)}
+  .schuif:disabled{opacity:.5;cursor:not-allowed}
   .paramfout{font-size:13px;color:var(--err);margin-top:8px}
 </style>
 </head>
@@ -1459,8 +1470,17 @@
    ongeldige transform-waarde wordt door de browser genegeerd, dus de kaart bleef stilstaan, terwijl de rondjes
    (--bf-inv = 1/zoom) wel bleven meeschalen. Gecorrigeerd: het gebaar gebruikt altijd het actuele kaart-element, een
    niet-eindige zoomstand wordt teruggezet naar niet ingezoomd, en dubbeltikken gebruikt ook het actuele element.
+   v0.25.0 (13 november 2026) — Kay: een schuifknop in Admin (beheermodus) om het inloggen van leden uit of aan te zetten.
+   Uit = leden kunnen niet inloggen met hun lidcode; aan = wel. Nieuwe kolom parameters.leden_login_aan (boolean, standaard
+   aan; schema.sql "Fase 2n", door Kay uit te voeren in Supabase). De schakelaar staat in een eigen kaart "Leden-login"
+   bovenaan de Admin-tab en slaat direct op. Het lidcode-scherm controleert de stand vóór de zoekopdracht (dus ook geen
+   verraad welke lidcodes bestaan) en toont dan "Inloggen voor leden staat op dit moment uit...". Niet geblokkeerd:
+   de beheerder-login en leden die al ingelogd zijn (de sessie leeft alleen in het geheugen: sluiten/herladen = uitgelogd).
+   Ontbreekt de kolom, dan geldt AAN en is de schakelaar uitgeschakeld met een melding. LET OP, zelfde beveiligingsmodel
+   als de rest van GoyerFlow (UI-restrictie, geen databasebeveiliging): de controle zit in de app, niet in de database; wie
+   rechtstreeks met de publieke sleutel tegen de database praat, omzeilt hem. Zie het beveiligingsplan (Fase 2).
    ============================================================================================ */
-const APP_VERSIE = "0.24.8";
+const APP_VERSIE = "0.25.0";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -2498,6 +2518,18 @@ async function zoekSpelerOpPersoonscode(ruw) {
   return { rows: [], gebruikteCode: schoon };
 }
 
+// v0.25.0: staat het inloggen voor leden aan? Bron: parameters.leden_login_aan (schema.sql "Fase 2n"). Ontbreekt de
+// kolom (SQL nog niet uitgevoerd) of is de waarde leeg, dan geldt AAN — zo verandert er niets tot de beheerder
+// de schakelaar zelf omzet. Bij een netwerkfout geldt ook AAN: de daaropvolgende ledenopvraag meldt dan zelf een fout.
+async function ledenLoginIsAan() {
+  try {
+    const [params] = await sb("parameters?select=leden_login_aan&limit=1");
+    return !(params && params.leden_login_aan === false);
+  } catch (e) {
+    return true;
+  }
+}
+
 /* ---- Scherm 1: persoonscode ---- */
 function renderPersoonscode(app) {
   const input = el("input", { type: "text", id: "persoonscode", inputmode: "text", "aria-label": "Goyer lidcode", autocomplete: "off", autocapitalize: "characters", maxlength: "12" });
@@ -2509,6 +2541,13 @@ function renderPersoonscode(app) {
     const btn = document.getElementById("submit-persoonscode");
     btn.disabled = true;
     try {
+      // v0.25.0: beheerder kan het inloggen van leden uitzetten (Admin > Leden-login). Eerst controleren, nog vóór
+      // de zoekopdracht, zodat een uitgeschakelde login ook niet verraadt welke lidcodes bestaan.
+      if (!(await ledenLoginIsAan())) {
+        state.fout = "Inloggen voor leden staat op dit moment uit. Probeer het later nog eens of neem contact op met de caddymaster.";
+        render();
+        return;
+      }
       const { rows, gebruikteCode: code } = await zoekSpelerOpPersoonscode(input.value);
       if (!rows || rows.length === 0) {
         loggen(code, "login", false);
@@ -4677,7 +4716,7 @@ async function vulAdminLedenTab(inhoud) {
       : el("div", { class: "ledenlijst" }, leden.flatMap((lid) => renderLidRij(lid))),
   ]);
 
-  inhoud.append(ledenKaart, bouwWachtwoordKaart());
+  inhoud.append(await bouwLedenLoginKaart(), ledenKaart, bouwWachtwoordKaart());
 }
 
 function renderLidRij(lid) {
@@ -4723,6 +4762,61 @@ function renderLidRij(lid) {
     nodes.push(el("div", { class: "ledendetail" }, [...(succes ? [succes] : []), resetBtn]));
   }
   return nodes;
+}
+
+// v0.25.0 (Kay): schuifknop om het inloggen van leden met hun lidcode uit/aan te zetten. Uit = leden kunnen niet
+// inloggen; aan = wel. Geldt NIET voor de beheerder (eigen wachtwoord-login) en niet voor leden die al ingelogd zijn.
+// Wordt direct opgeslagen (geen aparte opslaan-knop); bij een fout springt de knop terug naar de vorige stand.
+async function bouwLedenLoginKaart() {
+  let params = null, kolomOntbreekt = false;
+  try {
+    [params] = await sb("parameters?select=id,leden_login_aan&limit=1");
+  } catch (e) {
+    kolomOntbreekt = true; // waarschijnlijk: kolom bestaat nog niet (schema.sql Fase 2n nog niet uitgevoerd)
+    try { [params] = await sb("parameters?select=id&limit=1"); } catch (e2) { console.error(e2); }
+  }
+  let aan = !(params && params.leden_login_aan === false);
+
+  const knop = el("button", { class: "schuif", type: "button", role: "switch", "aria-label": "Inloggen voor leden" });
+  const tekst = el("div", { class: "switchtekst" });
+  const melding = el("div", { class: "msg err", style: "display:none" });
+  const toon = () => {
+    knop.setAttribute("aria-checked", aan ? "true" : "false");
+    tekst.className = "switchtekst" + (aan ? "" : " uit");
+    tekst.textContent = aan ? "Aan — leden kunnen inloggen met hun lidcode." : "Uit — leden kunnen niet inloggen met hun lidcode.";
+  };
+  toon();
+  if (kolomOntbreekt || !params) {
+    knop.disabled = true;
+    melding.style.display = "";
+    melding.textContent = "De schakelaar werkt pas nadat de SQL uit schema.sql (“Fase 2n”) in Supabase is uitgevoerd.";
+  }
+  knop.addEventListener("click", async () => {
+    const nieuw = !aan;
+    knop.disabled = true;
+    melding.style.display = "none";
+    try {
+      await sb(`parameters?id=eq.${params.id}`, {
+        method: "PATCH", prefer: "return=minimal",
+        body: JSON.stringify({ leden_login_aan: nieuw }),
+      });
+      aan = nieuw;
+    } catch (e) {
+      console.error(e);
+      melding.style.display = "";
+      melding.textContent = "Opslaan is niet gelukt. De schakelaar staat nog op de vorige stand.";
+    } finally {
+      knop.disabled = false;
+      toon();
+    }
+  });
+
+  return el("div", { class: "card" }, [
+    el("div", { class: "eyebrow", text: "Leden-login" }),
+    el("p", { class: "help", text: "Zet het inloggen met een lidcode voor alle leden uit of aan. Wie al is ingelogd blijft ingelogd tot de app wordt gesloten of herladen; de beheerder-login blijft altijd werken." }),
+    el("div", { class: "switchrij" }, [tekst, knop]),
+    melding,
+  ]);
 }
 
 function bouwWachtwoordKaart() {
