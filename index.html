@@ -1453,8 +1453,14 @@
    schaduw, en botst visueel met de Ophouder-ring; goud (#E8B923) valt op naast magenta en op de donkere fills. Eerder
    (v0.23.1) was het geschat/gemeld-onderscheid op de kaart bewust verwijderd; dit is een tijdgebonden variant daarvan: de
    rand betekent "gemeld < 30 min geleden", niet "nauwkeurig".
+   v0.24.8 (13 november 2026) — FIX Baan Flow-zoom: de rondjes werden groter/kleiner terwijl de kaart niet bewoog. Oorzaak
+   (nagebootst): de Baan Flow-kaart wordt elke 20 seconden vervangen door een nieuw element. Gebeurde dat midden in een
+   knijpgebaar, dan rekende het gebaar verder met het OUDE, losgekoppelde element (breedte 0) en werd de zoomstand NaN. Een
+   ongeldige transform-waarde wordt door de browser genegeerd, dus de kaart bleef stilstaan, terwijl de rondjes
+   (--bf-inv = 1/zoom) wel bleven meeschalen. Gecorrigeerd: het gebaar gebruikt altijd het actuele kaart-element, een
+   niet-eindige zoomstand wordt teruggezet naar niet ingezoomd, en dubbeltikken gebruikt ook het actuele element.
    ============================================================================================ */
-const APP_VERSIE = "0.24.7";
+const APP_VERSIE = "0.24.8";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -3853,6 +3859,8 @@ let baanflowZoomBewogen = false;
 
 function baanflowZoomKlem() {
   const z = baanflowZoom;
+  // Een niet-eindig getal (NaN/Infinity) zou de zoomstand voorgoed bederven: terug naar niet ingezoomd.
+  if (!isFinite(z.s) || !isFinite(z.fx) || !isFinite(z.fy)) { z.s = 1; z.fx = 0; z.fy = 0; }
   z.s = Math.max(1, Math.min(BAANFLOW_ZOOM_MAX, z.s));
   z.fx = Math.max(1 - z.s, Math.min(0, z.fx));
   z.fy = Math.max(1 - z.s, Math.min(0, z.fy));
@@ -3900,7 +3908,9 @@ function baanflowZoomKoppel(wrap) {
     const bewegen = (ev) => {
       const p = ptrs.get(ev.pointerId);
       if (!p) return;
-      const r = wrap.getBoundingClientRect();
+      // Na een verversing (elke 20 s) is `wrap` mogelijk vervangen door een nieuw element: altijd de actuele nemen.
+      const r = (baanflowZoomWrap || wrap).getBoundingClientRect();
+      if (!r.width || !r.height) return;
       if (ptrs.size === 2) {
         p.x = ev.clientX; p.y = ev.clientY;
         const m = midden();
@@ -3939,7 +3949,7 @@ function baanflowZoomKoppel(wrap) {
         if (ev.type === "pointerup" && start && !baanflowZoomBewogen && !start.opMarker && Date.now() - start.t < 350) {
           const nu = Date.now();
           if (laatsteTik && nu - laatsteTik.t < 350 && Math.hypot(ev.clientX - laatsteTik.x, ev.clientY - laatsteTik.y) < 30) {
-            const r = wrap.getBoundingClientRect();
+            const r = (baanflowZoomWrap || wrap).getBoundingClientRect();
             baanflowZoomRond(baanflowZoom.s > 1.5 ? 1 : 2.5, ev.clientX - r.left, ev.clientY - r.top);
             laatsteTik = null;
           } else {
