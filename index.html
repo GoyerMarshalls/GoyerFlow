@@ -1479,8 +1479,57 @@
    Ontbreekt de kolom, dan geldt AAN en is de schakelaar uitgeschakeld met een melding. LET OP, zelfde beveiligingsmodel
    als de rest van GoyerFlow (UI-restrictie, geen databasebeveiliging): de controle zit in de app, niet in de database; wie
    rechtstreeks met de publieke sleutel tegen de database praat, omzeilt hem. Zie het beveiligingsplan (Fase 2).
+   v0.26.0 (18 november 2026) — Kay, na de Heerendag-praktijktest. Twee wijzigingen.
+   (1) WEDSTRIJDNORM. Op de Heerendag stond vanaf 13:15 het grootste deel van de flights "ver achter" (9 van 11 om 13:45),
+   omdat het reguliere schema (3-bal 210 min) voor een wedstrijd te strak is; rood onderscheidde niets meer en de projectie
+   liep gemiddeld ~7 min voor. Een flight met een toernooinaam (flights.toernooi_naam, hetzelfde veld als het trofee-icoontje)
+   krijgt een eigen norm en eigen kleurbanden. Clubnorm (Kay): 3-bal 18 holes 4:00 = zeer goed, 4:15 = nog acceptabel.
+   (2) PAR 3: MAXIMAAL ÉÉN FLIGHT VOORBIJ DE AFSLAG. Zie begrensPar3(). Op holes 2, 5, 11 en 14 kan er in werkelijkheid maar één
+   flight tegelijk op fairway/green zijn. In de Heerendag-herberekening stonden in 39 van 311 minuten twee flights tegelijk voorbij
+   de afslag van dezelfde par 3. Nu: de verste flight is de bezetter, elke andere flight zonder verse melding gaat terug naar de
+   afslag van die hole; een verse melding wint altijd. Greep in 22 van 311 minuten in; nauwkeurigheid t.o.v. meldingen
+   nauwelijks veranderd (1 geval van 31): het doel is een geloofwaardige kaart. NIET opgenomen (bewust): de "lus-rij"
+   (volgorde per lus over starthole-groepen heen) — op de data één geval verbeterd, geen duidelijke winst; en het optillen van de
+   berekende voorste flight wanneer de flight erachter vers voorbij de afslag meldt (niet getoetst).
+   v0.26.1 (18 november 2026) — Kay, direct na v0.26.0: de wedstrijdnorm hangt aan de WEDSTRIJD, niet aan de flightgrootte.
+   Een 2-bal in een 3-bal-wedstrijd (en een 3-bal in een 4-bal-wedstrijd) speelt op het tempo van het veld; een eigen, kortere norm
+   voor een 2-bal liet hem in het schema voorbij eerder gestarte 3-ballen lopen (zelfde probleem als v0.24.0). Daarom nu twee normen:
+   3-bal-wedstrijd 240 min en 4-bal-wedstrijd 270 min, beide met 15 min marge (vast aantal minuten, geen percentage meer):
+   groen tot de norm, oranje tot norm + 15, rood daarboven, blauw ("snel") vanaf 15 min voor (reguliere flights: 5 min, ongewijzigd).
+   Het type wedstrijd wordt AFGELEID uit het veld: meeste flights met dezelfde toernooinaam zijn 4-ballen -> 4-bal-wedstrijd, anders
+   3-bal-wedstrijd (gelijk aantal: de ruimste norm). Geteld over alle flights van vandaag met die toernooinaam, ook de al uitgestapte
+   (extra query), zodat het type niet omslaat naarmate flights klaar zijn; bij een mislukte query telt de geladen lijst. Op de
+   Heerendag: 9 van 10 flights 3-bal, 1 2-bal -> 3-bal-wedstrijd, alle tien op 4:00. NIET door de club bevestigd: de 4-bal-norm
+   (270 = dezelfde stap van 30 min als bij reguliere flights), en de afleidingsregel. Normen en marge instelbaar in Admin >
+   Parameters > Wedstrijdnorm (schema.sql "Fase 2o"). De verantwoording (Admin > Parameters) beschrijft de wedstrijdnorm en de
+   par-3-regel in gewone taal. Reguliere flights zijn ongewijzigd. Op de Heerendag-data daalde de systematische voorloop van de
+   projectie van wedstrijdflights van +7,2 naar +3,1 min (n=28; slechts 3 meldingen van reguliere flights).
+   v0.26.2 (18 november 2026) — Kay: de tekst-tracker gaf niet altijd hetzelfde beeld als de kaart-tracker; aan het einde van de
+   Heerendag was de flight vóór Kay al uit de lijst terwijl hij op de kaart nog op de fairway van hole 9 stond. Oorzaak: twee
+   verschillende regels voor "nog zichtbaar". De kaart verbergt een flight pas als zijn (berekende of gemelde) positie voorbij de laatste
+   hole is (baanflowIsZichtbaar); de lijst verborg een flight op de klok: starttijd + norm + 30 min (trackerIsActief). Een flight die
+   trager is dan de norm verdween dus uit de lijst terwijl hij nog op de baan liep. Herberekening Heerendag met de toenmalige norm van
+   210 min: de flight vóór Kay (11:52 vanaf hole 10) uit de lijst om ca. 15:52, van de kaart om ca. 16:01; Kay's flight 16:00 resp. 16:07.
+   Nu: een niet-voltooide flight blijft in de lijst staan; alleen voltooide flights vallen nog onder de klokregel (zichtbaar tot
+   norm + 30 min, bedoeld als nagloeitijd). Alleen GoyerFlow nagekeken; de lijst van de Marshal App heeft eigen code, niet vergeleken.
+   v0.26.3 (18 november 2026) — meetbaarheid voor de volgende testdag (Kay: "wie meldde er" en wat we nog meer moeten kunnen terugvinden).
+   Na de Heerendag bleek het logboek (flights_historie) alleen flight, hole, checkpoint en tijdstip te bewaren, niet wie een melding deed,
+   niet met welke appversie, en niet welke parameters toen golden. Nu (schema.sql "Fase 2p"; geen gedragswijziging voor leden):
+   (1) flights.gemeld_door (lid | goyerflow_admin | marshal_admin | marshal) en flights.gemeld_app_versie worden bij elke schrijfactie op een
+       flight meegeschreven (positiemelding, uitgestapt) en door de trigger naar flights_historie gekopieerd. Een wijziging die niet uit de
+       app komt (de Teecontrol-sync, bv. een andere starttijd) krijgt in het logboek gemeld_door leeg, zodat die niet ten onrechte aan de laatste
+       melder wordt toegeschreven. Vandaag komen alleen lid en goyerflow_admin voor; marshal_admin en marshal staan klaar voor de koppeling met
+       de Marshal App (nog niet ontworpen). Geen persoonscode: alleen de rol (pseudoniem op flightniveau, niet op spelerniveau).
+   (2) login_log.reden bij een mislukte poging: onbekende_code, uitgestapt, te_vroeg, onjuiste_pincode, login_uit, fout (netwerk/server).
+       Let op: een poging terwijl de leden-login uitstaat wordt nu WEL gelogd (reden login_uit); in v0.25.0 had ik dat bewust niet gedaan,
+       dat was mijn eigen keuze en niet door Kay bevestigd.
+   (3) parameters_historie: elke wijziging van de rij in `parameters` wordt als jsonb bewaard (plus een beginstand), zodat we later weten welke
+       streeftijden en welke wedstrijdnorm op een speeldag golden.
+   (4) De definitie van flights_historie en zijn trigger staat nu in schema.sql (stond alleen in de database).
+   Robuustheid: ontbreken de nieuwe kolommen (Fase 2p nog niet uitgevoerd), dan wordt de melding gewoon zonder herkomst opgeslagen en een
+   mislukte login zonder reden gelogd. Een melding mag nooit mislukken door de meetlaag.
    ============================================================================================ */
-const APP_VERSIE = "0.25.0";
+const APP_VERSIE = "0.26.3";
 
 /* ============================================================================================
    TIJDELIJKE VELDTEST-INSTELLING (toegevoegd 24 oktober 2026, zie bouwgeschiedenis) — NIET
@@ -1738,14 +1787,37 @@ async function sb(path, opts = {}) {
   return res.json();
 }
 
-function loggen(persoonscode, type, succes) {
+function loggen(persoonscode, type, succes, reden = null) {
   // Logboek van logins/pincode-wijzigingen (maatregel 1+2 uit "Login-beveiliging"). Best-effort:
   // een logging-fout mag een login nooit blokkeren.
-  sb("login_log", {
-    method: "POST",
-    prefer: "return=minimal",
-    body: JSON.stringify({ persoonscode, type, succes }),
-  }).catch((e) => console.warn("Loggen mislukt (niet blokkerend):", e));
+  // v0.26.3: optionele `reden` bij een mislukte poging (schema.sql "Fase 2p", kolom login_log.reden). Bestaat die kolom nog
+  // niet, dan schrijven we dezelfde regel zonder reden — de poging zelf blijft dus altijd gelogd.
+  const basis = { persoonscode: String(persoonscode == null ? "" : persoonscode).slice(0, 60), type, succes };
+  const stuur = (body) => sb("login_log", { method: "POST", prefer: "return=minimal", body: JSON.stringify(body) });
+  const poging = reden ? stuur(Object.assign({}, basis, { reden })).catch(() => stuur(basis)) : stuur(basis);
+  poging.catch((e) => console.warn("Loggen mislukt (niet blokkerend):", e));
+}
+
+// v0.26.3 (Kay, 18 november 2026): bij elke schrijfactie op een flight vanuit de app leggen we vast WIE het deed en met welke
+// appversie (schema.sql "Fase 2p": flights.gemeld_door + flights.gemeld_app_versie; de trigger kopieert ze naar flights_historie).
+// Waarden: lid, goyerflow_admin, marshal_admin, marshal. Alleen de eerste twee komen vandaag voor: een marshal of de admin van de
+// Marshal App schrijft nog niet in dit project (architectuurvraag van 8 november 2026, nog open). Een positiemelding mag NOOIT
+// mislukken doordat deze kolommen ontbreken: geeft de database een fout over precies deze kolommen, dan sturen we dezelfde
+// wijziging zonder herkomst.
+const GEMELD_DOOR_WAARDEN = ["lid", "goyerflow_admin", "marshal_admin", "marshal"];
+function herkomstVelden(door) {
+  return { gemeld_door: door, gemeld_app_versie: APP_VERSIE };
+}
+async function patchFlight(flightId, body, door) {
+  const url = `flights?id=eq.${flightId}`;
+  const stuur = (b) => sb(url, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify(b) });
+  try {
+    await stuur(Object.assign({}, body, herkomstVelden(door)));
+  } catch (e) {
+    if (!/gemeld_(door|app_versie)/.test(String((e && e.message) || e))) throw e;
+    console.warn("gemeld_door/gemeld_app_versie bestaan nog niet (Fase 2p niet uitgevoerd); melding zonder herkomst opgeslagen.");
+    await stuur(body);
+  }
 }
 
 /* ============================================================================================
@@ -1822,16 +1894,88 @@ function flightsizeSchaal(aantalSpelers) {
 // hole van déze ronde, zie fysiekeHole()/RONDE_INFO) en al geschaald voor de flightgrootte. Dit is
 // de array waarmee de hele rekenkern voortaan werkt (zie fractieVoorVerstrekenTijd/
 // minutenVoorFractie hieronder) i.p.v. met één plat gemiddeld minutenPerHole-getal.
-function holeMinutenVoorRonde(params, aantalSpelers, rondeType) {
+function holeMinutenVoorRonde(params, aantalSpelers, rondeType, flight = null) {
   const basis = holeMinutenBasis(params);
   const schaal = flightsizeSchaal(aantalSpelers);
   const { holesInRonde } = rondeInfo(rondeType);
+  // v0.26.0: een wedstrijdflight (flights.toernooi_naam gevuld) krijgt een eigen totaaltijd per
+  // flightgrootte (zie wedstrijdInfoVoor). De holetijden worden daartoe evenredig opgeschaald zodat
+  // een volle 18-holesronde precies op die norm uitkomt; de verdeling over de holes blijft gelijk.
+  const wed = wedstrijdInfoVoor(params, flight);
+  const wedFactor = wed ? wed.totaal / (basis.reduce((a, b) => a + b, 0) * schaal) : 1;
   const result = [];
   for (let i = 0; i < holesInRonde; i++) {
     const fysiek = fysiekeHole(rondeType, i + 1);
-    result.push(basis[fysiek - 1] * schaal);
+    result.push(basis[fysiek - 1] * schaal * wedFactor);
   }
   return result;
+}
+
+// v0.26.0/v0.26.1 — WEDSTRIJDNORM (Kay, 18 november 2026, na de Heerendag-test). Op de Heerendag liep vrijwel
+// elke flight "ver achter" (vanaf 13:15 stond 9 van de 11 flights rood), omdat het reguliere schema (3-bal =
+// 210 min) voor een wedstrijd te strak is. Clubnorm volgens Kay: een 3-bal over 18 holes in een wedstrijd is in
+// 4:00 "zeer goed" en in 4:15 "nog acceptabel", langer niet. Een flight geldt als wedstrijdflight zodra
+// flights.toernooi_naam gevuld is (Teecontrol-sync; hetzelfde veld als het trofee-icoontje).
+// v0.26.1: de norm hangt aan de WEDSTRIJD, niet aan de flightgrootte (Kay: een 2-bal in een 3-bal-wedstrijd
+// speelt op het tempo van het veld, en een 3-bal in een 4-bal-wedstrijd ook). Er zijn dus twee normen:
+// "3-bal-wedstrijd" 240 min en "4-bal-wedstrijd" 270 min, elk met 15 min marge (zeer goed tot de norm, nog
+// acceptabel tot norm + 15, "snel" vanaf 15 min voor). Welke van de twee geldt, wordt AFGELEID uit het veld:
+// zijn de meeste flights met dezelfde toernooinaam 4-ballen, dan is het een 4-bal-wedstrijd, anders een
+// 3-bal-wedstrijd (bij gelijk aantal de ruimste norm; een 2-bal telt als "niet-4"). Zie bepaalWedstrijdTypes().
+// NIET door de club bevestigd: de 4-bal-norm van 270 min (afgeleid: dezelfde stap van 30 min tussen 3-bal en
+// 4-bal als bij reguliere flights) en de afleidingsregel zelf. Normen en marge zijn in Admin > Parameters aan
+// te passen (schema.sql "Fase 2o").
+const WEDSTRIJD_NORM_DEFAULT = { 3: 240, 4: 270 };
+const WEDSTRIJD_MARGE_MIN_DEFAULT = 15;
+function isWedstrijdFlight(flight) {
+  return !!(flight && typeof flight.toernooi_naam === "string" && flight.toernooi_naam.trim() !== "");
+}
+// Type van één toernooi uit een lijst flights (met toernooi_naam + aantal_spelers): 4 als de meeste flights
+// 4-ballen zijn (of gelijk), anders 3.
+function wedstrijdTypeUitFlights(flights) {
+  let vier = 0, rest = 0;
+  for (const f of flights) { if (f.aantal_spelers >= 4) vier++; else rest++; }
+  return vier >= rest && vier > 0 ? 4 : 3;
+}
+// Zet op elke wedstrijdflight in `flights` het afgeleide type (f._wedType). `alleVanVandaag` (optioneel) is
+// een lijst {toernooi_naam, aantal_spelers} van ALLE flights van vandaag met een toernooinaam, ook de al
+// uitgestapte: zonder die lijst zou het type kunnen omslaan naarmate flights klaar zijn (de lijst met
+// actieve flights wordt kleiner). Ontbreekt die lijst, dan telt de meegegeven lijst zelf.
+function markeerWedstrijdTypes(flights, alleVanVandaag = null) {
+  const bron = Array.isArray(alleVanVandaag) && alleVanVandaag.length ? alleVanVandaag : flights;
+  const perNaam = new Map();
+  for (const f of bron) {
+    if (!isWedstrijdFlight(f)) continue;
+    if (!perNaam.has(f.toernooi_naam)) perNaam.set(f.toernooi_naam, []);
+    perNaam.get(f.toernooi_naam).push(f);
+  }
+  const typen = new Map([...perNaam].map(([naam, lijst]) => [naam, wedstrijdTypeUitFlights(lijst)]));
+  for (const f of flights) {
+    if (isWedstrijdFlight(f)) f._wedType = typen.get(f.toernooi_naam) ?? wedstrijdTypeUitFlights([f]);
+  }
+  return flights;
+}
+// Haalt alle flights van vandaag met een toernooinaam op (ook uitgestapte) en markeert het type. Valt bij
+// een fout terug op de meegegeven lijst. Gedeeld door de drie plekken die flights laden.
+async function laadEnMarkeerWedstrijdTypes(flights) {
+  if (!flights.some(isWedstrijdFlight)) return flights;
+  let alle = null;
+  try {
+    const dagStart = new Date(); dagStart.setHours(0, 0, 0, 0);
+    alle = await sb(`flights?toernooi_naam=not.is.null&starttijd_effectief=gte.${encodeURIComponent(dagStart.toISOString())}&select=toernooi_naam,aantal_spelers`);
+  } catch (e) { console.error(e); }
+  return markeerWedstrijdTypes(flights, alle);
+}
+function wedstrijdInfoVoor(params, flight) {
+  if (!isWedstrijdFlight(flight)) return null;
+  const type = flight._wedType === 4 || flight._wedType === 3 ? flight._wedType : (flight.aantal_spelers >= 4 ? 4 : 3);
+  const raw = params ? params[`wedstrijd_norm_${type}bal_min`] : null;
+  const norm = Number(raw);
+  const totaal = raw == null || !(norm > 0) ? WEDSTRIJD_NORM_DEFAULT[type] : norm;
+  const rawM = params ? params.wedstrijd_marge_min : null;
+  const m = Number(rawM);
+  const marge = rawM == null || !(m >= 0) ? WEDSTRIJD_MARGE_MIN_DEFAULT : m;
+  return { totaal, marge, type, naam: flight.toernooi_naam };
 }
 
 // Totale streeftijd (minuten) voor de hele ronde — som van holeMinutenVoorRonde(). Vervangt het
@@ -1839,8 +1983,8 @@ function holeMinutenVoorRonde(params, aantalSpelers, rondeType) {
 // min/max meer, dus min en max zijn hier bewust gelijk — puur zodat alle bestaande aanroepers die
 // alleen naar `.max` kijken (bouwSpelersoverzicht(Beheer), bouwFlightDetailModal, trackerIsActief)
 // ongewijzigd kunnen blijven werken.
-function rondetijdBereikVoor(params, aantalSpelers, rondeType) {
-  const totaal = holeMinutenVoorRonde(params, aantalSpelers, rondeType).reduce((a, b) => a + b, 0);
+function rondetijdBereikVoor(params, aantalSpelers, rondeType, flight = null) {
+  const totaal = holeMinutenVoorRonde(params, aantalSpelers, rondeType, flight).reduce((a, b) => a + b, 0);
   return { min: totaal, max: totaal };
 }
 
@@ -2073,7 +2217,7 @@ function formatUurMinWoorden(minuten) {
 // noemde; aangeven als een andere drempel beter past. `--blue` bestond al (gebruikt voor
 // .flighttoernooi/.flightprogressvoortgang/de ongemelde-kaart-kleur) — hergebruikt, geen nieuwe
 // kleurvariabele nodig.
-function conclusieVoor(deltaMinuten) {
+function conclusieVoor(deltaMinuten, wed = null) {
   const minutenAchter = Math.round(Math.max(0, -deltaMinuten));
   const achterText = `${minutenAchter} minuten achter op schema`;
   const minutenVoor = Math.round(Math.max(0, deltaMinuten));
@@ -2084,9 +2228,15 @@ function conclusieVoor(deltaMinuten) {
   // EIGEN schema, niet op het (per definitie kleine) gat naar diens voorganger — zie de
   // bouwgeschiedenis voor de bug die dit repareert. Puur een additieve veldtoevoeging, verandert
   // niets aan het bestaande gedrag van deze functie voor alle bestaande aanroepers.
-  if (deltaMinuten >= 5) return { key: "voor_schema", label: voorText, kleur: "var(--blue)", resultaatTekst: `je loopt ${voorText}`, zin: `Dus je loopt ${voorText}.`, minutenAchter: 0 };
-  if (deltaMinuten > -5) return { key: "op_schema", label: "Op schema", kleur: "var(--accent)", resultaatTekst: "je loopt op schema", zin: "Dus je loopt op schema.", minutenAchter: 0 };
-  if (deltaMinuten > -10) return { key: "achter", label: achterText, kleur: "var(--warn)", resultaatTekst: `je loopt ${achterText}`, zin: `Dus je loopt ${achterText}.`, minutenAchter };
+  const voorGrens = wed ? wed.marge : 5;
+  if (deltaMinuten >= voorGrens) return { key: "voor_schema", label: voorText, kleur: "var(--blue)", resultaatTekst: `je loopt ${voorText}`, zin: `Dus je loopt ${voorText}.`, minutenAchter: 0 };
+  // v0.26.0: wedstrijdflights hebben clubbanden i.p.v. 5/10 min: groen tot de norm (afgerond op de minuut),
+  // oranje tot de acceptabel-marge (15 min), rood daarboven; "voor schema" (blauw) vanaf dezelfde marge voor
+  // (v0.26.1, Kay: 15 min i.p.v. 5). `wed` is {totaal, marge} uit wedstrijdInfoVoor(); null = reguliere banden, ongewijzigd.
+  const opSchemaGrens = wed ? -0.5 : -5;
+  const achterGrens = wed ? -wed.marge : -10;
+  if (deltaMinuten > opSchemaGrens) return { key: "op_schema", label: "Op schema", kleur: "var(--accent)", resultaatTekst: "je loopt op schema", zin: "Dus je loopt op schema.", minutenAchter: 0 };
+  if (deltaMinuten > achterGrens) return { key: "achter", label: achterText, kleur: "var(--warn)", resultaatTekst: `je loopt ${achterText}`, zin: `Dus je loopt ${achterText}.`, minutenAchter };
   return { key: "ver_achter", label: achterText, kleur: "var(--err)", resultaatTekst: `je loopt ${achterText}`, zin: `Dus je loopt ${achterText}.`, minutenAchter };
 }
 
@@ -2233,7 +2383,10 @@ const VERANTWOORDING_PARAMETERS = [
   "Deze tijden gaan uit van een 4-bal. Een 2-bal speelt sneller (75%) en een 3-bal iets sneller (88%).",
   "De positie van een flight wordt per hole opgebouwd: een lange hole kost meer speeltijd dan een korte.",
   "Handicap speelt geen rol in de berekening omdat onderzoek naar speelsnelheid geen aantoonbaar verband tussen handicap en speelsnelheid heeft vastgesteld.",
-  "Op het trackerscherm is een flight groen tot 5 minuten boven de streeftijd, oranje bij 5 tot 10 minuten boven de streeftijd, en rood boven de 10 minuten. Een flight die sneller loopt dan de streeftijd wordt blauw.",
+  "Op het trackerscherm is een flight (buiten wedstrijden) groen tot 5 minuten boven de streeftijd, oranje bij 5 tot 10 minuten boven de streeftijd, en rood boven de 10 minuten. Een flight die 5 minuten of meer sneller loopt dan de streeftijd wordt blauw.",
+  "In een wedstrijd gelden andere tijden. Een flight uit een wedstrijd herken je aan het bekertje. Zo'n flight wordt niet beoordeeld op de gewone streeftijd, maar op de wedstrijdnorm: 4 uur in een wedstrijd waarin voornamelijk 3-ballen spelen en 4,5 uur in een wedstrijd waarin voornamelijk 4-ballen spelen. Tot de norm is een flight groen. Tot 15 minuten boven de norm is hij oranje (nog acceptabel), daarboven rood. Een flight die meer dan 15 minuten sneller loopt dan de norm wordt blauw.",
+  "De wedstrijdnorm hoort bij de wedstrijd en niet bij de flight. Spelen de meeste flights van een wedstrijd met 4 spelers, dan geldt de 4-ballnorm voor alle flights van die wedstrijd, ook voor een flight met 3 of 2 spelers. Anders geldt de 3-ballnorm, ook voor een 2-bal. Zo loopt een kleinere flight in een wedstrijd niet vanzelf voor op de flights voor zich. De vier uur voor een 3-bal komt van de club (4 uur is zeer goed, 4 uur en een kwartier nog acceptabel). De 4,5 uur voor een 4-bal is een inschatting en nog niet door de club bevestigd. De normen en de 15 minuten zijn in dit scherm aan te passen.",
+  "Op een par 3 kan maar één flight tegelijk voorbij de afslag zijn: de flight erachter wacht op de afslag tot de flight ervoor van de green is. De kaart houdt daar rekening mee. Staan er volgens het schema twee flights tegelijk op de fairway of green van dezelfde par 3 (hole 2, 5, 11 of 14), dan wordt de flight die het minst ver is teruggezet naar de afslag van die hole. Heeft een flight in de laatste 30 minuten een positie gemeld, dan wordt die flight niet teruggezet: een melding wint altijd van het schema.",
   "Op de Baan Flow-kaart wordt ook gekeken of een flight de flight erachter ophoudt. Dat geldt alleen voor de kop van zo'n file: een flight die zelf niet wordt opgehouden, maar waar een andere flight wel dicht achter zit en zelf achter op schema staat. Het icoon van die ophoudende flight wordt groter naarmate de flight erachter verder achter op schema staat. Lopen alle flights gelijk langzaam met voldoende ruimte ertussen, dan wordt niemand als ophouder gemarkeerd.",
 ];
 
@@ -2544,13 +2697,14 @@ function renderPersoonscode(app) {
       // v0.25.0: beheerder kan het inloggen van leden uitzetten (Admin > Leden-login). Eerst controleren, nog vóór
       // de zoekopdracht, zodat een uitgeschakelde login ook niet verraadt welke lidcodes bestaan.
       if (!(await ledenLoginIsAan())) {
+        loggen(input.value.trim(), "login", false, "login_uit");
         state.fout = "Inloggen voor leden staat op dit moment uit. Probeer het later nog eens of neem contact op met de caddymaster.";
         render();
         return;
       }
       const { rows, gebruikteCode: code } = await zoekSpelerOpPersoonscode(input.value);
       if (!rows || rows.length === 0) {
-        loggen(code, "login", false);
+        loggen(code, "login", false, "onbekende_code");
         state.fout = "Geen geboekte flight gevonden voor deze persoonscode. Probeer het vanaf ongeveer 15 minuten voor je starttijd nog eens, of neem contact op met de caddymaster.";
         render();
         return;
@@ -2558,7 +2712,7 @@ function renderPersoonscode(app) {
       const speler = rows[0];
       const flight = speler.flights;
       if (flight.uitgestapt) {
-        loggen(code, "login", false);
+        loggen(code, "login", false, "uitgestapt");
         state.fout = "Deze flight staat als uitgestapt geregistreerd.";
         render();
         return;
@@ -2566,7 +2720,7 @@ function renderPersoonscode(app) {
       const nu = new Date();
       const venstertijd = new Date(new Date(flight.starttijd_effectief).getTime() - ZICHTBAARHEIDSVENSTER_MINUTEN * 60000);
       if (nu < venstertijd) {
-        loggen(code, "login", false);
+        loggen(code, "login", false, "te_vroeg");
         const tijdstr = venstertijd.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" });
         state.fout = `Nog niet beschikbaar — deze flight wordt zichtbaar vanaf ${tijdstr} (15 minuten voor de starttijd).`;
         render();
@@ -2590,6 +2744,7 @@ function renderPersoonscode(app) {
       state.scherm = speler.pincode_gewijzigd ? "pincode" : "nieuwe_pincode";
       render();
     } catch (e) {
+      loggen(input.value.trim(), "login", false, "fout");
       state.fout = "Er ging iets mis bij het ophalen van je gegevens. Probeer het zo nog eens.";
       console.error(e);
       render();
@@ -2628,7 +2783,7 @@ function renderPincode(app) {
     btn.disabled = true;
     try {
       if (pin !== state.speler.pincode) {
-        loggen(state.speler.persoonscode, "login", false);
+        loggen(state.speler.persoonscode, "login", false, "onjuiste_pincode");
         state.fout = "Onjuiste pincode.";
         render();
         return;
@@ -2868,6 +3023,7 @@ async function renderTracker(app, opts = {}) {
     // scherm (zie bouwSpelersoverzicht) — haalt de spelers van ALLE flights op deze lus mee (voor/
     // zelf/achter), maar alleen die van "zelf" worden gebruikt; geen aparte losse aanvraag nodig.
     flights = await sb(`flights?lus=eq.${encodeURIComponent(state.flight.lus)}&uitgestapt=eq.false&select=*,spelers(*)&order=starttijd_effectief.asc`);
+    flights = await laadEnMarkeerWedstrijdTypes(flights);
   } catch (e) {
     console.error(e);
     if (!stil) {
@@ -2885,7 +3041,7 @@ async function renderTracker(app, opts = {}) {
   // hieronder, die bewust tegen het ORIGINELE rondeschema vergelijkt (zie de "op schema"-conclusie
   // verderop), niet tegen een al gemelde/geprojecteerde positie.
   function posVan(flight) {
-    const holeMinuten = holeMinutenVoorRonde(params, flight.aantal_spelers, flight.ronde_type);
+    const holeMinuten = holeMinutenVoorRonde(params, flight.aantal_spelers, flight.ronde_type, flight);
     return { ...verwachtePositie(flight.starttijd_effectief, holeMinuten, nu, flight.ronde_type), holeMinuten };
   }
 
@@ -2898,7 +3054,7 @@ async function renderTracker(app, opts = {}) {
   // de bouwgeschiedenis voor de volledige afweging. Dit scherm toont voortaan alleen nog waar JOUW
   // eigen flight is, voor inzicht in je eigen speeltempo.)
   const zelfPos = posVan(zelf);
-  const zelfBereik = rondetijdBereikVoor(params, zelf.aantal_spelers, zelf.ronde_type);
+  const zelfBereik = rondetijdBereikVoor(params, zelf.aantal_spelers, zelf.ronde_type, zelf);
 
   // (v0.16.0, bugfix na de testronde van 28 oktober 2026): verwachtePositie() kent geen "nog niet
   // begonnen"-status — vóór starttijd_effectief levert de formule een negatieve fractie op die
@@ -2919,7 +3075,7 @@ async function renderTracker(app, opts = {}) {
   // v0.24.7: delta t.o.v. de doorgerekende weergavepositie (zie deltaMinutenVoor), niet de bevroren gemelde plek.
   const zelfWeergavePos = (heeftGekozen ? projecteerVanafMelding(zelf, zelfPos.holeMinuten, nu, zelf.ronde_type) : null) ?? zelfPos;
   const deltaMinuten = heeftGekozen ? deltaMinutenVoor(zelfWeergavePos, zelfPos, zelfPos.holeMinuten) : null;
-  const conclusie = heeftGekozen ? conclusieVoor(deltaMinuten) : null;
+  const conclusie = heeftGekozen ? conclusieVoor(deltaMinuten, wedstrijdInfoVoor(params, zelf)) : null;
   const kaartKleur = conclusie ? conclusie.kleur : "var(--accent)";
   // v0.21.4: de nieuwe "voor_schema"-band (zie conclusieVoor()) mag de "Tips om sneller te
   // spelen"-knop niet laten verschijnen — alleen nog bij echt achterlopen.
@@ -3243,11 +3399,7 @@ async function renderTracker(app, opts = {}) {
     if (trackerLocal.bezig) return;
     trackerLocal.bezig = true;
     try {
-      await sb(`flights?id=eq.${zelf.id}`, {
-        method: "PATCH",
-        prefer: "return=minimal",
-        body: JSON.stringify({ gerapporteerde_hole: hole, gerapporteerd_checkpoint: checkpoint, gerapporteerd_tijdstip: new Date().toISOString() }),
-      });
+      await patchFlight(zelf.id, { gerapporteerde_hole: hole, gerapporteerd_checkpoint: checkpoint, gerapporteerd_tijdstip: new Date().toISOString() }, "lid");
       trackerLocal.zelfHoleDraft = null;
       trackerLocal.fout = null;
       evalueerGatMetStartbuur(hole, checkpoint);
@@ -3278,7 +3430,7 @@ async function renderTracker(app, opts = {}) {
     if (trackerLocal.bezig) return;
     trackerLocal.bezig = true;
     try {
-      await sb(`flights?id=eq.${zelf.id}`, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ uitgestapt: true }) });
+      await patchFlight(zelf.id, { uitgestapt: true }, "lid");
       logout();
     } catch (e) {
       trackerLocal.fout = "Afsluiten van de ronde is niet gelukt. Probeer het nog eens.";
@@ -3415,7 +3567,8 @@ function deltaMinutenVoor(weergave, zelfPos, holeMinuten) {
   return minutenVoorFractie(weergave.fractie, holeMinuten) - minutenVoorFractie(zelfPos.fractie, holeMinuten);
 }
 function berekenFlightPositie(flight, params, nu) {
-  const holeMinuten = holeMinutenVoorRonde(params, flight.aantal_spelers, flight.ronde_type);
+  const holeMinuten = holeMinutenVoorRonde(params, flight.aantal_spelers, flight.ronde_type, flight);
+  const wed = wedstrijdInfoVoor(params, flight);
   const zelfPos = verwachtePositie(flight.starttijd_effectief, holeMinuten, nu, flight.ronde_type);
   const heeftMelding = flight.gerapporteerde_hole != null && flight.gerapporteerd_checkpoint != null;
   // (28 oktober 2026: pasWachttijdToe is hier verwijderd — de doorlaat-functionaliteit (en dus het
@@ -3426,13 +3579,13 @@ function berekenFlightPositie(flight, params, nu) {
   if (heeftMelding && !voltooid) {
     // v0.18.0: conclusieVoor() rekent in minuten — zie de toelichting bij renderTracker's gebruik.
     // v0.24.7: vergelijkt de doorgerekende weergave met het schema (zie deltaMinutenVoor).
-    conclusie = conclusieVoor(deltaMinutenVoor(weergave, zelfPos, holeMinuten));
+    conclusie = conclusieVoor(deltaMinutenVoor(weergave, zelfPos, holeMinuten), wed);
   }
   const meldingLeeftijdMin = heeftMelding && flight.gerapporteerd_tijdstip
     ? (nu.getTime() - new Date(flight.gerapporteerd_tijdstip).getTime()) / 60000 : null;
   const meldingGeldig = meldingLeeftijdMin != null && meldingLeeftijdMin <= MELDING_GELDIG_MINUTEN;
   const gestartNog = nu.getTime() < new Date(flight.starttijd_effectief).getTime();
-  return { flight, holeMinuten, zelfPos, weergave, voltooid, heeftMelding, meldingGeldig, conclusie, gestartNog };
+  return { flight, holeMinuten, zelfPos, weergave, voltooid, heeftMelding, meldingGeldig, conclusie, gestartNog, wed };
 }
 
 // Achternaam uit een volledige naam: laatste woord, geen tussenvoegsel-detectie (dus bij
@@ -3492,7 +3645,7 @@ function begrensInhalen(posities) {
           else if (rest >= 0.25) checkpoint = "fairway";
           const hole = Math.max(1, Math.min(holesInRonde, Math.floor(fractie) + 1));
           const weergave = { ...p.weergave, hole, checkpoint, fractie };
-          const conclusie = conclusieVoor(minutenVoorFractie(fractie, hm) - minutenVoorFractie(p.zelfPos.fractie, hm));
+          const conclusie = conclusieVoor(minutenVoorFractie(fractie, hm) - minutenVoorFractie(p.zelfPos.fractie, hm), p.wed);
           resultaat = { ...p, weergave, conclusie, begrensd: true, voltooid: rondeVoltooid({ fractie }, p.flight.ronde_type) };
         }
       }
@@ -3500,7 +3653,46 @@ function begrensInhalen(posities) {
       if (!resultaat.voltooid) vorige = resultaat; // een afgeronde flight staat niet meer op de baan
     }
   }
-  return posities.map((p) => eind.get(p.flight.id));
+  return begrensPar3(posities.map((p) => eind.get(p.flight.id)));
+}
+
+// v0.26.0 — PAR 3: MAXIMAAL ÉÉN FLIGHT VOORBIJ DE AFSLAG (Kay, 18 november 2026). Op een par 3 kan er in
+// werkelijkheid maar één flight tegelijk op de fairway/green zijn: de flight erachter wacht op de afslag
+// tot de flight ervoor van de green is. Tijdens de Heerendag stonden er in 39 van 311 minuten twee flights
+// tegelijk voorbij de afslag van dezelfde par 3 (holes 2, 5, 11, 14), door het schema berekend. Per par 3
+// geldt nu: de flight die het verst op de hole is, is de bezetter; elke andere flight voorbij de afslag
+// (rest >= 0,25) zonder verse melding wordt teruggezet op de afslag van diezelfde hole. Een verse melding
+// (meldingGeldig) wint altijd van de regel — de werkelijkheid verslaat het model. Werkt op FYSIEKE holes,
+// dus los van de rondevorm of de richting waaruit een flight komt. Zoals bij begrensInhalen() telt de
+// teruggezette flight daarna als "achter" t.o.v. zijn eigen schema (conclusie herberekend). Op de
+// Heerendag-data zette dit in 22 van 311 minuten minstens één flight terug; de nauwkeurigheid t.o.v.
+// meldingen veranderde nauwelijks (zie bouwgeschiedenis) — het doel is geloofwaardigheid van de kaart.
+const PAR3_FYSIEKE_HOLES = new Set(HOLE_PAR.map((par, i) => (par === 3 ? i + 1 : null)).filter((h) => h != null));
+function begrensPar3(posities) {
+  const uit = posities.slice();
+  const perHole = new Map();
+  uit.forEach((p, i) => {
+    if (!p || p.gestartNog || p.voltooid) return;
+    const fysiek = fysiekeHole(p.flight.ronde_type, p.weergave.hole);
+    if (!PAR3_FYSIEKE_HOLES.has(fysiek)) return;
+    const rest = p.weergave.fractie - Math.floor(p.weergave.fractie);
+    if (rest <= 0.25) return;
+    if (!perHole.has(fysiek)) perHole.set(fysiek, []);
+    perHole.get(fysiek).push({ i, rest });
+  });
+  for (const lijst of perHole.values()) {
+    if (lijst.length < 2) continue;
+    lijst.sort((a, b) => b.rest - a.rest);
+    for (const { i } of lijst.slice(1)) {
+      const p = uit[i];
+      if (p.meldingGeldig) continue;
+      const fractie = Math.floor(p.weergave.fractie) + 0.125;
+      const hm = p.holeMinuten;
+      const conclusie = conclusieVoor(minutenVoorFractie(fractie, hm) - minutenVoorFractie(p.zelfPos.fractie, hm), p.wed);
+      uit[i] = { ...p, weergave: { ...p.weergave, checkpoint: "afslag", fractie }, conclusie, begrensdPar3: true };
+    }
+  }
+  return uit;
 }
 
 // Titel voor het flight-detailscherm, naar het voorbeeld van de Marshal App ("Wekking + 2
@@ -3532,8 +3724,14 @@ const ACTIEF_GRACE_MIN = 30; // zelfde grace-periode als de Marshal App
 
 function trackerIsActief(positie, params, nu) {
   if (positie.gestartNog) return false;
+  // v0.26.2 (Kay, 18 november 2026): een flight die volgens zijn positie nog op de baan is, blijft in de lijst staan,
+  // ook als de klok (starttijd + norm + 30 min) al voorbij is. De kaart (baanflowIsZichtbaar) verbergt een flight pas
+  // als hij voltooid is; de lijst verborg hem voorheen puur op de klok, dus een flight die langzamer was dan de norm
+  // verdween uit de lijst terwijl hij op de kaart nog op zijn laatste hole stond (Heerendag: de flight vóór Kay,
+  // ca. 9 minuten). Alleen een VOLTOOIDE flight valt nog onder de klokregel hieronder (zichtbaar tot norm + 30 min).
+  if (!positie.voltooid) return true;
   const verstrekenMin = (nu.getTime() - new Date(positie.flight.starttijd_effectief).getTime()) / 60000;
-  const rondetijdMax = rondetijdBereikVoor(params, positie.flight.aantal_spelers, positie.flight.ronde_type).max;
+  const rondetijdMax = rondetijdBereikVoor(params, positie.flight.aantal_spelers, positie.flight.ronde_type, positie.flight).max;
   return verstrekenMin < rondetijdMax + ACTIEF_GRACE_MIN;
 }
 function trackerIsAankomend(flight, nu) {
@@ -3590,6 +3788,7 @@ async function vulAdminTrackerTab(inhoud, opts = {}) {
     // spelers(*) : PostgREST-embed via de bestaande spelers.flight_id-foreignkey — haalt per flight
     // meteen de bijbehorende spelersrijen mee in één aanvraag, i.p.v. een aparte fetch per flight.
     flights = await sb("flights?uitgestapt=eq.false&select=*,spelers(*)&order=starttijd_effectief.asc");
+    flights = await laadEnMarkeerWedstrijdTypes(flights);
   } catch (e) {
     console.error(e);
     if (!stil) throw e;
@@ -4042,6 +4241,7 @@ async function vulAdminBaanFlowTab(inhoud, opts = {}) {
   try {
     [params] = await sb("parameters?select=*&limit=1");
     flights = await sb("flights?uitgestapt=eq.false&select=*,spelers(*)&order=starttijd_effectief.asc");
+    flights = await laadEnMarkeerWedstrijdTypes(flights);
   } catch (e) {
     console.error(e);
     if (!stil) throw e;
@@ -4326,7 +4526,7 @@ function bouwFlightDetailModal(positie, params, nu, ververs = render, knelpuntIn
 
   // v0.20.0: eenmalig berekend, hergebruikt door zowel de Streeftijd-regel in het spelersoverzicht
   // hieronder als de infotekst-na-positie-melding verderop in deze functie.
-  const bereikFlight = rondetijdBereikVoor(params, flight.aantal_spelers, flight.ronde_type);
+  const bereikFlight = rondetijdBereikVoor(params, flight.aantal_spelers, flight.ronde_type, flight);
 
   // Spelersoverzicht + "Streeftijd" (v0.14.0, tekst herschreven in v0.20.0): zie
   // bouwSpelersoverzichtBeheer hierboven — ALLE Teecontrol-spelers van deze flight, niet (meer) de
@@ -4351,7 +4551,7 @@ function bouwFlightDetailModal(positie, params, nu, ververs = render, knelpuntIn
     if (adminLocal.flightDetailBezig) return;
     adminLocal.flightDetailBezig = true;
     try {
-      await sb(`flights?id=eq.${flight.id}`, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ uitgestapt: true }) });
+      await patchFlight(flight.id, { uitgestapt: true }, "goyerflow_admin");
       adminLocal.flightDetailBezig = false;
       sluiten();
     } catch (e) {
@@ -4366,11 +4566,7 @@ function bouwFlightDetailModal(positie, params, nu, ververs = render, knelpuntIn
     if (adminLocal.flightDetailBezig) return;
     adminLocal.flightDetailBezig = true;
     try {
-      await sb(`flights?id=eq.${flight.id}`, {
-        method: "PATCH",
-        prefer: "return=minimal",
-        body: JSON.stringify({ gerapporteerde_hole: hole, gerapporteerd_checkpoint: checkpoint, gerapporteerd_tijdstip: new Date().toISOString() }),
-      });
+      await patchFlight(flight.id, { gerapporteerde_hole: hole, gerapporteerd_checkpoint: checkpoint, gerapporteerd_tijdstip: new Date().toISOString() }, "goyerflow_admin");
       adminLocal.flightDetailHoleDraft = null;
       adminLocal.flightDetailFout = null;
     } catch (e) {
@@ -4656,7 +4852,7 @@ async function vulAdminParametersTab(inhoud) {
     analyseBtn.textContent = "Bezig…";
     analyseResultaatNode.innerHTML = "";
     try {
-      const alleFlights = await sb("flights?uitgestapt=eq.false&select=*");
+      const alleFlights = await laadEnMarkeerWedstrijdTypes(await sb("flights?uitgestapt=eq.false&select=*"));
       const metMelding = alleFlights.filter((f) => f.gerapporteerde_hole != null && f.gerapporteerd_checkpoint != null);
       const nu = new Date();
       // v0.18.0: hergebruikt conclusieVoor() zelf (i.p.v. een eigen losse drempel-check) zodat deze
@@ -4666,12 +4862,12 @@ async function vulAdminParametersTab(inhoud) {
       // else-tak ving alles op wat niet "op_schema"/"achter" was).
       let opSchema = 0, voorSchema = 0, achter = 0, verAchter = 0, somAfwijkingMin = 0;
       for (const flight of metMelding) {
-        const holeMinuten = holeMinutenVoorRonde(params, flight.aantal_spelers, flight.ronde_type);
+        const holeMinuten = holeMinutenVoorRonde(params, flight.aantal_spelers, flight.ronde_type, flight);
         const zelfPos = verwachtePositie(flight.starttijd_effectief, holeMinuten, nu, flight.ronde_type);
         const weergavePos = projecteerVanafMelding(flight, holeMinuten, nu, flight.ronde_type) ?? zelfPos;
         const deltaMinuten = deltaMinutenVoor(weergavePos, zelfPos, holeMinuten);
         somAfwijkingMin += deltaMinuten;
-        const key = conclusieVoor(deltaMinuten).key;
+        const key = conclusieVoor(deltaMinuten, wedstrijdInfoVoor(params, flight)).key;
         if (key === "op_schema") opSchema++;
         else if (key === "voor_schema") voorSchema++;
         else if (key === "achter") achter++;
@@ -4700,7 +4896,67 @@ async function vulAdminParametersTab(inhoud) {
     analyseResultaatNode,
   ]);
 
-  inhoud.append(paramKaart, analyseKaart);
+  inhoud.append(paramKaart, bouwWedstrijdNormKaart(params), analyseKaart);
+}
+
+// v0.26.0/v0.26.1: kaart "Wedstrijdnorm" in Admin > Parameters. Totaaltijd voor een volle 18-holesronde voor
+// een 3-bal-wedstrijd en een 4-bal-wedstrijd, plus de marge in minuten (zie wedstrijdInfoVoor). Eigen
+// opslaan-knop en foutmelding, los van de streeftijd-per-hole-kaart (die niet opnieuw wordt opgebouwd).
+function bouwWedstrijdNormKaart(params) {
+  const waarde = (kolom, def) => {
+    const n = Number(params[kolom]);
+    return params[kolom] == null || Number.isNaN(n) ? def : n;
+  };
+  const maakVeld = (kolom, def) => el("input", { class: "paraminput", type: "number", step: "1", value: waarde(kolom, def) });
+  const i3 = maakVeld("wedstrijd_norm_3bal_min", WEDSTRIJD_NORM_DEFAULT[3]);
+  const i4 = maakVeld("wedstrijd_norm_4bal_min", WEDSTRIJD_NORM_DEFAULT[4]);
+  const iMarge = maakVeld("wedstrijd_marge_min", WEDSTRIJD_MARGE_MIN_DEFAULT);
+  const uitleg = el("p", { class: "help" });
+  const fmt = (min) => `${Math.floor(min / 60)}:${String(Math.round(min % 60)).padStart(2, "0")}`;
+  const herbereken = () => {
+    const m = parseFloat(iMarge.value);
+    const regel = (naam, input) => {
+      const v = parseFloat(input.value);
+      return Number.isNaN(v) || Number.isNaN(m) ? `${naam}: —` : `${naam}: groen tot ${fmt(v)}, oranje tot ${fmt(v + m)}, daarboven rood`;
+    };
+    uitleg.textContent = [regel("3-bal-wedstrijd", i3), regel("4-bal-wedstrijd", i4)].join(" · ");
+  };
+  const fout = el("div", { class: "paramfout", style: "display:none" });
+  const knop = el("button", { class: "btn", text: "Opslaan" });
+  knop.disabled = true;
+  [i3, i4, iMarge].forEach((input) => input.addEventListener("input", () => { knop.disabled = false; fout.style.display = "none"; herbereken(); }));
+  herbereken();
+  knop.addEventListener("click", async () => {
+    const nieuw = {
+      wedstrijd_norm_3bal_min: parseFloat(i3.value), wedstrijd_norm_4bal_min: parseFloat(i4.value),
+      wedstrijd_marge_min: parseFloat(iMarge.value),
+    };
+    if (Object.values(nieuw).some((v) => Number.isNaN(v) || v < 0) || nieuw.wedstrijd_norm_3bal_min <= 0 || nieuw.wedstrijd_norm_4bal_min <= 0) {
+      fout.textContent = "Vul voor elk veld een geldig getal in (normen groter dan 0, marge niet negatief).";
+      fout.style.display = "";
+      return;
+    }
+    knop.disabled = true; knop.textContent = "Bezig…";
+    try {
+      await sb(`parameters?id=eq.${params.id}`, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ ...nieuw, updated_at: new Date().toISOString() }) });
+      knop.textContent = "Opslaan";
+    } catch (e) {
+      console.error(e);
+      fout.textContent = "Opslaan is niet gelukt. Is schema.sql \"Fase 2o\" al uitgevoerd in Supabase?";
+      fout.style.display = "";
+      knop.textContent = "Opslaan"; knop.disabled = false;
+    }
+  });
+  return el("div", { class: "card" }, [
+    el("div", { class: "eyebrow", text: "Wedstrijdnorm (minuten, 18 holes)" }),
+    el("p", { class: "help", text: "Geldt voor alle flights van een wedstrijd (flights met 🏆), ook voor een 2-bal of 3-bal daarin. Het type wedstrijd volgt uit de meeste flights met dezelfde toernooinaam: zijn dat 4-ballen, dan geldt de 4-bal-norm, anders de 3-bal-norm. Overige flights gebruiken de streeftijd per hole hierboven." }),
+    el("div", { class: "holeparamgrid" }, [
+      el("div", { class: "holelabel", text: "3-bal wedstr." }), i3,
+      el("div", { class: "holelabel", text: "4-bal wedstr." }), i4,
+      el("div", { class: "holelabel", text: "Marge (min)" }), iMarge,
+    ]),
+    uitleg, fout, knop,
+  ]);
 }
 
 /* ---- Tab: Admin — ledenlijst met pincode-reset + beheerderswachtwoord wijzigen ---- */
